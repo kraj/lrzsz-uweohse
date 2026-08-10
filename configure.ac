@@ -1,11 +1,12 @@
 dnl Process this file with autoconf to produce a configure script.
-AC_INIT(src/crctab.c)
-AM_INIT_AUTOMAKE(lrzsz, 0.12.21rc)
-AM_CONFIG_HEADER(config.h)
+AC_INIT([src/crctab.],[0.12.21.rc])
+AM_INIT_AUTOMAKE(foreign)
+AC_CONFIG_HEADERS(config.h)
+AC_USE_SYSTEM_EXTENSIONS
 
 
-dnl AC_C_CROSS is in AC_PROG_CC since 2.12
-AC_PREREQ(2.12)
+dnl  is in AC_PROG_CC since 2.12
+AC_PREREQ([2.72])
 
 PACKAGE_VERSION="$PACKAGE-$VERSION"
 AC_DEFINE_UNQUOTED(PACKAGE, "$PACKAGE")
@@ -16,9 +17,6 @@ AC_SUBST(VERSION)
 AC_SUBST(PACKAGE_VERSION)
 
 ALL_LINGUAS="de"
-
-AC_SUBST(PACKAGE)
-AC_SUBST(VERSION)
 
 changequote(,)dnl
 case $VERSION in
@@ -38,7 +36,7 @@ AC_ARG_ENABLE(timesync,
 	[AC_DEFINE(ENABLE_TIMESYNC)])
 AC_SUBST(ENABLE_TIMESYNC)
 AC_ARG_ENABLE(pubdir,
-	[--enable-pubdir=/path   include support for a public writeable directory],
+	[--enable-pubdir=/path   include support for a public writeable directory (do not do that)],
 	[if test "$enableval" = "no" ; then 
 		: 
 	  else 
@@ -96,14 +94,8 @@ if test "x$GCC" = xyes ; then
         fi
     fi
 fi
-AC_PROG_GCC_TRADITIONAL
-dnl AC_PROG_INSTALL  included in AM_INIT_AUTOMAKE
-dnl AC_PROG_MAKE_SET included in AM_INIT_AUTOMAKE
 AC_PROG_RANLIB
-AC_ISC_POSIX
-AC_AIX
-AC_MINIX
-AM_C_PROTOTYPES
+AC_SEARCH_LIBS([strerror],[cposix])
 AC_C_CONST
 AC_C_INLINE
 
@@ -136,31 +128,42 @@ AC_CHECK_LIB(be,syslog,,,)
 dnl slowlartis needs this
 AC_CHECK_LIB(nsl,gethostbyname,,,)
 
-dnl Checks for header files.
-AC_HEADER_STDC
+# Autoupdate added the next two lines to ensure that your configure
+# script's behavior did not change.  They are probably safe to remove.
+AC_CHECK_INCLUDES_DEFAULT
+AC_PROG_EGREP
+
 AC_CHECK_HEADERS(fcntl.h limits.h sys/ioctl.h sys/time.h unistd.h sys/times.h)
 LRZSZ_HEADERS_TERM_IO
 AC_CHECK_HEADERS(termios.h sys/termios.h termio.h sys/termio.h sgtty.h)
 AC_CHECK_HEADERS(sys/mman.h utime.h syslog.h sys/syslog.h sys/param.h)
-AC_CHECK_HEADERS(sys/select.h strings.h arpa/inet.h)
+AC_CHECK_HEADERS(sys/select.h strings.h arpa/inet.h locale.h)
 
 dnl Checks for typedefs, structures, and compiler characteristics.
 AC_TYPE_SIZE_T
 AC_TYPE_MODE_T
 AC_TYPE_OFF_T
 LRZSZ_TYPE_SPEED_T
-AC_STRUCT_ST_RDEV
-AC_HEADER_TIME
+
+m4_warn([obsolete],
+[Update your code to rely only on HAVE_SYS_TIME_H,
+then remove this warning and the obsolete code below it.
+All current systems provide time.h; it need not be checked for.
+Not all systems provide sys/time.h, but those that do, all allow
+you to include it and time.h simultaneously.])dnl
+AC_CHECK_HEADERS_ONCE([sys/time.h])
+# Obsolete code to be removed.
+if test $ac_cv_header_sys_time_h = yes; then
+  AC_DEFINE([TIME_WITH_SYS_TIME],[1],[Define to 1 if you can safely include both <sys/time.h>
+	     and <time.h>.  This macro is obsolete.])
+fi
+# End of obsolete code.
+
 UO_TYPE_SOCKLEN_T
 lrzsz_HEADER_SYS_SELECT
 AC_STRUCT_TM
 LRZSZ_ERRNO_DECL
 
-dnl Checks for library functions.
-if test $cross_compiling = no ; then
-	AC_FUNC_SETVBUF_REVERSED
-fi
-AC_TYPE_SIGNAL
 dnl suggested by autoscan, but not really needed.
 dnl AC_FUNC_UTIME_NULL
 AC_FUNC_MMAP
@@ -168,15 +171,16 @@ AC_FUNC_ALLOCA
 AC_EGREP_HEADER([struct.*utimbuf], utime.h, AC_DEFINE(HAVE_STRUCT_UTIMBUF))
 
 AC_CHECK_FUNCS(gettimeofday settimeofday)
-AC_CHECK_FUNCS(strchr memcpy select vprintf)
+AC_CHECK_FUNCS(strchr memcpy select vprintf setlocale)
 AC_CHECK_FUNCS(times rdchk utime syslog siginterrupt)
 AC_REPLACE_FUNCS(mkdir mktime strerror strstr strdup strtoul strtol strpbrk)
 AC_REPLACE_FUNCS(stpcpy strftime vasprintf)
 
-AC_REPLACE_GNU_GETOPT
+AC_REPLACE_GNU_GETOPT([])
 
 dnl for lib/error.c
 AC_DEFINE(HAVE_STRERROR)
+
 
 
 dnl special tests
@@ -188,7 +192,7 @@ dnl accept that ftime exists.
 AC_CHECK_FUNC(ftime,
 [AC_MSG_CHECKING(that ftime works correctly)
 AC_CACHE_VAL(lrzsz_cv_sys_ftime_ok,
-[AC_TRY_RUN([
+[AC_RUN_IFELSE([AC_LANG_SOURCE([[
 #include <sys/types.h>
 #include <sys/timeb.h>
 #include <stdio.h>
@@ -213,10 +217,7 @@ main ()
     }
   exit (0);
 }
-],
-lrzsz_cv_sys_ftime_ok=yes,
-lrzsz_cv_sys_ftime_ok=no,
-lrzsz_cv_sys_ftime_ok=runtime)])
+]])],[lrzsz_cv_sys_ftime_ok=yes],[lrzsz_cv_sys_ftime_ok=no],[lrzsz_cv_sys_ftime_ok=runtime])])
 case $lrzsz_cv_sys_ftime_ok in
 yes) AC_DEFINE(HAVE_FTIME) AC_MSG_RESULT(yes) ;;
 no)  AC_MSG_RESULT(no)
@@ -229,9 +230,7 @@ esac
 dnl
 AC_MSG_CHECKING([for timezone variable])
 AC_CACHE_VAL(libquark_cv_var_timezone,[
-AC_TRY_LINK([#include <time.h>],[return(int)(timezone/2);],
-	[libquark_cv_var_timezone=yes],
-	[libquark_cv_var_timezone=no])
+AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <time.h>]], [[return(int)(timezone/2);]])],[libquark_cv_var_timezone=yes],[libquark_cv_var_timezone=no])
 ])
 if test $libquark_cv_var_timezone = yes ; then
 	AC_MSG_RESULT(yes)
@@ -269,13 +268,13 @@ AC_SUBST(CFLAGS)
 AC_SUBST(LDFLAGS)
 AC_SUBST(LIBS)
 
-AM_GNU_GETTEXT
+AM_GNU_GETTEXT(external)
+AM_GNU_GETTEXT_REQUIRE_VERSION([0.0.1]) dnl hack alert. i don't know what i'm doing
 
-AC_DEFINE_UNQUOTED(LOCALEDIR,"$prefix/$DATADIRNAME")
-dnl AC_LINK_FILES($nls_cv_header_libgt, $nls_cv_header_intl)
+dnl AC_DEFINE_UNQUOTED(LOCALEDIR,"$prefix/$DATADIRNAME","Description… autoheader wants this")
 
-AC_OUTPUT([Makefile intl/Makefile lib/Makefile testsuite/Makefile \
-man/Makefile po/Makefile.in src/Makefile Specfile systype \
-src/lrzszbug],
-[sed -e "/POTFILES =/r po/POTFILES" po/Makefile.in > po/Makefile; 
-test -z "$CONFIG_HEADERS" || echo timestamp > stamp-h])
+AC_CONFIG_FILES([Makefile lib/Makefile testsuite/Makefile \
+man/Makefile po/Makefile.in src/Makefile Specfile systype])
+AC_CONFIG_COMMANDS([default],[
+test -z "$CONFIG_HEADERS" || echo timestamp > stamp-h],[])
+AC_OUTPUT
