@@ -1433,6 +1433,10 @@ make_dirs(char *pathname)
 		/* Avoid mkdir where last part of path is '.' */
 		if (p[-1] == '.' && (p == pathname+1 || p[-2] == '/'))
 			continue;
+		/* Skip ".." components — don't create dirs above cwd */
+		if (p - pathname >= 2 && p[-1] == '.' && p[-2] == '.'
+		    && (p - pathname == 2 || p[-3] == '/'))
+			continue;
 		*p = 0;				/* Truncate the path there */
 		if ( !mkdir(pathname, 0777)) {	/* Try to create it as a dir */
 			vfile("Made directory %s\n", pathname);
