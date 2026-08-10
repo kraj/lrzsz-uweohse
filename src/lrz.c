@@ -1141,11 +1141,13 @@ procheader(char *name, struct zm_fileinfo *zi)
 					vstringf(_("file exists, skipped: %s\n"),name);
 				DO_SYSLOG((LOG_ERR,"cannot fstat open file %s: %s",
 					name,strerror(e)));
+				fclose(fout);
 				return ERROR;
 			}
 			if (zmanag == ZF1_ZMNEW) {
 				if (sta.st_mtime > zi->modtime) {
 					DO_SYSLOG((LOG_INFO,"skipping %s: newer file exists", name));
+					fclose(fout);
 					return ERROR; /* skips file */
 				}
 			} else {
@@ -1153,6 +1155,7 @@ procheader(char *name, struct zm_fileinfo *zi)
 				if (((size_t) sta.st_size) >= zi->bytes_total 
 					&& sta.st_mtime > zi->modtime) {
 					DO_SYSLOG((LOG_INFO,"skipping %s: longer+newer file exists", name));
+					fclose(fout);
 					return ERROR; /* skips file */
 				}
 			}
@@ -1164,6 +1167,7 @@ procheader(char *name, struct zm_fileinfo *zi)
 				return ERROR;
 			}
 			if (r!=ZCRC_DIFFERS) {
+				fclose(fout);
 				return ERROR; /* skips */
 			}
 			fclose(fout);
