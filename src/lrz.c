@@ -2039,12 +2039,32 @@ zmputs(const char *s)
 		p=strpbrk(s,"\335\336");
 		if (!p)
 		{
-			write(1,s,strlen(s));
+			ssize_t off=0;
+			size_t len=strlen(s);
+			while ((size_t)off < len) {
+				ssize_t n=write(1,s+off,len-off);
+				if (n < 0) {
+					if (errno == EINTR)
+						continue;
+					return;
+				}
+				off += n;
+			}
 			return;
 		}
 		if (p!=s)
 		{
-			write(1,s,(size_t) (p-s));
+			ssize_t off=0;
+			size_t len=(size_t) (p-s);
+			while ((size_t)off < len) {
+				ssize_t n=write(1,s+off,len-off);
+				if (n < 0) {
+					if (errno == EINTR)
+						continue;
+					return;
+				}
+				off += n;
+			}
 			s=p;
 		}
 		if (*p=='\336')
