@@ -460,6 +460,7 @@ main(int argc, char *argv[])
 			error(0,0, _("cannot turnoff syslog"));
 #  endif
 #endif
+			break;
 		case 3:
 			s_err = xstrtoul (optarg, NULL, 0, &tmp, "km");
 			bytes_per_error = tmp;
