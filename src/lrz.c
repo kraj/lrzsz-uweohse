@@ -1334,13 +1334,13 @@ buffer_it:
 	{
 		static char *s=NULL;
 		static size_t last_length=0;
-#if defined(F_GETFD) && defined(F_SETFD) && defined(O_SYNC)
+#if defined(F_GETFL) && defined(F_SETFL) && defined(O_SYNC)
 		if (o_sync) {
 			int oldflags;
-			oldflags = fcntl (fileno(fout), F_GETFD, 0);
+			oldflags = fcntl (fileno(fout), F_GETFL, 0);
 			if (oldflags>=0 && !(oldflags & O_SYNC)) {
 				oldflags|=O_SYNC;
-				fcntl (fileno(fout), F_SETFD, oldflags); /* errors don't matter */
+				fcntl (fileno(fout), F_SETFL, oldflags); /* errors don't matter */
 			}
 		}
 #endif
