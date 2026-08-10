@@ -1425,11 +1425,7 @@ buffer_it:
 			}
 		}
 		if (s) {
-#ifdef SETVBUF_REVERSED
-			setvbuf(fout,_IOFBF,s,last_length);
-#else
-			setvbuf(fout,s,_IOFBF,last_length);
-#endif
+                    setvbuf(fout,s,_IOFBF,last_length);
 		}
 	}
 	zi->bytes_received=zi->bytes_skipped;
