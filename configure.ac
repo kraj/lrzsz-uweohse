@@ -145,7 +145,6 @@ AC_CHECK_HEADERS_ONCE([sys/time.h])
 UO_TYPE_SOCKLEN_T
 lrzsz_HEADER_SYS_SELECT
 AC_STRUCT_TM
-LRZSZ_ERRNO_DECL
 
 dnl suggested by autoscan, but not really needed.
 dnl AC_FUNC_UTIME_NULL

@@ -46,10 +46,6 @@ extern time_t time();
 extern char *strerror();
 #endif
 
-#ifndef HAVE_ERRNO_DECLARATION
-extern int errno;
-#endif
-
 #define MAX_BLOCK 8192
 
 /*
