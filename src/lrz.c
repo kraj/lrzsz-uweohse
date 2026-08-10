@@ -1473,13 +1473,11 @@ chkinvok(const char *s)
 		protocol=ZM_YMODEM;
 }
 
-/*
- * Totalitarian Communist pathname processing
- */
 static void 
 checkpath(const char *name)
 {
 	if (Restricted) {
+                FILE *noleak = NULL;
 		const char *p;
 		p=strrchr(name,'/');
 		if (p)
@@ -1488,20 +1486,16 @@ checkpath(const char *name)
 			p=name;
 		/* don't overwrite any file in very restricted mode.
 		 * don't overwrite hidden files in restricted mode */
-		if ((Restricted==2 || *name=='.') && fopen(name, "r") != NULL) {
+		if ((Restricted==2 || *name=='.') && (noleak = fopen(name, "r")) != NULL) {
+                        fclose(noleak);
 			canit(STDOUT_FILENO);
 			vstring("\r\n");
 			vstringf(_("%s: %s exists\n"), 
 				program_name, name);
 			bibi(-1);
 		}
-		/* restrict pathnames to current tree or uucppublic */
-		if ( strstr(name, "../")
-#ifdef PUBDIR
-		 || (name[0]== '/' && strncmp(name, PUBDIR, 
-		 	strlen(PUBDIR)))
-#endif
-		) {
+		/* restrict pathnames to the current tree */
+		if ( strstr(name, "../") || name[0] == '/') {
 			canit(STDOUT_FILENO);
 			vstring("\r\n");
 			vstringf(_("%s:\tSecurity Violation"),program_name);
