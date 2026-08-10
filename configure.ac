@@ -159,7 +159,8 @@ AC_CHECK_FUNCS(times rdchk utime syslog siginterrupt)
 AC_REPLACE_FUNCS(mkdir mktime strerror strstr strdup strtoul strtol strpbrk)
 AC_REPLACE_FUNCS(stpcpy strftime vasprintf)
 
-AC_CHECK_FUNCS([getopt_long])
+AC_CHECK_FUNC([getopt_long], [],
+  [AC_LIBOBJ([getopt1]) AC_LIBOBJ([getopt])])
 
 
 
