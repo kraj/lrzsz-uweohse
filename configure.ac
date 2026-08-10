@@ -171,8 +171,6 @@ AC_REPLACE_FUNCS(stpcpy strftime vasprintf)
 
 AC_REPLACE_GNU_GETOPT([])
 
-dnl for lib/error.c
-AC_DEFINE(HAVE_STRERROR)
 
 
 
