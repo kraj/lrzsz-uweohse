@@ -24,7 +24,6 @@ AC_CHECK_HEADERS(termios.h sys/termios.h termio.h sys/termio.h sgtty.h)dnl
 
 dnl LRZSZ_TYPE_SPEED_T
 AC_DEFUN(LRZSZ_TYPE_SPEED_T,[
-AC_REQUIRE([AC_HEADER_STDC])dnl
 AC_REQUIRE([LRZSZ_HEADERS_TERM_IO])dnl
 AC_MSG_CHECKING(for speed_t)
 AC_CACHE_VAL(ac_cv_type_speed_t,
