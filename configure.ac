@@ -155,6 +155,17 @@ AC_REPLACE_FUNCS(stpcpy strftime vasprintf)
 AC_CHECK_FUNC([getopt_long], [],
   [AC_LIBOBJ([getopt1]) AC_LIBOBJ([getopt])])
 
+dnl O_NOFOLLOW is POSIX.1-2008; provide a fallback for ancient systems.
+AH_TEMPLATE([HAVE_O_NOFOLLOW],
+  [Define to 1 if your fcntl.h defines O_NOFOLLOW.])
+AC_MSG_CHECKING([for O_NOFOLLOW])
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+#include <fcntl.h>
+]], [[int x = O_NOFOLLOW; return x;]])],
+  [AC_DEFINE([HAVE_O_NOFOLLOW], [1])
+   AC_MSG_RESULT([yes])],
+  [AC_MSG_RESULT([no])])
+
 
 
 

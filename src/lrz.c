@@ -42,6 +42,10 @@
 #include "xstrtoul.h"
 #include "error.h"
 
+#ifndef HAVE_O_NOFOLLOW
+#define O_NOFOLLOW 0
+#endif
+
 #define MAX_BLOCK 8192
 
 /*
@@ -120,6 +124,7 @@ static void ackbibi __P ((void));
 static void zmputs __P ((const char *s));
 static size_t getfree __P ((void));
 static int install_signal_handler __P ((int sig));
+static FILE *safe_open __P ((const char *path, const char *mode));
 
 static long buffersize=32768;
 static unsigned long min_bps=0;
@@ -728,7 +733,7 @@ wcreceive(int argc, char **argp)
 		vstringf(_("%s: ready to receive %s"), program_name, Pathname);
 		vstring("\r\n");
 
-		if ((fout=fopen(Pathname, "w")) == NULL) {
+		if ((fout=safe_open(Pathname, "w")) == NULL) {
 #ifdef ENABLE_SYSLOG
 			if (enable_syslog)
 				lsyslog(LOG_ERR,"%s/%s: cannot open: %m",
@@ -1047,6 +1052,45 @@ do_crc_check(FILE *f, size_t remote_bytes, size_t check_bytes)
 }
 
 /*
+ * Open a file for writing without following symlinks in the final
+ * path component.  Maps fopen-style mode strings to open() flags.
+ * Returns a FILE* on success, NULL on error (errno set).
+ */
+static FILE *
+safe_open(const char *path, const char *mode)
+{
+	int flags = 0;
+	int fd;
+	const char *p = mode;
+
+	for (; *p; p++) {
+		switch (*p) {
+		case 'r':
+			flags |= O_RDONLY;
+			break;
+		case 'w':
+			flags |= O_WRONLY | O_CREAT | O_TRUNC;
+			break;
+		case 'a':
+			flags |= O_WRONLY | O_CREAT | O_APPEND;
+			break;
+		case '+':
+			flags &= ~(O_RDONLY | O_WRONLY | O_APPEND);
+			flags |= O_RDWR;
+			break;
+		default:
+			break;
+		}
+	}
+	flags |= O_NOFOLLOW;
+
+	fd = open(path, flags, 0666);
+	if (fd < 0)
+		return NULL;
+	return fdopen(fd, mode);
+}
+
+/*
  * Process incoming file information header
  */
 static int
@@ -1135,7 +1179,7 @@ procheader(char *name, struct zm_fileinfo *zi)
 #ifdef ENABLE_TIMESYNC
 	    && !in_timesync
 #endif
-		&& (fout=fopen(name, "r"))) {
+		&& (fout=safe_open(name, "r"))) {
 		struct stat sta;
 		char *tmpname;
 		char *ptr;
@@ -1265,7 +1309,7 @@ procheader(char *name, struct zm_fileinfo *zi)
 
         if (Thisbinary && zconv==ZCRESUM) {
                 struct stat st;
-                fout = fopen(name_static, "r+");
+                fout = safe_open(name_static, "r+");
                 if (fout && 0==fstat(fileno(fout),&st))
                 {
                         int can_resume=TRUE;
@@ -1298,11 +1342,11 @@ procheader(char *name, struct zm_fileinfo *zi)
                 if (fout)
                         fclose(fout);
         }
-        fout = fopen(name_static, openmode);
+        fout = safe_open(name_static, openmode);
 #ifdef ENABLE_MKDIR
         if ( !fout && Restricted < 2) {
                 if (make_dirs(name_static))
-                        fout = fopen(name_static, openmode);
+                        fout = safe_open(name_static, openmode);
         }
 #endif
         if ( !fout)
@@ -1513,7 +1557,7 @@ checkpath(const char *name)
 		const char *bn;
 		bn = strrchr(name, '/');
 		bn = bn ? bn + 1 : name;
-		if ((Restricted == 2 || *bn == '.') && (noleak = fopen(name, "r")) != NULL) {
+		if ((Restricted == 2 || *bn == '.') && (noleak = safe_open(name, "r")) != NULL) {
 			fclose(noleak);
 			canit(STDOUT_FILENO);
 			vstring("\r\n");
