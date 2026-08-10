@@ -59,18 +59,10 @@ char *alloca ();
 #include <varargs.h>
 #endif
 
-#ifdef TIME_WITH_SYS_TIME
 #  include <sys/time.h>
 #  include <time.h>
 #  define INCLUDED_SYS_TIME
-#else
-#  ifdef HAVE_SYS_TIME_H
-#    include <sys/time.h>
-#    define INCLUDED_SYS_TIME
-#  else
-#    include <time.h>
-#  endif
-#endif
+
 #ifdef SYS_TIME_WITHOUT_SYS_SELECT
 # ifdef INCLUDED_SYS_TIME
 #  undef HAVE_SYS_SELECT_H
@@ -360,7 +352,7 @@ extern int no_timeout;
 extern int Zctlesc;    /* Encode control characters */
 extern int under_rsh;
 
-RETSIGTYPE bibi __P ((int n));
+void bibi __P ((int n));
 
 #define sendline(c) putchar((c) & 0377)
 #define xsendline(c) putchar(c)
