@@ -1,3 +1,9 @@
+Version 0.13.0 -  August 2026, Uwe Ohse
+
+* autotools updated. I can only hope it works.
+
+* the TCP mode was removed (no authentication, no encryption).
+
 Version 0.12.20 - December 1998, Uwe Ohse
 
 * works on BeOS and stone-aged SCO (sco-3.2v4.2)
