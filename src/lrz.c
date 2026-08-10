@@ -1087,15 +1087,16 @@ procheader(char *name, struct zm_fileinfo *zi)
 
 	nameend = name + 1 + strlen(name);
 	if (*nameend) {	/* file coming from Unix or DOS system */
-		long modtime;
-		long bytes_total;
-		int mode;
-		sscanf(nameend, "%ld%lo%o", &bytes_total, &modtime, &mode);
-		zi->modtime=modtime;
-		zi->bytes_total=bytes_total;
-		zi->mode=mode;
-		if (zi->mode & UNIXFILE)
-			++Thisbinary;
+		long modtime = 0;
+		long bytes_total = 0;
+		long mode = 0;
+		if (sscanf(nameend, "%ld%lo%lo", &bytes_total, &modtime, &mode) >= 1) {
+			zi->modtime = (time_t) modtime;
+			zi->bytes_total = (size_t) bytes_total;
+			zi->mode = (mode_t) mode;
+			if (zi->mode & UNIXFILE)
+				++Thisbinary;
+                }
 	}
 
 	/* Check for existing file */
