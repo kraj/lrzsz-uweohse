@@ -1,5 +1,4 @@
 noinst_LIBRARIES=libzmodem.a
-CFLAGS=@CFLAGS@
 
 EXTRA_DIST = alloca.c \
 	getopt.c getopt1.c mkdir.c mktime.c \

@@ -2,14 +2,10 @@ bin_PROGRAMS=lrz lsz
 lrz_SOURCES=lrz.c timing.c zperr.c zreadline.c crctab.c rbsb.c zm.c protname.c tcp.c lsyslog.c canit.c
 lsz_SOURCES=lsz.c timing.c zperr.c zreadline.c crctab.c rbsb.c zm.c protname.c tcp.c lsyslog.c canit.c
 noinst_HEADERS = timing.h zglobal.h zmodem.h
-datadir = $(prefix)/share
-localedir = $(datadir)/locale
-CFLAGS=@CFLAGS@
 
 LDADD = ../lib/libzmodem.a @LIBINTL@
-INCLUDES = -I.. -I$(srcdir) -I$(top_srcdir)/src -I$(top_srcdir)/lib
-#DEFS = -DLOCALEDIR=\"$(localedir)\" -DOS=\"@host_os@\" -DCPU=\"@host_cpu@\"
-DEFS = -DNFGVMIN @DEFS@ -DLOCALEDIR=\"$(localedir)\"
+AM_CPPFLAGS = -I.. -I$(srcdir) -I$(top_srcdir)/src -I$(top_srcdir)/lib \
+	-DNFGVMIN -DLOCALEDIR=\"$(localedir)\"
 
 install-exec-local:
 	rm -f $(DESTDIR)/$(bindir)/`echo lsb | sed -e '$(transform)'`
