@@ -126,6 +126,7 @@ static int closeit __P ((struct zm_fileinfo *));
 static void ackbibi __P ((void));
 static void zmputs __P ((const char *s));
 static size_t getfree __P ((void));
+static void install_signal_handler __P ((int sig));
 
 static long buffersize=32768;
 static unsigned long min_bps=0;
@@ -173,7 +174,18 @@ int enable_syslog=FALSE;
 #endif
 
 
-/* called by signal interrupt or terminate to clean things up */
+/* async-signal-safe signal handler */
+static void
+bibi_sighandler(int n)
+{
+	if (zmodem_requested)
+		zmputs(Attn);
+	canit(STDOUT_FILENO);
+	io_mode(0,0);
+	_exit(128+n);
+}
+
+/* called from normal control flow (checkpath, rbsb) to clean things up */
 void
 bibi(int n)
 {
@@ -182,6 +194,25 @@ bibi(int n)
 	canit(STDOUT_FILENO);
 	io_mode(0,0);
 	error(128+n,0,_("caught signal %d; exiting"), n);
+}
+
+static void
+install_signal_handler(int sig)
+{
+#ifdef HAVE_SIGACTION
+	struct sigaction sa, old;
+	sa.sa_handler = bibi_sighandler;
+	sigemptyset(&sa.sa_mask);
+	sa.sa_flags = 0;
+	if (sigaction(sig, &sa, &old) == 0) {
+		if (old.sa_handler == SIG_IGN)
+			sigaction(sig, &old, NULL);
+		return;
+	}
+#else
+	if (signal(sig, bibi_sighandler) == SIG_IGN)
+		signal(sig, SIG_IGN);
+#endif
 }
 
 static struct option const long_options[] =
@@ -483,12 +514,9 @@ main(int argc, char *argv[])
 
 	io_mode(0,1);
 	readline_setup(0, HOWMANY, MAX_BLOCK*2);
-	if (signal(SIGINT, bibi) == SIG_IGN) 
-		signal(SIGINT, SIG_IGN);
-	else
-		signal(SIGINT, bibi);
-	signal(SIGTERM, bibi);
-	signal(SIGPIPE, bibi);
+	install_signal_handler(SIGINT);
+	install_signal_handler(SIGTERM);
+	install_signal_handler(SIGPIPE);
 	if (wcreceive(npats, patts)==ERROR) {
 		exitcode=0200;
 		canit(STDOUT_FILENO);

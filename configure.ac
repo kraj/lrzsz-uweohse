@@ -148,7 +148,7 @@ AC_CHECK_TYPES([struct utimbuf], [], [], [[#include <utime.h>]])
 
 AC_CHECK_FUNCS(gettimeofday settimeofday)
 AC_CHECK_FUNCS(strchr memcpy select vprintf setlocale)
-AC_CHECK_FUNCS(times rdchk utime syslog siginterrupt)
+AC_CHECK_FUNCS(times rdchk utime syslog siginterrupt sigaction)
 AC_REPLACE_FUNCS(mkdir mktime strerror strstr strdup strtoul strtol strpbrk)
 AC_REPLACE_FUNCS(stpcpy strftime vasprintf)
 
