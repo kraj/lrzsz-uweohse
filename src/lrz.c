@@ -400,14 +400,6 @@ main(int argc, char *argv[])
 		case 'S':
 #ifdef ENABLE_TIMESYNC
 			timesync_flag++;
-			if (timesync_flag==2) {
-#ifdef HAVE_SETTIMEOFDAY
-				error(0,0,_("don't have settimeofday, will not set time\n"));
-#endif
-				if (getuid()!=0)
-					error(0,0,
-				_("not running as root (this is good!), can not set time\n"));
-			}
 #endif
 			break;
 		case 't':
@@ -1223,17 +1215,6 @@ procheader(char *name, struct zm_fileinfo *zi)
 		if ((Verbose && d>60) || Verbose > 1)
 			vstringf(_("TIMESYNC: here %ld, remote %ld, diff %ld seconds\n"),
 			(long) t, (long) zi->modtime, d);
-#ifdef HAVE_SETTIMEOFDAY
-		if (timesync_flag > 1 && d > 10)
-		{
-			struct timeval tv;
-			tv.tv_sec=zi->modtime;
-			tv.tv_usec=0;
-			if (settimeofday(&tv,NULL))
-				vstringf(_("TIMESYNC: cannot set time: %s\n"),
-					strerror(errno));
-		}
-#endif
 		return ERROR; /* skips file */
 	}
 #endif /* ENABLE_TIMESYNC */

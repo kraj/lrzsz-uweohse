@@ -61,6 +61,9 @@ not perfectly trustworthy senders.
 * the lrz file CRC check could have run into an endless loop.
   This was a possible denial of service attack.
 
+* the timesync mode to set the receivers system clock was
+  removed (needed root).
+
 Version 0.12.20 - December 1998, Uwe Ohse
 
 * works on BeOS and stone-aged SCO (sco-3.2v4.2)
