@@ -36,16 +36,8 @@
 
 #include <sys/types.h>		/* Some systems define `time_t' here.  */
 
-#ifdef TIME_WITH_SYS_TIME
-# include <sys/time.h>
-# include <time.h>
-#else
-# ifdef HAVE_SYS_TIME_H
-#  include <sys/time.h>
-# else
-#  include <time.h>
-# endif
-#endif
+#include <sys/time.h>
+#include <time.h>
 
 #if HAVE_TZNAME
 extern char *tzname[];
