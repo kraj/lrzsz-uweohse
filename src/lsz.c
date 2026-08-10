@@ -28,6 +28,7 @@
 #define SS_NORMAL 0
 #include <stdio.h>
 #include <stdlib.h>
+#include <limits.h>
 #include <signal.h>
 #include <setjmp.h>
 #include <ctype.h>
@@ -420,9 +421,11 @@ main(int argc, char **argv)
 			break;
 		case 'C': 
 			s_err = xstrtoul (optarg, NULL, 0, &tmp, NULL);
-			Cmdtries = tmp;
 			if (s_err != LONGINT_OK)
 				STRTOL_FATAL_ERROR (optarg, _("command tries"), s_err);
+			if (tmp > INT_MAX)
+				usage(2,_("command tries out of range"));
+			Cmdtries = (int)tmp;
 			break;
 		case 'i':
 			Cmdack1 = ZCACK1;
@@ -442,9 +445,11 @@ main(int argc, char **argv)
 		case 'k': start_blklen=1024; break;
 		case 'L':
 			s_err = xstrtoul (optarg, NULL, 0, &tmp, "ck");
-			blkopt = tmp;
 			if (s_err != LONGINT_OK)
 				STRTOL_FATAL_ERROR (optarg, _("packetlength"), s_err);
+			if (tmp > UINT_MAX)
+				usage(2,_("packetlength out of range"));
+			blkopt = (unsigned)tmp;
 			if (blkopt<24 || blkopt>MAX_BLOCK)
 			{
 				char meld[256];
@@ -456,9 +461,11 @@ main(int argc, char **argv)
 			break;
 		case 'l':
 			s_err = xstrtoul (optarg, NULL, 0, &tmp, "ck");
-			Tframlen = tmp;
 			if (s_err != LONGINT_OK)
 				STRTOL_FATAL_ERROR (optarg, _("framelength"), s_err);
+			if (tmp > UINT_MAX)
+				usage(2,_("framelength out of range"));
+			Tframlen = (unsigned)tmp;
 			if (Tframlen<32 || Tframlen>MAX_BLOCK)
 			{
 				char meld[256];
@@ -470,17 +477,21 @@ main(int argc, char **argv)
 			break;
         case 'm':
 			s_err = xstrtoul (optarg, &tmpptr, 0, &tmp, "km");
-			min_bps = tmp;
 			if (s_err != LONGINT_OK)
 				STRTOL_FATAL_ERROR (optarg, _("min_bps"), s_err);
+			if (tmp > LONG_MAX)
+				usage(2,_("min_bps out of range"));
+			min_bps = (long)tmp;
 			if (min_bps<0)
 				usage(2,_("min_bps must be >= 0"));
 			break;
         case 'M':
 			s_err = xstrtoul (optarg, NULL, 0, &tmp, NULL);
-			min_bps_time = tmp;
 			if (s_err != LONGINT_OK)
 				STRTOL_FATAL_ERROR (optarg, _("min_bps_time"), s_err);
+			if (tmp > LONG_MAX)
+				usage(2,_("min_bps_time out of range"));
+			min_bps_time = (long)tmp;
 			if (min_bps_time<=1)
 				usage(2,_("min_bps_time must be > 1"));
 			break;
@@ -525,20 +536,24 @@ main(int argc, char **argv)
 					usage(2,_("stop time to small"));
 			} else {
 				s_err = xstrtoul (optarg, NULL, 0, &tmp, NULL);
-				stop_time = tmp + time(0);
 				if (s_err != LONGINT_OK)
 					STRTOL_FATAL_ERROR (optarg, _("stop-at"), s_err);
+				if (tmp > LONG_MAX)
+					usage(2,_("stop time out of range"));
 				if (tmp<10)
 					usage(2,_("stop time to small"));
+				stop_time = (time_t)tmp + time(0);
 			}
 			break;
 		case 'S': enable_timesync=1; break;
 		case 'T': turbo_escape=1; break;
 		case 't':
 			s_err = xstrtoul (optarg, NULL, 0, &tmp, NULL);
-			Rxtimeout = tmp;
 			if (s_err != LONGINT_OK)
 				STRTOL_FATAL_ERROR (optarg, _("timeout"), s_err);
+			if (tmp > UINT_MAX)
+				usage(2,_("timeout out of range 10..1000"));
+			Rxtimeout = (unsigned int)tmp;
 			if (Rxtimeout<10 || Rxtimeout>1000)
 				usage(2,_("timeout out of range 10..1000"));
 			break;
@@ -553,9 +568,11 @@ main(int argc, char **argv)
 		case 'v': ++Verbose; break;
 		case 'w':
 			s_err = xstrtoul (optarg, NULL, 0, &tmp, NULL);
-			Txwindow = tmp;
 			if (s_err != LONGINT_OK)
 				STRTOL_FATAL_ERROR (optarg, _("window size"), s_err);
+			if (tmp > UINT_MAX)
+				usage(2,_("window size out of range"));
+			Txwindow = (unsigned)tmp;
 			if (Txwindow < 256)
 				Txwindow = 256;
 			Txwindow = (Txwindow/64) * 64;
@@ -591,9 +608,11 @@ main(int argc, char **argv)
 			break;
 		case 4:
 			s_err = xstrtoul (optarg, NULL, 0, &tmp, NULL);
-			startup_delay = tmp;
 			if (s_err != LONGINT_OK)
 				STRTOL_FATAL_ERROR (optarg, _("startup delay"), s_err);
+			if (tmp > UINT_MAX)
+				usage(2,_("startup delay out of range"));
+			startup_delay = (unsigned int)tmp;
 			break;
 		case 8: no_unixmode=1; break;
 		default:
