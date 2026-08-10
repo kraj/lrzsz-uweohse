@@ -185,7 +185,7 @@ int enable_syslog=FALSE;
 
 
 /* called by signal interrupt or terminate to clean things up */
-RETSIGTYPE
+void
 bibi(int n)
 {
 	if (zmodem_requested)
