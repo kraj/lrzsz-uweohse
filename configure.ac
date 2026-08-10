@@ -1,5 +1,6 @@
 dnl Process this file with autoconf to produce a configure script.
-AC_INIT([src/crctab.],[0.12.21.rc])
+AC_INIT([lrzsz],[0.12.21.rc])
+AC_CONFIG_SRCDIR([src/crctab.c])
 AM_INIT_AUTOMAKE(foreign)
 AC_CONFIG_HEADERS(config.h)
 AH_TEMPLATE([ENABLE_TIMESYNC], [Define to 1 if you want support for the timesync protocol.])
@@ -279,7 +280,7 @@ AC_SUBST(LDFLAGS)
 AC_SUBST(LIBS)
 
 AM_GNU_GETTEXT(external)
-AM_GNU_GETTEXT_REQUIRE_VERSION([0.0.1]) dnl hack alert. i don't know what i'm doing
+AM_GNU_GETTEXT_REQUIRE_VERSION([0.23])
 
 dnl AC_DEFINE_UNQUOTED(LOCALEDIR,"$prefix/$DATADIRNAME","Description… autoheader wants this")
 
