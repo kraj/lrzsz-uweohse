@@ -1473,45 +1473,58 @@ chkinvok(const char *s)
 		protocol=ZM_YMODEM;
 }
 
-static void 
+static void
 checkpath(const char *name)
 {
-	if (Restricted) {
-                FILE *noleak = NULL;
-		const char *p;
-		p=strrchr(name,'/');
-		if (p)
-			p++;
-		else
-			p=name;
-		/* don't overwrite any file in very restricted mode.
-		 * don't overwrite hidden files in restricted mode */
-		if ((Restricted==2 || *name=='.') && (noleak = fopen(name, "r")) != NULL) {
-                        fclose(noleak);
+	if (!Restricted)
+		return;
+
+	/* don't overwrite any file in very restricted mode.
+	 * don't overwrite hidden files in restricted mode */
+	{
+		FILE *noleak = NULL;
+		const char *bn;
+		bn = strrchr(name, '/');
+		bn = bn ? bn + 1 : name;
+		if ((Restricted == 2 || *bn == '.') && (noleak = fopen(name, "r")) != NULL) {
+			fclose(noleak);
 			canit(STDOUT_FILENO);
 			vstring("\r\n");
-			vstringf(_("%s: %s exists\n"), 
+			vstringf(_("%s: %s exists\n"),
 				program_name, name);
 			bibi(-1);
 		}
-		/* restrict pathnames to the current tree */
-		if ( strstr(name, "../") || name[0] == '/') {
-			canit(STDOUT_FILENO);
-			vstring("\r\n");
-			vstringf(_("%s:\tSecurity Violation"),program_name);
-			vstring("\r\n");
-			bibi(-1);
-		}
-		if (Restricted > 1) {
-			if (name[0]=='.' || strstr(name,"/.")) {
-				canit(STDOUT_FILENO);
-				vstring("\r\n");
-				vstringf(_("%s:\tSecurity Violation"),program_name);
-				vstring("\r\n");
-				bibi(-1);
+	}
+
+	/* deny absolute paths */
+	if (name[0] == '/')
+		goto violation;
+
+	/* walk path components */
+	{
+		const char *cp;
+		for (cp = name; *cp; ) {
+			const char *slash = strchr(cp, '/');
+			size_t len = slash ? (size_t)(slash - cp) : strlen(cp);
+			if (len > 0) {
+				if (Restricted > 1 && cp[0] == '.')
+					goto violation;
+				if (len == 2 && strncmp(cp, "..", 2) == 0)
+					goto violation;
 			}
+			if (!slash)
+				break;
+			cp = slash + 1;
 		}
 	}
+	return;
+
+violation:
+	canit(STDOUT_FILENO);
+	vstring("\r\n");
+	vstringf(_("%s:\tSecurity Violation"), program_name);
+	vstring("\r\n");
+	bibi(-1);
 }
 
 /*

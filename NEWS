@@ -27,7 +27,7 @@ not perfectly trustworthy senders.
 
   This was a security bug found by TristanInSec with an email
   domain gmail under the com tld.
-  
+
 * autotools updated. I can only hope it works.
 
 * the TCP mode was removed (no authentication, no encryption).
@@ -46,6 +46,18 @@ not perfectly trustworthy senders.
   uploads into that, too.
   If you really need something like this, you can add a 
   symlink to the current directory.
+
+* an attacker could have created a setuid/setgid/sticky
+  file through when restricted mode was not used.
+
+* the lrz path name check would have allowed to create 
+  a filename `..`, which may or may not be a security
+  problem with pre-created symlinks for `..`.
+
+* lrz in very restricted mode now disallows invisible
+  leading directories, too (`dir/.subdir/filename` was allowed
+  before).
+
 
 Version 0.12.20 - December 1998, Uwe Ohse
 
