@@ -87,7 +87,6 @@ int Rxbinary=FALSE;	/* receive all files in bin mode */
 int Rxascii=FALSE;	/* receive files in ascii (translate) mode */
 int Thisbinary;		/* current file is to be received in bin mode */
 int try_resume=FALSE;
-int allow_remote_commands=FALSE;
 int junk_path=FALSE;
 int no_timeout=FALSE;
 enum zm_type_enum protocol;
@@ -295,7 +294,6 @@ main(int argc, char *argv[])
 				buffersize=strtol(optarg,NULL,10);
 			break;
 		case 'c': Crcflg=TRUE; break;
-		case 'C': allow_remote_commands=TRUE; break;
 		case 'D': Nflag = TRUE; break;
 		case 'E': Lzmanag = ZF1_ZMCHNG; break;
 		case 'e': Zctlesc = 1; break;
@@ -479,9 +477,6 @@ main(int argc, char *argv[])
 		usage(2,_("garbage on commandline"));
 	if (protocol!=ZM_XMODEM && npats)
 		usage(2, _("garbage on commandline"));
-	if (Restricted && allow_remote_commands) {
-		allow_remote_commands=FALSE;
-	}
 	if (Fromcu && !Quiet) {
 		if (Verbose == 0)
 			Verbose = 2;
@@ -1655,35 +1650,14 @@ again:
 		case ZCOMMAND:
 			cmdzack1flg = Rxhdr[ZF0];
 			if (zrdata(secbuf, MAX_BLOCK,&bytes_in_block) == GOTCRCW) {
-				if (Verbose)
-				{
+				if (Verbose) {
 					vstringf("%s: %s\n", program_name,
-						_("remote command execution requested"));
+						_("remote command execution denied"));
 					vstringf("%s: %s\n", program_name, secbuf);
 				}
-				if (!allow_remote_commands) 
-				{
-					if (Verbose)
-						vstringf("%s: %s\n", program_name, 
-							_("not executed"));
-					zshhdr(ZCOMPL, Txhdr);
-					DO_SYSLOG((LOG_INFO,"rexec denied: %s",secbuf));
-					return ZCOMPL;
-				}
-				DO_SYSLOG((LOG_INFO,"rexec allowed: %s",secbuf));
-				if (cmdzack1flg & ZCACK1)
-					stohdr(0L);
-				else
-					stohdr((size_t)sys2(secbuf));
-				purgeline(0);	/* dump impatient questions */
-				do {
-					zshhdr(ZCOMPL, Txhdr);
-				}
-				while (++errors<20 && zgethdr(Rxhdr,1, NULL) != ZFIN);
-				ackbibi();
-				if (cmdzack1flg & ZCACK1)
-					exec2(secbuf);
-				return ZCOMPL;
+                                zshhdr(ZCOMPL, Txhdr);
+                                DO_SYSLOG((LOG_INFO,"rexec denied: %s",secbuf));
+                                return ZCOMPL;
 			}
 			zshhdr(ZNAK, Txhdr);
 			goto again;
