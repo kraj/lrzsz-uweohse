@@ -29,12 +29,9 @@ AC_SUBST(PACKAGE_VERSION)
 
 ALL_LINGUAS="de"
 
-changequote(,)dnl
-case $VERSION in
-	[0-9]*.[0-9]*.[0-9]*) README_ALPHA="README-alpha";;
-	*) README_ALPHA=;;
-esac
-changequote([, ])dnl
+AS_CASE([$VERSION],
+  [[0-9]*.[0-9]*.[0-9]*], [README_ALPHA="README-alpha"],
+  [*], [README_ALPHA=])
 
 
 AC_ARG_ENABLE(timesync,
