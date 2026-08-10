@@ -682,11 +682,10 @@ wcreceive(int argc, char **argp)
 		if (Pathname)
 			free(Pathname);
 		errno=0;
-		Pathname=malloc(PATH_MAX+1);
+		Pathname=strdup(*argp);
 		if (!Pathname)
 			error(1,0,_("out of memory"));
 
-		strcpy(Pathname, *argp);
 		checkpath(Pathname);
 #ifdef ENABLE_SYSLOG
 		shortname=strrchr(*argp,'/');
@@ -1214,15 +1213,16 @@ procheader(char *name, struct zm_fileinfo *zi)
                 return OK; /* dummy */
         if (Pathname)
                 free(Pathname);
-        Pathname=malloc((PATH_MAX)*2);
+
+        Pathname=strdup(name_static);
         if (!Pathname)
                 error(1,0,_("out of memory"));
-        strcpy(Pathname, name_static);
         if (Verbose) {
                 /* overwrite the "waiting to receive" line */
                 vstring("\r                                                                     \r");
                 vstringf(_("Receiving: %s\n"), name_static);
         }
+
         checkpath(name_static);
         if (Nflag)
         {
