@@ -29,11 +29,6 @@
 #include <sys/param.h>
 #endif
 
-#if !defined(TIME_WITH_SYS_TIME) && !defined(HAVE_SYS_TIME_H)
-   /* can't use gettimeofday without struct timeval */
-#  undef HAVE_GETTIMEOFDAY
-#endif
-
 /* Prefer gettimeofday to ftime to times.  */
 #if defined(HAVE_GETTIMEOFDAY)
 #  undef HAVE_FTIME
