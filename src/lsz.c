@@ -86,6 +86,7 @@ static void chkinvok __P ((const char *s));
 static void usage __P ((int exitcode, const char *what));
 static int zsendcmd __P ((const char *buf, size_t blen));
 static void saybibi __P ((void));
+static int install_signal_handler __P ((int sig));
 static int wcsend __P ((int argc, char *argp[]));
 static int wcputsec __P ((char *buf, int sectnum, size_t cseclen));
 static void usage1 __P ((int exitcode));
@@ -210,20 +211,54 @@ static int io_mode_fd=0;
 static int zrqinits_sent=0;
 static int play_with_sigint=0;
 
-/* called by signal interrupt or terminate to clean things up */
-void
-bibi (int n)
+/* async-signal-safe signal handler */
+static void
+bibi_sighandler(int n)
 {
 	canit(STDOUT_FILENO);
-	fflush (stdout);
-	io_mode (io_mode_fd,0);
+	io_mode(io_mode_fd, 0);
+	_exit(128 + n);
+}
+
+/* called from normal control flow (rbsb.c) to clean things up */
+void
+bibi(int n)
+{
+	canit(STDOUT_FILENO);
+	fflush(stdout);
+	io_mode(io_mode_fd, 0);
 	if (n == 99)
-		error (0, 0, _ ("io_mode(,2) in rbsb.c not implemented\n"));
+		error(0, 0, _("io_mode(,2) in rbsb.c not implemented\n"));
 	else
-		error (0, 0, _ ("caught signal %d; exiting"), n);
+		error(0, 0, _("caught signal %d; exiting"), n);
 	if (n == SIGQUIT)
-		abort ();
-	exit (128 + n);
+		abort();
+	exit(128 + n);
+}
+
+static int
+install_signal_handler(int sig)
+{
+#ifdef HAVE_SIGACTION
+	struct sigaction sa, old;
+	sa.sa_handler = bibi_sighandler;
+	sigemptyset(&sa.sa_mask);
+	sa.sa_flags = 0;
+	if (sigaction(sig, &sa, &old) == 0) {
+		if (old.sa_handler == SIG_IGN) {
+			sigaction(sig, &old, NULL);
+			return 0;
+		}
+		return 1;
+	}
+	return 0;
+#else
+	if (signal(sig, bibi_sighandler) == SIG_IGN) {
+		signal(sig, SIG_IGN);
+		return 0;
+	}
+	return 1;
+#endif
 }
 
 /* Called when ZMODEM gets an interrupt (^C) */
@@ -646,15 +681,11 @@ main(int argc, char **argv)
 	io_mode(io_mode_fd,1);
 	readline_setup(io_mode_fd, 128, 256);
 
-	if (signal(SIGINT, bibi) == SIG_IGN)
-		signal(SIGINT, SIG_IGN);
-	else {
-		signal(SIGINT, bibi); 
+	if (install_signal_handler(SIGINT))
 		play_with_sigint=1;
-	}
-	signal(SIGTERM, bibi);
-	signal(SIGPIPE, bibi);
-	signal(SIGHUP, bibi);
+	install_signal_handler(SIGTERM);
+	install_signal_handler(SIGPIPE);
+	install_signal_handler(SIGHUP);
 
 	if ( protocol!=ZM_XMODEM) {
 		if (protocol==ZM_ZMODEM) {

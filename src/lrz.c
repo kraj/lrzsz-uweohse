@@ -126,7 +126,7 @@ static int closeit __P ((struct zm_fileinfo *));
 static void ackbibi __P ((void));
 static void zmputs __P ((const char *s));
 static size_t getfree __P ((void));
-static void install_signal_handler __P ((int sig));
+static int install_signal_handler __P ((int sig));
 
 static long buffersize=32768;
 static unsigned long min_bps=0;
@@ -196,7 +196,7 @@ bibi(int n)
 	error(128+n,0,_("caught signal %d; exiting"), n);
 }
 
-static void
+static int
 install_signal_handler(int sig)
 {
 #ifdef HAVE_SIGACTION
@@ -205,13 +205,19 @@ install_signal_handler(int sig)
 	sigemptyset(&sa.sa_mask);
 	sa.sa_flags = 0;
 	if (sigaction(sig, &sa, &old) == 0) {
-		if (old.sa_handler == SIG_IGN)
+		if (old.sa_handler == SIG_IGN) {
 			sigaction(sig, &old, NULL);
-		return;
+			return 0;
+		}
+		return 1;
 	}
+	return 0;
 #else
-	if (signal(sig, bibi_sighandler) == SIG_IGN)
+	if (signal(sig, bibi_sighandler) == SIG_IGN) {
 		signal(sig, SIG_IGN);
+		return 0;
+	}
+	return 1;
 #endif
 }
 
