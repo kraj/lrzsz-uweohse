@@ -1744,6 +1744,18 @@ typedef struct oosb_t {
 	struct oosb_t *next;
 } oosb_t;
 struct oosb_t *anker=NULL;
+
+static void
+oosb_free(void)
+{
+	oosb_t *akt;
+	while (anker) {
+		akt = anker;
+		anker = akt->next;
+		free(akt->data);
+		free(akt);
+	}
+}
 #endif
 
 /*
@@ -1759,6 +1771,9 @@ rzfile(struct zm_fileinfo *zi)
 	long not_printed=0;
 	time_t low_bps=0;
 	size_t bytes_in_block=0;
+#ifdef SAVE_OOSB
+	oosb_free();
+#endif
 
 	zi->eof_seen=FALSE;
 
