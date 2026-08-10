@@ -38,7 +38,7 @@
 #include <stdlib.h>
 #include "error.h"
 
-static RETSIGTYPE
+static void
 tcp_alarm_handler(int dummy)
 {
 	dummy++; /* doesn't need to do anything */
