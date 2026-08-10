@@ -368,15 +368,15 @@ main(int argc, char *argv[])
 					usage(2,_("hour to large (0..23)"));
 				if (*nex!=':')
 					usage(2, _("unparsable stop time\n"));
-				nex++;
-                mm = strtoul (optarg, &nex, 10);
-				if (mm>59)
-					usage(2,_("minute to large (0..59)"));
-				
-				t=time(NULL);
-				tm=localtime(&t);
-				tm->tm_hour=hh;
-				tm->tm_min=hh;
+			nex++;
+			mm = strtoul(nex, &nex, 10);
+			if (mm>59)
+				usage(2,_("minute to large (0..59)"));
+			
+			t=time(NULL);
+			tm=localtime(&t);
+			tm->tm_hour=hh;
+			tm->tm_min=mm;
 				stop_time=mktime(tm);
 				if (stop_time<t)
 					stop_time+=86400L; /* one day more */
