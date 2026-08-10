@@ -119,7 +119,6 @@ int Fromcu;		/* Were called from cu or yam */
 int 
 from_cu(void)
 {
-#ifdef HAVE_ST_RDEV
 	struct stat a, b;
 #if defined(makedev)
 	dev_t help=makedev(0,0);
@@ -143,9 +142,6 @@ from_cu(void)
 		Fromcu=0;
 #else
 	Fromcu = (a.st_rdev != b.st_rdev) || (a.st_dev != b.st_dev);
-#endif
-#else
-	Fromcu = 1; /* a bad guess .. */
 #endif
 	return Fromcu;
 }
