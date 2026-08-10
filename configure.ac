@@ -161,7 +161,7 @@ dnl suggested by autoscan, but not really needed.
 dnl AC_FUNC_UTIME_NULL
 AC_FUNC_MMAP
 AC_FUNC_ALLOCA
-AC_EGREP_HEADER([struct.*utimbuf], utime.h, AC_DEFINE(HAVE_STRUCT_UTIMBUF))
+AC_CHECK_TYPES([struct utimbuf], [], [], [[#include <utime.h>]])
 
 AC_CHECK_FUNCS(gettimeofday settimeofday)
 AC_CHECK_FUNCS(strchr memcpy select vprintf setlocale)
@@ -236,16 +236,16 @@ if test "x$lookup_facility" = x ; then
 else
 	AC_MSG_CHECKING([for $lookup_facility])
 	AC_CACHE_VAL(lrzsz_cv_lookup_facility,[
-		AC_EGREP_CPP(ihave$lookup_facility, [
+		AC_PREPROC_IFELSE([AC_LANG_SOURCE([[
 #ifdef HAVE_SYSLOG_H
 #include <syslog.h>
 #else
 #include <sys/syslog.h>
 #endif
-#ifdef $lookup_facility
-ihave$lookup_facility
+#ifndef $lookup_facility
+#error $lookup_facility not defined
 #endif
-		], lrzsz_cv_lookup_facility=yes, lrzsz_cv_lookup_facility=no)
+		]])], [lrzsz_cv_lookup_facility=yes], [lrzsz_cv_lookup_facility=no])
 	])
 	if test $lrzsz_cv_lookup_facility = yes ; then
 		AC_MSG_RESULT(yes)
