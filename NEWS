@@ -58,6 +58,8 @@ not perfectly trustworthy senders.
   leading directories, too (`dir/.subdir/filename` was allowed
   before).
 
+* the lrz file CRC check could have run into an endless loop.
+  This was a possible denial of service attack.
 
 Version 0.12.20 - December 1998, Uwe Ohse
 

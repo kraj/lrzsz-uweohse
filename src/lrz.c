@@ -986,6 +986,7 @@ do_crc_check(FILE *f, size_t remote_bytes, size_t check_bytes)
 	while (t1<3) {
 		stohdr(check_bytes);
 		zshhdr(ZCRC, Txhdr);
+		t2=0;
 		while(t2<3) {
 			size_t tmp;
 			c = zgethdr(Rxhdr, 0, &tmp);
@@ -1008,7 +1009,9 @@ do_crc_check(FILE *f, size_t remote_bytes, size_t check_bytes)
 				return ZCRC_EQUAL;
 				break;
 			}
+			t2++;
 		}
+		t1++;
 	}
 	return ERROR;
 }
