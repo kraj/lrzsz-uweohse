@@ -77,7 +77,6 @@ int skip_if_not_found;
 char *Pathname;
 const char *program_name;		/* the name by which we were called */
 
-int Topipe=0;
 int MakeLCPathname=TRUE;	/* make received pathname lower case */
 int Verbose=0;
 int Quiet=0;		/* overrides logic that would otherwise set verbose */
@@ -123,10 +122,8 @@ static int wcreceive __P ((int argc, char **argp));
 static int rzfile __P ((struct zm_fileinfo *));
 static void usage __P ((int exitcode, const char *what));
 static void usage1 __P ((int exitcode));
-static void exec2 __P ((const char *s));
 static int closeit __P ((struct zm_fileinfo *));
 static void ackbibi __P ((void));
-static int sys2 __P ((const char *s));
 static void zmputs __P ((const char *s));
 static size_t getfree __P ((void));
 
@@ -744,9 +741,6 @@ fubar:
 			shortname ? shortname : "no.name", protname());
 #endif
 	canit(STDOUT_FILENO);
-	if (Topipe && fout) {
-		pclose(fout);  return ERROR;
-	}
 	if (fout)
 		fclose(fout);
 
@@ -1214,111 +1208,89 @@ procheader(char *name, struct zm_fileinfo *zi)
 	if (!zmodem_requested && MakeLCPathname && !IsAnyLower(name_static)
 	  && !(zi->mode&UNIXFILE))
 		uncaps(name_static);
-	if (Topipe > 0) {
-		if (Pathname)
-			free(Pathname);
-		Pathname=malloc((PATH_MAX)*2);
-		if (!Pathname)
-			error(1,0,_("out of memory"));
-		sprintf(Pathname, "%s %s", program_name+2, name_static);
-		if (Verbose) {
-			vstringf("%s: %s %s\n",
-				_("Topipe"),
-				Pathname, Thisbinary?"BIN":"ASCII");
-		}
-		if ((fout=popen(Pathname, "w")) == NULL)
-			return ERROR;
-	} else {
-		if (protocol==ZM_XMODEM)
-			/* we don't have the filename yet */
-			return OK; /* dummy */
-		if (Pathname)
-			free(Pathname);
-		Pathname=malloc((PATH_MAX)*2);
-		if (!Pathname)
-			error(1,0,_("out of memory"));
-		strcpy(Pathname, name_static);
-		if (Verbose) {
-			/* overwrite the "waiting to receive" line */
-			vstring("\r                                                                     \r");
-			vstringf(_("Receiving: %s\n"), name_static);
-		}
-		checkpath(name_static);
-		if (Nflag)
-		{
-			/* cast because we might not have a prototyp for strdup :-/ */
-			free(name_static);
-			name_static=(char *) strdup("/dev/null");
-			if (!name_static)
-			{
-				fprintf(stderr,"%s: %s\n", program_name, _("out of memory"));
-				exit(1);
-			}
-		}
-#ifdef OMEN
-		/* looks like a security hole -- uwe */
-		if (name_static[0] == '!' || name_static[0] == '|') {
-			if ( !(fout = popen(name_static+1, "w"))) {
-				return ERROR;
-			}
-			Topipe = -1;  return(OK);
-		}
-#endif
-		if (Thisbinary && zconv==ZCRESUM) {
-			struct stat st;
-			fout = fopen(name_static, "r+");
-			if (fout && 0==fstat(fileno(fout),&st))
-			{
-				int can_resume=TRUE;
-				if (zmanag==ZF1_ZMCRC) {
-					int r=do_crc_check(fout,zi->bytes_total,st.st_size);
-					if (r==ERROR) {
-						fclose(fout);
-						return ZFERR;
-					}
-					if (r==ZCRC_DIFFERS) {
-						can_resume=FALSE;
-					}
-				}
-				if ((unsigned long)st.st_size > zi->bytes_total) {
-					can_resume=FALSE;
-				}
-				/* retransfer whole blocks */
-				zi->bytes_skipped = st.st_size & ~(1023);
-				if (can_resume) {
-					if (fseek(fout, (long) zi->bytes_skipped, SEEK_SET)) {
-						fclose(fout);
-						return ZFERR;
-					}
-				}
-				else
-					zi->bytes_skipped=0; /* resume impossible, file has changed */
-				goto buffer_it;
-			}
-			zi->bytes_skipped=0;
-			if (fout)
-				fclose(fout);
-		}
-		fout = fopen(name_static, openmode);
+
+        if (protocol==ZM_XMODEM)
+                /* we don't have the filename yet */
+                return OK; /* dummy */
+        if (Pathname)
+                free(Pathname);
+        Pathname=malloc((PATH_MAX)*2);
+        if (!Pathname)
+                error(1,0,_("out of memory"));
+        strcpy(Pathname, name_static);
+        if (Verbose) {
+                /* overwrite the "waiting to receive" line */
+                vstring("\r                                                                     \r");
+                vstringf(_("Receiving: %s\n"), name_static);
+        }
+        checkpath(name_static);
+        if (Nflag)
+        {
+                /* cast because we might not have a prototyp for strdup :-/ */
+                free(name_static);
+                name_static=(char *) strdup("/dev/null");
+                if (!name_static)
+                {
+                        fprintf(stderr,"%s: %s\n", program_name, _("out of memory"));
+                        exit(1);
+                }
+        }
+
+        if (Thisbinary && zconv==ZCRESUM) {
+                struct stat st;
+                fout = fopen(name_static, "r+");
+                if (fout && 0==fstat(fileno(fout),&st))
+                {
+                        int can_resume=TRUE;
+                        if (zmanag==ZF1_ZMCRC) {
+                                int r=do_crc_check(fout,zi->bytes_total,st.st_size);
+                                if (r==ERROR) {
+                                        fclose(fout);
+                                        return ZFERR;
+                                }
+                                if (r==ZCRC_DIFFERS) {
+                                        can_resume=FALSE;
+                                }
+                        }
+                        if ((unsigned long)st.st_size > zi->bytes_total) {
+                                can_resume=FALSE;
+                        }
+                        /* retransfer whole blocks */
+                        zi->bytes_skipped = st.st_size & ~(1023);
+                        if (can_resume) {
+                                if (fseek(fout, (long) zi->bytes_skipped, SEEK_SET)) {
+                                        fclose(fout);
+                                        return ZFERR;
+                                }
+                        }
+                        else
+                                zi->bytes_skipped=0; /* resume impossible, file has changed */
+                        goto buffer_it;
+                }
+                zi->bytes_skipped=0;
+                if (fout)
+                        fclose(fout);
+        }
+        fout = fopen(name_static, openmode);
 #ifdef ENABLE_MKDIR
-		if ( !fout && Restricted < 2) {
-			if (make_dirs(name_static))
-				fout = fopen(name_static, openmode);
-		}
+        if ( !fout && Restricted < 2) {
+                if (make_dirs(name_static))
+                        fout = fopen(name_static, openmode);
+        }
 #endif
-		if ( !fout)
-		{
+        if ( !fout)
+        {
 #ifdef ENABLE_SYSLOG
-			int e=errno;
+                int e=errno;
 #endif
-			zpfatal(_("cannot open %s"), name_static);
-			DO_SYSLOG((LOG_ERR,"%s: cannot open: %s",
-				protname(),strerror(e)));
-			return ERROR;
-		}
-	}
+                zpfatal(_("cannot open %s"), name_static);
+                DO_SYSLOG((LOG_ERR,"%s: cannot open: %s",
+                        protname(),strerror(e)));
+                return ERROR;
+        }
+
 buffer_it:
-	if (Topipe == 0) {
+	{
 		static char *s=NULL;
 		static size_t last_length=0;
 #if defined(F_GETFD) && defined(F_SETFD) && defined(O_SYNC)
@@ -1474,8 +1446,7 @@ report(int sct)
 }
 
 /*
- * If called as [-][dir/../]vrzCOMMAND set Verbose to 1
- * If called as [-][dir/../]rzCOMMAND set the pipe flag
+ * If called as [-][dir/../]vrz set Verbose to 1
  * If called as rb use YMODEM protocol
  */
 static void
@@ -1500,8 +1471,6 @@ chkinvok(const char *s)
 		protocol=ZM_XMODEM;
 	if (s[0]=='r' && (s[1]=='b' || s[1]=='y'))
 		protocol=ZM_YMODEM;
-	if (s[2] && protocol!=ZM_XMODEM)
-		Topipe = 1;
 }
 
 /*
@@ -2109,12 +2078,6 @@ static int
 closeit(struct zm_fileinfo *zi)
 {
 	int ret;
-	if (Topipe) {
-		if (pclose(fout)) {
-			return ERROR;
-		}
-		return OK;
-	}
 	ret=fclose(fout);
 	if (ret) {
 		zpfatal(_("file close error"));
@@ -2179,31 +2142,6 @@ ackbibi(void)
 			break;
 		}
 	}
-}
-
-/*
- * Strip leading ! if present, do shell escape. 
- */
-static int
-sys2(const char *s)
-{
-	if (*s == '!')
-		++s;
-	return system(s);
-}
-
-/*
- * Strip leading ! if present, do exec.
- */
-static void 
-exec2(const char *s)
-{
-	if (*s == '!')
-		++s;
-	io_mode(0,0);
-	execl("/bin/sh", "sh", "-c", s);
-	zpfatal("execl");
-	exit(1);
 }
 
 /*
