@@ -2,6 +2,16 @@ dnl Process this file with autoconf to produce a configure script.
 AC_INIT([src/crctab.],[0.12.21.rc])
 AM_INIT_AUTOMAKE(foreign)
 AC_CONFIG_HEADERS(config.h)
+AH_TEMPLATE([ENABLE_TIMESYNC], [Define to 1 if you want support for the timesync protocol.])
+AH_TEMPLATE([ENABLE_MKDIR], [Define to 1 if lrz shall create directories if needed.])
+AH_TEMPLATE([ENABLE_SYSLOG], [Define to LOG_xxx (a syslog facility) if syslog() shall be used.])
+AH_TEMPLATE([ENABLE_SYSLOG_FORCE], [Define to 1 if syslogging shall be forced.])
+AH_TEMPLATE([ENABLE_SYSLOG_DEFAULT], [Define to 1 if syslogging shall be default.])
+AH_TEMPLATE([PUBDIR], [Define to public writable directory if you want this.])
+AH_TEMPLATE([STRICT_PROTOTYPES], [Define to 1 if you want strict ANSI prototypes.])
+AH_TEMPLATE([HAVE_FTIME], [Define to 1 if you have a reliable ftime function.])
+AH_TEMPLATE([HAVE_TIMEZONE_VAR], [Define to 1 if you have the timezone variable.])
+AH_TEMPLATE([HAVE_STRUCT_UTIMBUF], [Define to 1 if your utime() takes struct utimbuf as second argument.])
 AC_USE_SYSTEM_EXTENSIONS
 
 
