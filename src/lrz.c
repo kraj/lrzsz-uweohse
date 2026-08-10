@@ -228,7 +228,6 @@ static struct option const long_options[] =
 	{"binary", no_argument, NULL, 'b'},
 	{"bufsize", required_argument, NULL, 'B'},
 	{"allow-commands", no_argument, NULL, 'C'},
-	{"allow-remote-commands", no_argument, NULL, 'C'},
 	{"escape", no_argument, NULL, 'e'},
 	{"rename", no_argument, NULL, 'E'},
 	{"help", no_argument, NULL, 'h'},
@@ -577,7 +576,6 @@ usage(int exitcode, const char *what)
 "  -b, --binary                binary transfer\n"
 "  -B, --bufsize N             buffer N bytes (N==auto: buffer whole file)\n"
 "  -c, --with-crc              Use 16 bit CRC (X)\n"
-"  -C, --allow-remote-commands allow execution of remote commands (Z)\n"
 "  -D, --null                  write all received data to /dev/null\n"
 "      --delay-startup N       sleep N seconds before doing anything\n"
 "  -e, --escape                Escape control characters (Z)\n"
