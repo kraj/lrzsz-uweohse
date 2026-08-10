@@ -2103,9 +2103,9 @@ closeit(struct zm_fileinfo *zi)
 		 * unrestricted shell.
 		 */
 		if (under_rsh)
-			chmod(Pathname, (00666 & zi->mode));
+			chmod(Pathname, (0666 & zi->mode));
 		else
-			chmod(Pathname, (07777 & zi->mode));
+			chmod(Pathname, (0777 & zi->mode));
 	}
 	return OK;
 }
