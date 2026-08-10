@@ -136,10 +136,7 @@ AC_CHECK_LIB(be,syslog,,,)
 dnl slowlartis needs this
 AC_CHECK_LIB(nsl,gethostbyname,,,)
 
-# Autoupdate added the next two lines to ensure that your configure
-# script's behavior did not change.  They are probably safe to remove.
 AC_CHECK_INCLUDES_DEFAULT
-AC_PROG_EGREP
 
 AC_CHECK_HEADERS(fcntl.h limits.h sys/ioctl.h sys/time.h unistd.h sys/times.h)
 LRZSZ_HEADERS_TERM_IO
