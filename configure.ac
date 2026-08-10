@@ -83,6 +83,7 @@ if test "x$CFLAGS" = x ; then old_cflags_empty=1; fi
 
 dnl Checks for programs.
 AC_PROG_CC
+AC_PROG_CC_C_O
 AC_PROG_CPP
 if test "x$GCC" = xyes ; then
     if test "x$old_cflags_empty" = x1 ; then
