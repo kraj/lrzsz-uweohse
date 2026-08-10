@@ -1,8 +1,3 @@
-dnl AC_REPLACE_GNU_GETOPT
-AC_DEFUN([AC_REPLACE_GNU_GETOPT],
-[AC_CHECK_FUNC(getopt_long, , [AC_LIBOBJ([getopt1]) AC_LIBOBJ([getopt])])
-])
-
 dnl
 dnl taken from taylor uucp
 AC_DEFUN([LRZSZ_ERRNO_DECL],[

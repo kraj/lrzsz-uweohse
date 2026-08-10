@@ -3,16 +3,6 @@ AC_INIT([lrzsz],[0.12.21.rc])
 AC_CONFIG_SRCDIR([src/crctab.c])
 AM_INIT_AUTOMAKE(foreign)
 AC_CONFIG_HEADERS(config.h)
-AH_TEMPLATE([ENABLE_TIMESYNC], [Define to 1 if you want support for the timesync protocol.])
-AH_TEMPLATE([ENABLE_MKDIR], [Define to 1 if lrz shall create directories if needed.])
-AH_TEMPLATE([ENABLE_SYSLOG], [Define to LOG_xxx (a syslog facility) if syslog() shall be used.])
-AH_TEMPLATE([ENABLE_SYSLOG_FORCE], [Define to 1 if syslogging shall be forced.])
-AH_TEMPLATE([ENABLE_SYSLOG_DEFAULT], [Define to 1 if syslogging shall be default.])
-AH_TEMPLATE([PUBDIR], [Define to public writable directory if you want this.])
-AH_TEMPLATE([STRICT_PROTOTYPES], [Define to 1 if you want strict ANSI prototypes.])
-AH_TEMPLATE([HAVE_FTIME], [Define to 1 if you have a reliable ftime function.])
-AH_TEMPLATE([HAVE_TIMEZONE_VAR], [Define to 1 if you have the timezone variable.])
-AH_TEMPLATE([HAVE_STRUCT_UTIMBUF], [Define to 1 if your utime() takes struct utimbuf as second argument.])
 AC_USE_SYSTEM_EXTENSIONS
 
 
@@ -20,9 +10,9 @@ dnl  is in AC_PROG_CC since 2.12
 AC_PREREQ([2.72])
 
 PACKAGE_VERSION="$PACKAGE-$VERSION"
-AC_DEFINE_UNQUOTED(PACKAGE, "$PACKAGE")
-AC_DEFINE_UNQUOTED(VERSION, "$VERSION")
-AC_DEFINE_UNQUOTED(PACKAGE_VERSION, "$PACKAGE_VERSION")
+AC_DEFINE_UNQUOTED([PACKAGE], ["$PACKAGE"], [Name of package])
+AC_DEFINE_UNQUOTED([VERSION], ["$VERSION"], [Version number of package])
+AC_DEFINE_UNQUOTED([PACKAGE_VERSION], ["$PACKAGE_VERSION"], [The concatenation of the strings PACKAGE, "-", and VERSION.])
 AC_SUBST(PACKAGE)
 AC_SUBST(VERSION)
 AC_SUBST(PACKAGE_VERSION)
@@ -39,25 +29,25 @@ AC_ARG_ENABLE(timesync,
 	[if test "$enableval" = "no" ; then 
 		:
 	  else
-		AC_DEFINE(ENABLE_TIMESYNC)
+		AC_DEFINE([ENABLE_TIMESYNC], [], [Define to 1 if you want support for the timesync protocol.])
 	  fi],
-	[AC_DEFINE(ENABLE_TIMESYNC)])
+	[AC_DEFINE([ENABLE_TIMESYNC], [], [Define to 1 if you want support for the timesync protocol.])])
 AC_SUBST(ENABLE_TIMESYNC)
 AC_ARG_ENABLE(pubdir,
 	[--enable-pubdir=/path   include support for a public writeable directory (do not do that)],
 	[if test "$enableval" = "no" ; then 
 		: 
 	  else 
-	    AC_DEFINE_UNQUOTED(PUBDIR,"$enableval")
+	    AC_DEFINE_UNQUOTED([PUBDIR],["$enableval"],[Define to public writable directory if you want this.])
 	  fi])
 AC_ARG_ENABLE(mkdir,
 	[--disable-mkdir   disable support for creating directories (lrz)],
 	[if test "$enableval" = "no" ; then 
 		:
 	  else
-	  	AC_DEFINE(ENABLE_MKDIR)
+	  	AC_DEFINE([ENABLE_MKDIR], [], [Define to 1 if lrz shall create directories if needed.])
 	  fi],
-	[AC_DEFINE(ENABLE_MKDIR)])
+	[AC_DEFINE([ENABLE_MKDIR], [], [Define to 1 if lrz shall create directories if needed.])])
 AC_ARG_ENABLE(syslog,
 	[--enable-syslog=FACILITY,{force,default,optional} include syslogsupport],
 	[
@@ -68,7 +58,7 @@ AC_ARG_ENABLE(syslog,
 	    *,*)
 			level=`echo $enableval|sed -e 's/^.*,//'`
 			fac=`echo $enableval|sed -e 's/,.*$//'`
-			AC_DEFINE_UNQUOTED(ENABLE_SYSLOG,$fac)
+			AC_DEFINE_UNQUOTED([ENABLE_SYSLOG],$fac,[Define to LOG_xxx (a syslog facility) if syslog() shall be used.])
 			;;
 		*)
 			lookup_facility=LOG_UUCP
@@ -76,16 +66,16 @@ AC_ARG_ENABLE(syslog,
 			;;
 		esac
 	  	if test "$level" = "force" ; then
-		  AC_DEFINE(ENABLE_SYSLOG_FORCE)
+		  AC_DEFINE([ENABLE_SYSLOG_FORCE], [], [Define to 1 if syslogging shall be forced.])
 	  	else 
 	  	  if test "$level" = "optional" ; then
 	  	    :
 	  	  else
-		    AC_DEFINE(ENABLE_SYSLOG_DEFAULT)
+		    AC_DEFINE([ENABLE_SYSLOG_DEFAULT], [], [Define to 1 if syslogging shall be default.])
 		  fi
 	  	fi
 	  fi],[
-		AC_DEFINE(ENABLE_SYSLOG_DEFAULT)
+		AC_DEFINE([ENABLE_SYSLOG_DEFAULT], [], [Define to 1 if syslogging shall be default.])
 		lookup_facility=LOG_UUCP
 	  ])
 
@@ -124,7 +114,7 @@ if test `hostname` = tirka.ohse.de -a "$cross_compiling" = no ; then
 fi
 case "$CFLAGS" in
 *-Wstrict-prototypes*)
-	AC_DEFINE(STRICT_PROTOTYPES)
+	AC_DEFINE([STRICT_PROTOTYPES], [], [Define to 1 if you want strict ANSI prototypes.])
 	;;
 esac
 
@@ -169,7 +159,7 @@ AC_CHECK_FUNCS(times rdchk utime syslog siginterrupt)
 AC_REPLACE_FUNCS(mkdir mktime strerror strstr strdup strtoul strtol strpbrk)
 AC_REPLACE_FUNCS(stpcpy strftime vasprintf)
 
-AC_REPLACE_GNU_GETOPT([])
+AC_CHECK_FUNCS([getopt_long])
 
 
 
@@ -210,10 +200,10 @@ main ()
 }
 ]])],[lrzsz_cv_sys_ftime_ok=yes],[lrzsz_cv_sys_ftime_ok=no],[lrzsz_cv_sys_ftime_ok=runtime])])
 case $lrzsz_cv_sys_ftime_ok in
-yes) AC_DEFINE(HAVE_FTIME) AC_MSG_RESULT(yes) ;;
+yes) AC_DEFINE([HAVE_FTIME], [], [Define to 1 if you have a reliable ftime function.]) AC_MSG_RESULT(yes) ;;
 no)  AC_MSG_RESULT(no)
 	AC_MSG_WARN(ftime seems to be buggy) ;;
-runtime) AC_DEFINE(HAVE_FTIME)
+runtime) AC_DEFINE([HAVE_FTIME], [], [Define to 1 if you have a reliable ftime function.])
 	AC_MSG_RESULT(will check at run time) ;;
 esac
 ])
@@ -225,7 +215,7 @@ AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <time.h>]], [[return(int)(timezone/2)
 ])
 if test $libquark_cv_var_timezone = yes ; then
 	AC_MSG_RESULT(yes)
-	AC_DEFINE(HAVE_TIMEZONE_VAR)
+	AC_DEFINE([HAVE_TIMEZONE_VAR], [], [Define to 1 if you have the timezone variable.])
 else
 	AC_MSG_RESULT(no)
 fi
@@ -247,9 +237,9 @@ else
 	])
 	if test $lrzsz_cv_lookup_facility = yes ; then
 		AC_MSG_RESULT(yes)
-		AC_DEFINE_UNQUOTED(ENABLE_SYSLOG,$lookup_facility)
+		AC_DEFINE_UNQUOTED([ENABLE_SYSLOG],$lookup_facility,[Define to LOG_xxx (a syslog facility) if syslog() shall be used.])
 	else
-		AC_DEFINE(ENABLE_SYSLOG,LOG_USER)
+		AC_DEFINE([ENABLE_SYSLOG],[LOG_USER],[Define to LOG_xxx (a syslog facility) if syslog() shall be used.])
 		AC_MSG_RESULT(no)
 	fi
 fi
