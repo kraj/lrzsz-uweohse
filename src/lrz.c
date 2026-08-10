@@ -282,9 +282,13 @@ main(int argc, char *argv[])
 
 	Rxtimeout = 100;
 	setbuf(stderr, NULL);
-	if ((cp=getenv("SHELL")) && (strstr(cp, "rsh") || strstr(cp, "rksh")
-		|| strstr(cp,"rbash") || strstr(cp, "rshell")))
-		under_rsh=TRUE;
+	if ((cp=getenv("SHELL")) && cp[0]) {
+		const char *base = strrchr(cp, '/');
+		base = base ? base + 1 : cp;
+		if (strcmp(base, "rsh") == 0 || strcmp(base, "rksh") == 0
+			|| strcmp(base, "rbash") == 0 || strcmp(base, "rshell") == 0)
+			under_rsh=TRUE;
+	}
 	if ((cp=getenv("ZMODEM_RESTRICTED"))!=NULL)
 		Restricted=2;
 
