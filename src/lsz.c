@@ -341,6 +341,7 @@ main(int argc, char **argv)
 #endif
 
 	setlocale (LC_ALL, "");
+	setlocale (LC_TIME, "C"); /* do not translate just the timestamp of a syslog message. uh. */
 	bindtextdomain (PACKAGE, LOCALEDIR);
 	textdomain (PACKAGE);
 
