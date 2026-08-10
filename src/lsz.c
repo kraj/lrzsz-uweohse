@@ -218,7 +218,7 @@ static int zrqinits_sent=0;
 static int play_with_sigint=0;
 
 /* called by signal interrupt or terminate to clean things up */
-RETSIGTYPE
+void
 bibi (int n)
 {
 	canit(STDOUT_FILENO);
@@ -234,7 +234,7 @@ bibi (int n)
 }
 
 /* Called when ZMODEM gets an interrupt (^C) */
-static RETSIGTYPE
+static void
 onintr(int n)
 {
 	signal(SIGINT, SIG_IGN);
