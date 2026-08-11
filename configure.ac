@@ -124,8 +124,8 @@ AC_FUNC_ALLOCA
 AC_CHECK_TYPES([struct utimbuf], [], [], [[#include <utime.h>]])
 
 AC_CHECK_FUNCS(gettimeofday settimeofday)
-AC_CHECK_FUNCS(strchr memcpy select vprintf setlocale)
-AC_CHECK_FUNCS(times rdchk utime syslog sigaction nogetopt_long)
+AC_CHECK_FUNCS(select)
+AC_CHECK_FUNCS(times utime syslog sigaction nogetopt_long)
 AC_REPLACE_FUNCS(strerror strstr strdup strtoul strtol strpbrk)
 AC_REPLACE_FUNCS(stpcpy strftime vasprintf)
 
