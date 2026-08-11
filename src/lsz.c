@@ -429,14 +429,17 @@ main(int argc, char **argv)
 			break;
 		case 'i':
 			Cmdack1 = ZCACK1;
-			/* **** FALL THROUGH TO **** */
+			command_mode = TRUE;
+			Cmdstr = optarg;
+			break;
 		case 'c':
 			command_mode = TRUE;
 			Cmdstr = optarg;
 			break;
 		case 'd':
 			++Dottoslash;
-			/* **** FALL THROUGH TO **** */
+                        Fullname=TRUE;
+                        break;
 		case 'f': Fullname=TRUE; break;
 		case 'e': Zctlesc = 1; break;
 		case 'E': Lzmanag = ZF1_ZMCHNG; break;
@@ -586,7 +589,8 @@ main(int argc, char **argv)
 		case 'Z': protocol=ZM_ZMODEM; break;
 		case 'Y':
 			Lskipnocor = TRUE;
-			/* **** FALLL THROUGH TO **** */
+			Lzmanag = ZF1_ZMCLOB;
+                        break;
 		case 'y':
 			Lzmanag = ZF1_ZMCLOB; break;
 		case 2:
@@ -1250,8 +1254,11 @@ getnak(void)
 			io_mode(io_mode_fd,2);	/* Set cbreak, XON/XOFF, etc. */
 			Optiong = TRUE;
 			blklen=1024;
+			Crcflg = TRUE;
+                        return FALSE;
 		case WANTCRC:
 			Crcflg = TRUE;
+			return FALSE;
 		case NAK:
 			return FALSE;
 		case CAN:
@@ -1367,6 +1374,7 @@ cancan:
 		case WANTCRC:
 			if (firstsec)
 				Crcflg = TRUE;
+                        continue;
 		case NAK:
 			zperr(_("NAK on sector")); continue;
 		case ACK: 
@@ -1653,6 +1661,8 @@ getzrxinit(void)
 		case ZRQINIT:
 			if (Rxhdr[ZF0] == ZCOMMAND)
 				continue;
+			zshhdr(ZNAK, Txhdr);
+			continue;
 		default:
 			zshhdr(ZNAK, Txhdr);
 			continue;
@@ -2079,11 +2089,12 @@ zsendfdata (struct zm_fileinfo *zi)
 			case XOFF:			/* Wait a while for an XON */
 			case XOFF | 0200:
 				READLINE_PF (100);
+                                /* FALLTHROUGH */
 			default:
 				++junkcount;
 			}
 		}
-#endif							/* READCHECK */
+#endif	/* READCHECK */
 		if (Txwindow) {
 			size_t tcount = 0;
 			while ((tcount = zi->bytes_sent - Lrxpos) >= Txwindow) {
