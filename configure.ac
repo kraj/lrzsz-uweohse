@@ -24,7 +24,7 @@ AS_CASE([$VERSION],
 
 
 AC_ARG_ENABLE(mkdir,
-	[--disable-mkdir   disable support for creating directories (lrz)],
+	[  --disable-mkdir   disable support for creating directories (lrz)],
 	[if test "$enableval" = "no" ; then 
 		:
 	  else
@@ -32,7 +32,7 @@ AC_ARG_ENABLE(mkdir,
 	  fi],
 	[AC_DEFINE([ENABLE_MKDIR], [], [Define to 1 if lrz shall create directories if needed.])])
 AC_ARG_ENABLE(syslog,
-	[--enable-syslog=FACILITY,{force,default,optional} include syslogsupport],
+	[  --enable-syslog=FACILITY,{force,default,optional} include syslogsupport],
 	[
 	  if test "$enableval" = "no" ; then 
 		:
@@ -61,6 +61,11 @@ AC_ARG_ENABLE(syslog,
 		AC_DEFINE([ENABLE_SYSLOG_DEFAULT], [], [Define to 1 if syslogging shall be default.])
 		lookup_facility=LOG_UUCP
 	  ])
+have_std=
+AC_ARG_ENABLE([std],
+              [  --enable-std=STD Use a specific C std (c23, c17, c11, c99)],
+              [have_std=$enableval],
+              [have_std=""])
 
 if test "x$CFLAGS" = x ; then old_cflags_empty=1; fi
 
@@ -73,12 +78,16 @@ AC_SEARCH_LIBS([strerror],[cposix])
 AC_C_CONST
 AC_C_INLINE
 AX_COMPILER_FLAGS_CFLAGS()
+
+for i in c23 c17 c11 c99 ; do
+    if test -z "$have_std" ; then AX_CHECK_COMPILE_FLAG(-std=$i, [have_std=$i]) fi
+done
+if test -n "$have_std" ; then
+    AX_APPEND_COMPILE_FLAGS(-std=$have_std, [LRZSZ_CFLAGS])
+fi
+
+AX_APPEND_COMPILE_FLAGS([ -fforce-addr -falign-loops=2 -falign-jumps=2 -falign-functions=2 -g3], [LRZSZ_CFLAGS])
 AX_APPEND_COMPILE_FLAGS([ -Wunused-result -Wpendantic -Wcast-qual -Wmissing-braces -Wcomments], [WARN_CFLAGS])
-AX_APPEND_COMPILE_FLAGS([ -std=c11 -fforce-addr -falign-loops=2 -falign-jumps=2 -falign-functions=2 -g3], [LRZSZ_CFLAGS])
-
-echo "T0: $WARN_CFLAGS"
-echo "T1: $LRZSZ_CFLAGS"
-
 
 dnl Checks for libraries.
 dnl SCO needs this.
