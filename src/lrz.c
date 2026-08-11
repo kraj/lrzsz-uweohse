@@ -500,9 +500,6 @@ main(int argc, char *argv[])
 
 	/* initialize zsendline tab */
 	zsendline_init();
-#ifdef HAVE_SIGINTERRUPT
-	siginterrupt(SIGALRM,1);
-#endif
 	if (startup_delay)
 		sleep(startup_delay);
 

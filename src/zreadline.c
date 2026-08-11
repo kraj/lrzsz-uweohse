@@ -70,7 +70,16 @@ readline_internal(unsigned int timeout)
 		if (Verbose > 5)
 			vstringf("Calling read: alarm=%d  Readnum=%d ",
 			  n, readline_readnum);
-		signal(SIGALRM, zreadline_alarm_handler); 
+		{
+			/* Install the handler without SA_RESTART so that the
+			 * alarm interrupts the following read() instead of
+			 * restarting it. Replaces the deprecated siginterrupt(). */
+			struct sigaction sa;
+			sa.sa_handler = zreadline_alarm_handler;
+			sigemptyset(&sa.sa_mask);
+			sa.sa_flags = 0;
+			sigaction(SIGALRM, &sa, NULL);
+		}
 		alarm(n);
 	}
 	else if (Verbose > 5)
