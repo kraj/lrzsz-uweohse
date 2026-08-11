@@ -1,7 +1,6 @@
 noinst_LIBRARIES=libzmodem.a
 
 EXTRA_DIST = alloca.c \
-	mkdir.c mktime.c \
 	strdup.c strerror.c strstr.c strpbrk.c strtol.c strtoul.c stpcpy.c \
 	strftime.c vasprintf.c
 
