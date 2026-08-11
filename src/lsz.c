@@ -810,10 +810,10 @@ send_pseudo(const char *name, const char *data)
 	lfd=0;
 	do {
 		if (lfd++==10) {
-			free(tmp);
 			vstringf (_ ("send_pseudo %s: cannot open tmpfile %s: %s"),
 					 name, tmp, strerror (errno));
 			vstring ("\r\n");
+			free(tmp);
 			return 1;
 		}
 		sprintf(tmp+plen,"%s.%lu.%d",name,(unsigned long) getpid(),lfd);
