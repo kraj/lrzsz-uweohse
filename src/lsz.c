@@ -912,26 +912,6 @@ wcsend (int argc, char *argp[])
 #endif
 	Totsecs = 0;
 	if (Filcnt == 0) {			/* bitch if we couldn't open ANY files */
-#if 0
-	/* i *really* do not like this */
-		if (protocol != ZM_XMODEM) {
-			const char *Cmdstr;		/* Pointer to the command string */
-			command_mode = TRUE;
-			Cmdstr = "echo \"lsz: Can't open any requested files\"";
-			if (getnak ()) {
-				Exitcode = 0200;
-				canit(STDOUT_FILENO);
-			}
-			if (!zmodem_requested)
-				canit(STDOUT_FILENO);
-			else if (zsendcmd (Cmdstr, 1 + strlen (Cmdstr))) {
-				Exitcode = 0200;
-				canit(STDOUT_FILENO);
-			}
-			Exitcode = 1;
-			return OK;
-		}
-#endif
 		canit(STDOUT_FILENO);
 		vstring ("\r\n");
 		vstringf (_ ("Can't open any requested files."));
@@ -2389,10 +2369,9 @@ listen:
 			saybibi();
 			return OK;
 		case ZRQINIT:
-			vfile("******** RZ *******");
-			system("rz");
-			vfile("******** SZ *******");
-			goto listen;
+			vfile(_("got a ZRQINIT packet: the other side is trying to send, too"));
+			if (++errors > 20)
+				return ERROR;
 		}
 	}
 }
