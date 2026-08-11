@@ -26,18 +26,6 @@ It is invoked from a shell prompt
 manually, or automatically as a result of an
 "sz file ..." command given to the calling program.
 
-While
-.I rz
-is smart enough to be called from
-.I cu(1),
-very few versions of
-.I cu(1)
-are smart enough to allow
-.I rz
-to work properly.
-Unix flavors of Professional-YAM are available for such dial-out application.
-
-
 .B Rz
 (Receive ZMODEM)
 receives files with the ZMODEM batch protocol.
@@ -54,7 +42,7 @@ the old fashioned way.
 receives file(s) with YMODEM,
 accepting either standard 128 byte sectors or
 1024 byte sectors
-(YAM sb
+(lsb
 .B -k
 option).
 The user should determine when
@@ -172,7 +160,7 @@ file transfer override.
 .B "-B NUMBER, --bufsize NUMBER"
 Buffer 
 .B NUMBER
-bytes before writing to disk. Default ist 32768, which should be enough
+bytes before writing to disk. Default is 32768, which should be enough
 for most situations. If you have a slow machine or a bad disk interface
 or suffer from other hardware problems you might want to increase
 the buffersize.
@@ -185,16 +173,6 @@ to swap.
 .TP
 .B "-c, --with-crc"
 XMODEM only. Use 16 bit CRC (normally a one byte checksum is used).
-.TP
-.B "-C, --allow-remote-commands"
-allow remote command execution (
-.B insecure
-). This allows the sender to execute an arbitrary command through
-.B system
-() or
-.B execl
-(). Default is to disable this feature (?). This option is ignored
-if running in restricted mode.
 .TP
 .B "-D, --null"
 Output file data to /dev/null; for testing.
@@ -289,39 +267,6 @@ through the
 .B O 
 option.
 .TP
-.B "--tcp-client ADDRESS:PORT"
-Act as a tcp/ip client: Connect to the given port.
-
-See 
-.B "--tcp-server"
-for more information.
-
-.TP
-.B "--tcp-server"
-Act as a server: Open a socket, print out what to do, wait for connection.
-
-You will normally not want to use this option as lrzsz is the only 
-zmodem which understands what to do (private extension). You might
-want to use this if you have to use zmodem (for which reason whatever),
-and cannot use the 
-.B --tcp
-option of
-.I lsz
-(perhaps because your telnet doesn't allow to spawn a local program
-with stdin/stdout connected to the remote side).
-
-If you use this option you have to start 
-.I lsz 
-with the
-.B --tcp-client ADDRESS:PORT
-option. 
-.I lrz will print the address and port on startup.
-
-Use of this option imposes a security risk, somebody else could connect
-to the port in between. See
-.B SECURITY 
-for details.
-.TP
 .B "-U, --unrestrict"
 turn off restricted mode (this is not possible if running under
 a restricted shell).
@@ -369,16 +314,6 @@ Restricted mode may be turned off with the
 .B U 
 option, unless lrz runs under a restricted shell.
 
-.TP
-Use of the 
-.B --tcp-client 
-or 
-.B --tcp-server 
-options imposes a security risk, as somebody else could connect to
-the port before you do it, and grab your data. If there's strong
-demand for a more secure mode i might introduce some sort of
-password challenge.
-
 .SH ENVIRONMENT
 lrz uses the following environment variables:
 .TP
@@ -391,31 +326,7 @@ or
 .TP
 .B ZMODEM_RESTRICTED
 lrz enters the more restricted mode if the variable is set.
-.SH EXAMPLES
-.RE
-(Pro-YAM command)
-.RS
-.I <ALT-2>
-.br
-Pro-YAM Command:
-.I "sz *.h *.c"
-.br
-(This automatically invokes
-.I rz
-on the connected system.)
-.RE
-.SH SEE ALSO
-ZMODEM.DOC,
-YMODEM.DOC,
-Professional-YAM,
-crc(omen),
-sz(omen),
-usq(omen),
-undos(omen)
 
-Compile time options required
-for various operating systems are described in the
-source file.
 .SH NOTES
 Sending serial data to timesharing minicomputers
 at sustained high speeds
@@ -439,27 +350,15 @@ If the system's tty line handling is really broken, the serial port
 or the entire system may not survive the onslaught of long bursts
 of high speed data.
 
-The DSZ or Pro-YAM
-.B "zmodem l"
-numeric parameter may be set to a value between 64 and 1024 to limit the
-burst length ("zmodem pl128").
-
 32 bit CRC code courtesy Gary S. Brown.
 Directory creation code from John Gilmore's PD TAR program.
 .SH BUGS
-Calling
-.I rz
-from most versions of cu(1) doesn't work because cu's receive process
-fights
-.I rz
-for characters from the modem.
-
 Programs that do not properly implement the specified file transfer protocol
 may cause
-.I sz
+.I lrz
 to "hang" the port for a minute or two.
 Every reported instance of this problem has been corrected by using
-ZCOMM, Pro-YAM, or other program with a correct implementation
+a program with a correct implementation
 of the specified protocol.
 
 Many programs claiming to support YMODEM only support XMODEM with 1k blocks,
@@ -468,32 +367,8 @@ and they often don't get that quite right.
 Pathnames are restricted to 127 characters.
 In XMODEM single file mode, the pathname given on the command line
 is still processed as described above.
-The ASCII option\'s CR/LF to NL translation merely deletes CR\'s;
-undos(omen) performs a more intelligent translation.
-.SH "VMS VERSION"
-The VMS version does not set the file time.
 
-VMS C Standard I/O and RMS may interact to modify
-file contents unexpectedly.
-
-The VMS version does not support invocation as
-.B rzCOMMAND .
-The current VMS version does not support XMODEM, XMODEM-1k, or YMODEM.
-
-According to the VMS documentation,
-the buffered input routine used on the VMS version of
-.I rz
-introduces a delay
-of up to one second for each protocol transaction.
-This delay may be significant for very short files.
-Removing the "#define BUFREAD" line from rz.c will
-eliminate this delay at the expense of increased
-CPU utilization.
-
-The VMS version causes DCL to generate a random off the wall
-error message under some error conditions; this is a result of
-the incompatibility of the VMS "exit" function with the
-Unix/MSDOS standard.
+The ASCII option\'s CR/LF to NL translation merely deletes CR\'s.
 .SH "ZMODEM CAPABILITIES"
 .I Rz
 supports incoming ZMODEM binary (-b), ASCII (-a),
@@ -504,8 +379,3 @@ requests.
 The default is protect (-p) and binary (-b).
 
 The Unix versions support ZMODEM command execution.
-.SH FILES
-rz.c, crctab.c, rbsb.c, zm.c, zmodem.h Unix source files.
-
-rz.c, crctab.c, vrzsz.c, zm.c, zmodem.h, vmodem.h, vvmodem.c,
-VMS source files.
