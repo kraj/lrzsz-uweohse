@@ -7,7 +7,9 @@ LDADD = ../lib/libzmodem.a @LIBINTL@
 AM_CPPFLAGS = -I.. -I$(srcdir) -I$(top_srcdir)/src -I$(top_srcdir)/lib -DLOCALEDIR=\"$(localedir)\" -D_FORTIFY_SOURCE=2
 AM_CFLAGS = @WARN_CFLAGS@ -Werror @LRZSZ_CFLAGS@
 
-install-exec-local:
+# The hard links below point at the installed binaries, so those must exist
+# first. Order it explicitly, otherwise FTBFS with make --shuffle=reverse.
+install-exec-local: install-binPROGRAMS
 	rm -f $(DESTDIR)/$(bindir)/`echo lsb | sed -e '$(transform)'`
 	ln $(DESTDIR)/$(bindir)/`echo lsz |sed -e '$(transform)'` \
 		$(DESTDIR)/$(bindir)/`echo lsb |sed -e '$(transform)'` 
