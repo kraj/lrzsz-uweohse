@@ -216,7 +216,7 @@ bibi_sighandler(int n)
 }
 
 /* called from normal control flow (rbsb.c) to clean things up */
-void
+LRZSZ_ATTRIB_NORET void
 bibi(int n)
 {
 	canit(STDOUT_FILENO);
