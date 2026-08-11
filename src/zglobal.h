@@ -200,60 +200,19 @@ extern int enable_syslog;
 # define PATH_MAX _POSIX_PATH_MAX
 #endif
 
-#ifdef __GNUC__
-
-#if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ > 5)
-# define LRZSZ_ATTRIB_SECTION(x) __attribute__((section(#x)))
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 202000L
+#  define LRZSZ_NORETURN [[noreturn]]
+#elif defined(__GNUC__) || defined(__clang__)
+#  define LRZSZ_NORETURN __attribute__((__noreturn__))
+#else
+#  define LRZSZ_NORETURN
 #endif
 
-#if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ > 4)
-# define LRZSZ_ATTRIB_CONST  __attribute__((__const__))
+#if defined(__GNUC__) || defined(__clang__)
+#  define LRZSZ_FORMAT_PRINTF(fmtidx, argidx) __attribute__((format(printf, fmtidx, argidx)))
+#else
+#  define LRZSZ_FORMAT_PRINTF(fmt, arg)
 #endif
-
-    /* gcc.info sagt, noreturn wäre ab 2.5 verfügbar. HPUX-gcc 2.5.8
-     * kann es noch nicht - what's this?
-     */
-#if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ > 5)
-# define LRZSZ_ATTRIB_NORET  __attribute__((__noreturn__))
-#endif
-
-#if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ > 5)
-# define LRZSZ_ATTRIB_PRINTF(formatnr,firstargnr)  \
-    __attribute__((__format__ (printf,formatnr,firstargnr)))
-#endif
-
-#if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ > 6)
-#define LRZSZ_ATTRIB_UNUSED __attribute__((__unused__))
-#endif
-
-#if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ >= 7)
-# define LRZSZ_ATTRIB_REGPARM(n)  \
-    __attribute__((__regparm__ (n)))
-#endif
-#endif /* __GNUC__ */
-#ifndef LRZSZ_ATTRIB_REGPARM
-#define LRZSZ_ATTRIB_REGPARM(n)
-#endif
-#ifndef LRZSZ_ATTRIB_UNUSED
-#define LRZSZ_ATTRIB_UNUSED
-#endif
-#ifndef LRZSZ_ATTRIB_NORET
-#define LRZSZ_ATTRIB_NORET
-#endif
-#ifndef LRZSZ_ATTRIB_CONST
-#define LRZSZ_ATTRIB_CONST
-#endif
-#ifndef LRZSZ_ATTRIB_PRINTF
-#define LRZSZ_ATTRIB_PRINTF(x,y)
-#endif
-#ifndef LRZSZ_ATTRIB_SECTION
-#define LRZSZ_ATTRIB_SECTION(n)
-#endif
-#undef LRZSZ_ATTRIB_SECTION
-#define LRZSZ_ATTRIB_SECTION(x)
-#undef LRZSZ_ATTRIB_REGPARM
-#define LRZSZ_ATTRIB_REGPARM(x)
-
 
 #define OK 0
 #define FALSE 0
@@ -324,8 +283,7 @@ extern int readline_left; /* number of buffered chars left to read */
 
 int readline_internal (unsigned int timeout);
 void readline_purge (void);
-void readline_setup (int fd, size_t readnum, 
-	size_t buffer_size) LRZSZ_ATTRIB_SECTION(lrzsz_rare);
+void readline_setup (int fd, size_t readnum, size_t buffer_size);
 
 
 /* rbsb.c */
@@ -337,9 +295,9 @@ extern unsigned char checked;
 extern int iofd;
 extern unsigned Baudrate;
 
-void zperr (const char *fmt, ...) LRZSZ_ATTRIB_PRINTF(1,2);
-void zpfatal (const char *fmt, ...) LRZSZ_ATTRIB_PRINTF(1,2);
-void vfile (const char *format, ...) LRZSZ_ATTRIB_PRINTF(1,2);
+LRZSZ_FORMAT_PRINTF(1,2) void zperr (const char *fmt, ...);
+LRZSZ_FORMAT_PRINTF(1,2) void zpfatal (const char *fmt, ...);
+LRZSZ_FORMAT_PRINTF(1,2) void vfile (const char *format, ...);
 #define vchar(x) putc(x,stderr)
 #define vstring(x) fputs(x,stderr)
 
@@ -349,15 +307,15 @@ void vfile (const char *format, ...) LRZSZ_ATTRIB_PRINTF(1,2);
 #endif
 #endif
 #ifndef vstringf
-void vstringf (const char *format, ...) LRZSZ_ATTRIB_PRINTF(1,2);
+LRZSZ_FORMAT_PRINTF(1,2) void vstringf (const char *format, ...);
 #endif
 #define VPRINTF(level,format_args) do {if ((Verbose)>=(level)) \
 	vstringf format_args ; } while(0)
 
 /* rbsb.c */
-int from_cu (void) LRZSZ_ATTRIB_SECTION(lrzsz_rare);
+int from_cu (void);
 int rdchk (int fd);
-int io_mode (int fd, int n) LRZSZ_ATTRIB_SECTION(lrzsz_rare);
+int io_mode (int fd, int n);
 void sendbrk (int fd);
 #define flushmo() fflush(stdout)
 void purgeline (int fd);
@@ -390,23 +348,18 @@ extern int Znulls;     /* Number of nulls to send at beginning of ZDATA hdr */
 extern char Attn[ZATTNLEN+1];  /* Attention string rx sends to tx on err */
 
 extern void zsendline (int c);
-extern void zsendline_init (void) LRZSZ_ATTRIB_SECTION(lrzsz_rare);
+extern void zsendline_init (void);
 void zsbhdr (int type, char *hdr);
 void zshhdr (int type, char *hdr);
 void zsdata (const char *buf, size_t length, int frameend);
 void zsda32 (const char *buf, size_t length, int frameend);
 int zrdata (char *buf, int length, size_t *received);
 int zgethdr (char *hdr, int eflag, size_t *);
-void stohdr (size_t pos) LRZSZ_ATTRIB_REGPARM(1);
-long rclhdr (char *hdr) LRZSZ_ATTRIB_REGPARM(1);
+void stohdr (size_t pos);
+long rclhdr (char *hdr);
 
-int tcp_server (char *buf) LRZSZ_ATTRIB_SECTION(lrzsz_rare);
-int tcp_connect (char *buf) LRZSZ_ATTRIB_SECTION(lrzsz_rare);
-int tcp_accept (int d) LRZSZ_ATTRIB_SECTION(lrzsz_rare);
-
-
-const char * protname (void) LRZSZ_ATTRIB_SECTION(lrzsz_rare);
-void lsyslog (int, const char *,...) LRZSZ_ATTRIB_PRINTF(2,3);
+const char * protname (void);
+LRZSZ_FORMAT_PRINTF(2,3) void lsyslog (int, const char *,...);
 
 
 

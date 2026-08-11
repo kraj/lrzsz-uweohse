@@ -92,7 +92,7 @@ static const char *frametypes[] = {
 /* static char *badcrc = "Bad CRC"; */
 static inline int noxrd7 (void);
 static inline int zdlread (void);
-static int zdlread2 (int) LRZSZ_ATTRIB_REGPARM(1);
+static int zdlread2 (int);
 static inline int zgeth1 (void);
 static void zputhex (int c, unsigned char *pos);
 static inline int zgethex (void);

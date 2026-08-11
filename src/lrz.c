@@ -154,7 +154,7 @@ int enable_syslog=FALSE;
 
 
 /* async-signal-safe signal handler */
-static void
+LRZSZ_NORETURN static void
 bibi_sighandler(int n)
 {
 	if (zmodem_requested)
@@ -245,7 +245,7 @@ static struct option const long_options[] =
 };
 #endif
 
-static void
+LRZSZ_NORETURN static void
 show_version(void)
 {
 	printf ("%s (GNU %s) %s\n", program_name, PACKAGE, VERSION);
@@ -522,7 +522,7 @@ main(int argc, char *argv[])
 	exit(exitcode);
 }
 
-static void
+LRZSZ_NORETURN static void
 usage(int exitcode, const char *what)
 {
 	FILE *f=stdout;

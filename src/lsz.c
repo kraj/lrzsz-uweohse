@@ -204,7 +204,7 @@ static int zrqinits_sent=0;
 static int play_with_sigint=0;
 
 /* async-signal-safe signal handler */
-static void
+LRZSZ_NORETURN static void
 bibi_sighandler(int n)
 {
 	canit(STDOUT_FILENO);
@@ -213,7 +213,7 @@ bibi_sighandler(int n)
 }
 
 /* called from normal control flow (rbsb.c) to clean things up */
-LRZSZ_ATTRIB_NORET void
+LRZSZ_NORETURN void
 bibi(int n)
 {
 	canit(STDOUT_FILENO);
@@ -254,7 +254,7 @@ install_signal_handler(int sig)
 }
 
 /* Called when ZMODEM gets an interrupt (^C) */
-static void
+LRZSZ_NORETURN static void
 onintr(int n)
 {
 	signal(SIGINT, SIG_IGN);
@@ -1326,7 +1326,7 @@ zfilbuf (struct zm_fileinfo *zi)
 	return n;
 }
 
-static void
+LRZSZ_NORETURN static void
 usage(int exitcode, const char *what)
 {
 	FILE *f=stdout;
