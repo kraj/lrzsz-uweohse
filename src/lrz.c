@@ -818,9 +818,13 @@ wcrx(struct zm_fileinfo *zi)
 		purgeline(0);	/* Do read next time ... */
 		sectcurr=wcgetsec(&Blklen, secbuf, 
 			(unsigned int) ((sectnum&0177) ? 50 : 130));
-		report(sectcurr);
 		if (sectcurr==((sectnum+1) &0377)) {
 			sectnum++;
+                        /* report the real section/block number, not sectcurr
+                         * this is (a) more correct, and
+                         * (b) avoid overwriting 255 with 0 to create 055…
+                         */
+		        report(sectnum);
 			/* if using xmodem we don't know how long a file is */
 			if (zi->bytes_total && R_BYTESLEFT(zi) < Blklen)
 				Blklen=R_BYTESLEFT(zi);
