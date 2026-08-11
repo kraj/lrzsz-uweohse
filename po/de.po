@@ -128,8 +128,7 @@ msgstr "Argument der Option t außerhalb des Bereichs 10..1000"
 
 #: src/lsz.c:570 src/lrz.c:416
 msgid "security violation: can't do that under restricted shell\n"
-msgstr ""
-"Sicherheitsverstoß: Ausführung unter eingeschränkter Shell verboten\n"
+msgstr "Sicherheitsverstoß: Ausführung unter eingeschränkter Shell verboten\n"
 
 #: src/lsz.c:577 src/lrz.c:403
 msgid "window size"
@@ -441,8 +440,7 @@ msgstr ""
 "  -w, --windowsize N          Fenstergröße auf N Bytes setzen (Z)\n"
 "  -X  --xmodem                XMODEM-Protokoll benutzen\n"
 "  -y, --overwrite             existierende Dateien überschreiben\n"
-"  -Y, --overwrite-or-skip     wie `y', aber nicht existierende "
-"überspringen\n"
+"  -Y, --overwrite-or-skip     wie `y', aber nicht existierende überspringen\n"
 "      --ymodem                YMODEM-Protokoll benutzen\n"
 "  -Z, --zmodem                ZMODEM-Protokoll benutzen\n"
 "\n"
