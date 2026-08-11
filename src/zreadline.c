@@ -46,7 +46,7 @@ char *readline_ptr;
 static void
 zreadline_alarm_handler(int dummy)
 {
-	dummy++; /* doesn't need to do anything */
+	(void) dummy;
 }
 
 /*

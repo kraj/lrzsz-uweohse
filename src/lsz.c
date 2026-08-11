@@ -258,7 +258,7 @@ LRZSZ_NORETURN static void
 onintr(int n)
 {
 	signal(SIGINT, SIG_IGN);
-	n++; /* use it */
+	(void) n; /* use it */
 	longjmp(intrjmp, -1);
 }
 
