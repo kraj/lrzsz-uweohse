@@ -11,6 +11,9 @@ not perfectly trustworthy senders.
   This was a security bug found by TristanInSec with an email
   domain gmail under the com tld.
 
+  Likewise lsz did not correctly check paths in the restricted
+  mode if PUBDIR support was not compiled in.
+
 * a buffer overflow was fixed in lrz, in which the attacker
   could quite easily cause an overflow in a malloc()ed buffer.
 
@@ -23,10 +26,14 @@ not perfectly trustworthy senders.
   argument, with escaping it, allowing arbitrary command
   execution.
   This feature/insecurity was only accessible if the installer
-  gave appended some string to the lrz (or rz) commands name.
+  appended some string to the lrz (or rz) commands name.
 
   This was a security bug found by TristanInSec with an email
   domain gmail under the com tld.
+
+* CVE-2018-10195 fixed, in which lsz could leak information
+  to the receiving attacker if that turned of crc32.
+  Impact: low to medium.
 
 * autotools updated. I can only hope it works.
 
@@ -42,7 +49,7 @@ not perfectly trustworthy senders.
 * the PUBDIR feature was removed from lsz and lrz.
   this feature of the restricted mode allowed uploads not
   only from the current directory, but from the compiled in
-  PUBDIR (/usr/spool/uucppublic, typically), and it allow
+  PUBDIR (/usr/spool/uucppublic, typically), and it allowed
   uploads into that, too.
   If you really need something like this, you can add a 
   symlink to the current directory.
@@ -63,6 +70,7 @@ not perfectly trustworthy senders.
 
 * the timesync mode to set the receivers system clock was
   removed (needed root).
+
 
 Version 0.12.20 - December 1998, Uwe Ohse
 
