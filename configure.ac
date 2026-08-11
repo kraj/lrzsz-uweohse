@@ -23,15 +23,6 @@ AS_CASE([$VERSION],
   [*], [README_ALPHA=])
 
 
-AC_ARG_ENABLE(timesync,
-	[--disable-timesync   exclude support for timesync protocol],
-	[if test "$enableval" = "no" ; then 
-		:
-	  else
-		AC_DEFINE([ENABLE_TIMESYNC], [], [Define to 1 if you want support for the timesync protocol.])
-	  fi],
-	[AC_DEFINE([ENABLE_TIMESYNC], [], [Define to 1 if you want support for the timesync protocol.])])
-AC_SUBST(ENABLE_TIMESYNC)
 AC_ARG_ENABLE(mkdir,
 	[--disable-mkdir   disable support for creating directories (lrz)],
 	[if test "$enableval" = "no" ; then 
@@ -135,20 +126,9 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
 ]], [[int x = O_NOFOLLOW; return x;]])],
   [AC_DEFINE([HAVE_O_NOFOLLOW], [1])
    AC_MSG_RESULT([yes])],
-  [AC_MSG_RESULT([no])])
+   [AC_MSG_RESULT([no])])
 
 
-dnl
-AC_MSG_CHECKING([for timezone variable])
-AC_CACHE_VAL(libquark_cv_var_timezone,[
-AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <time.h>]], [[return(int)(timezone/2);]])],[libquark_cv_var_timezone=yes],[libquark_cv_var_timezone=no])
-])
-if test $libquark_cv_var_timezone = yes ; then
-	AC_MSG_RESULT(yes)
-	AC_DEFINE([HAVE_TIMEZONE_VAR], [], [Define to 1 if you have the timezone variable.])
-else
-	AC_MSG_RESULT(no)
-fi
 if test "x$lookup_facility" = x ; then
 	:
 else

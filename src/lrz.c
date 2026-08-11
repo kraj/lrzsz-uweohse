@@ -81,11 +81,6 @@ int zmodem_requested=FALSE;
 
 static char *secbuf;
 
-#ifdef ENABLE_TIMESYNC
-static int timesync_flag=0;
-static int in_timesync=0;
-#endif
-
 #if defined(F_GETFD) && defined(F_SETFD) && defined(O_SYNC)
 static int o_sync = 0;
 #endif
@@ -391,11 +386,7 @@ main(int argc, char *argv[])
 				try_resume=TRUE;  
 			break;
 		case 'R': Restricted++;  break;
-		case 'S':
-#ifdef ENABLE_TIMESYNC
-			timesync_flag++;
-#endif
-			break;
+		case 'S': break; /* timesync removed, kept as no-op */
 		case 't':
 			s_err = xstrtoul (optarg, NULL, 0, &tmp, NULL);
 			if (s_err != LONGINT_OK)
@@ -576,7 +567,6 @@ usage(int exitcode, const char *what)
 "  -r, --resume                try to resume interrupted file transfer (Z)\n"
 "  -R, --restricted            restricted, more secure mode\n"
 "  -s, --stop-at {HH:MM|+N}    stop transmission at HH:MM or in N seconds\n"
-"  -S, --timesync              request remote time (twice: set local time)\n"
 "      --syslog[=off]          turn syslog on or off, if possible\n"
 "  -t, --timeout N             set timeout to N tenths of a second\n"
 "  -u, --keep-uppercase        keep upper case filenames\n"
@@ -1125,12 +1115,6 @@ procheader(char *name, struct zm_fileinfo *zi)
 	if (skip_if_not_found)
 		openmode="r+";
 
-#ifdef ENABLE_TIMESYNC
-	in_timesync=0;
-	if (timesync_flag && 0==strcmp(name,"$time$.t"))
-		in_timesync=1;
-#endif
-
 	zi->bytes_total = DEFBYTL;
 	zi->mode = 0; 
 	zi->eof_seen = 0; 
@@ -1153,9 +1137,6 @@ procheader(char *name, struct zm_fileinfo *zi)
 	/* Check for existing file */
 	if (zconv != ZCRESUM && !Rxclob && (zmanag&ZF1_ZMMASK) != ZF1_ZMCLOB 
 		&& (zmanag&ZF1_ZMMASK) != ZF1_ZMAPND
-#ifdef ENABLE_TIMESYNC
-	    && !in_timesync
-#endif
 		&& (fout=safe_open(name, "r"))) {
 		struct stat sta;
 		char *tmpname;
@@ -1237,20 +1218,6 @@ procheader(char *name, struct zm_fileinfo *zi)
 		if ( *--p == '.')		/* zap trailing period */
 			*p = 0;
 	}
-
-#ifdef ENABLE_TIMESYNC
-	if (in_timesync)
-	{
-		long t=time(0);
-		long d=t-zi->modtime;
-		if (d<0)
-			d=0;
-		if ((Verbose && d>60) || Verbose > 1)
-			vstringf(_("TIMESYNC: here %ld, remote %ld, diff %ld seconds\n"),
-			(long) t, (long) zi->modtime, d);
-		return ERROR; /* skips file */
-	}
-#endif /* ENABLE_TIMESYNC */
 
 	if (!zmodem_requested && MakeLCPathname && !IsAnyLower(name_static)
 	  && !(zi->mode&UNIXFILE))
@@ -1604,11 +1571,7 @@ tryz(void)
 #else
 		Txhdr[ZF0] = CANFC32|CANFDX|CANOVIO;
 #endif
-#ifdef ENABLE_TIMESYNC
-		if (timesync_flag)
-			Txhdr[ZF1] |= ZF1_TIMESYNC;
-#endif
-		if (Zctlesc)
+	if (Zctlesc)
 			Txhdr[ZF0] |= TESCCTL; /* TESCCTL == ESCCTL */
 		zshhdr(tryzhdrtype, Txhdr);
 

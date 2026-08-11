@@ -323,12 +323,6 @@ stops transmission in
 .B N
 seconds.
 .TP
-.B "-S, --timesync"
-enable timesync protocol support. See timesync.doc for further 
-information.
-
-This option is incompatible with standard zmodem. Use it with care.
-.TP
 .B "--syslog[=off]"
 turn syslogging on or off. the default is set at configure time.
 This option is ignored if no syslog support is compiled in.
@@ -405,15 +399,6 @@ or
 .TP
 .B ZMODEM_RESTRICTED
 lrz enters restricted mode if the variable is set.
-.TP
-.B TMPDIR
-If this environment variable is set its content is used as the 
-directory to place in the answer file to a 
-.B timesync 
-request.
-.B TMP
-Used instead of TMPDIR if TMPDIR is not set. If neither TMPDIR nor
-TMP is set /tmp will be used.
 .SH EXAMPLES
 .ne 7
 .B "ZMODEM File Transfer"

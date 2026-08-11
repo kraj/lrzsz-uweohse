@@ -158,7 +158,6 @@ unsigned Rxbuflen = 16384;	/* Receiver's max buffer length */
 unsigned Tframlen = 0;	/* Override for tx frame length */
 unsigned blkopt=0;		/* Override value for zmodem blklen */
 int Rxflags = 0;
-int Rxflags2 = 0;
 size_t bytcnt;
 int Wantfcs32 = TRUE;	/* want to send 32 bit FCS */
 char Lzconv;	/* Local ZMODEM file conversion request */
@@ -172,7 +171,6 @@ int command_mode;		/* Send a command, then exit. */
 int Cmdtries = 11;
 int Cmdack1;		/* Rx ACKs command, then do it */
 int Exitcode;
-int enable_timesync=0;
 size_t Lastsync;		/* Last offset to which we got a ZRPOS */
 int Beenhereb4;		/* How many times we've been ZRPOS'd same place */
 
@@ -551,7 +549,7 @@ main(int argc, char **argv)
 				stop_time = (time_t)tmp + time(0);
 			}
 			break;
-		case 'S': enable_timesync=1; break;
+		case 'S': break; /* timesync removed, kept as no-op */
 		case 'T': turbo_escape=1; break;
 		case 't':
 			s_err = xstrtoul (optarg, NULL, 0, &tmp, NULL);
@@ -744,16 +742,6 @@ main(int argc, char **argv)
 				Txhdr[ZF0] = ZCOMMAND;
 			zshhdr(ZRQINIT, Txhdr);
 			zrqinits_sent++;
-#if defined(ENABLE_TIMESYNC)
-			if (Rxflags2 != ZF1_TIMESYNC)
-				/* disable timesync if there are any flags we don't know.
-				 * dsz/gsz seems to use some other flags! */
-				enable_timesync=FALSE;
-			if (Rxflags2 & ZF1_TIMESYNC && enable_timesync) {
-				Totalleft+=6; /* TIMESYNC never needs more */
-				Filesleft++;
-			}
-#endif
 		}
 	}
 	fflush(stdout);
@@ -789,88 +777,6 @@ main(int argc, char **argv)
 	/*NOTREACHED*/
 }
 
-static int 
-send_pseudo(const char *name, const char *data)
-{
-	char *tmp;
-	const char *p;
-	int ret=0; /* ok */
-	size_t plen;
-	int fd;
-	int lfd;
-	
-	p = getenv ("TMPDIR");
-	if (!p)
-		p = getenv ("TMP");
-	if (!p)
-		p = "/tmp";
-	tmp=malloc(PATH_MAX+1);
-	if (!tmp)
-		error(1,0,_("out of memory"));
-	
-	plen=strlen(p);
-	memcpy(tmp,p,plen);	
-	tmp[plen++]='/';
-
-	lfd=0;
-	do {
-		if (lfd++==10) {
-			vstringf (_ ("send_pseudo %s: cannot open tmpfile %s: %s"),
-					 name, tmp, strerror (errno));
-			vstring ("\r\n");
-			free(tmp);
-			return 1;
-		}
-		sprintf(tmp+plen,"%s.%lu.%d",name,(unsigned long) getpid(),lfd);
-		fd=open(tmp,O_WRONLY|O_CREAT|O_EXCL,0700);
-		/* is O_EXCL guaranted to not follow symlinks? 
-		 * I don`t know ... so be careful
-		 */
-		if (fd!=-1) {
-			struct stat st;
-			if (0!=lstat(tmp,&st)) {
-				vstringf (_ ("send_pseudo %s: cannot lstat tmpfile %s: %s"),
-						 name, tmp, strerror (errno));
-				vstring ("\r\n");
-				unlink(tmp);
-				close(fd);
-				fd=-1;
-			} else {
-				if (S_ISLNK(st.st_mode)) {
-					vstringf (_ ("send_pseudo %s: avoiding symlink trap"),name);
-					vstring ("\r\n");
-					unlink(tmp);
-					close(fd);
-					fd=-1;
-				}
-			}
-		}
-	} while (fd==-1);
-	if (write(fd,data,strlen(data))!=(signed long) strlen(data)
-		|| close(fd)!=0) {
-		vstringf (_ ("send_pseudo %s: cannot write to tmpfile %s: %s"),
-				 name, tmp, strerror (errno));
-		vstring ("\r\n");
-		free(tmp);
-		return 1;
-	}
-
-	if (wcs (tmp,name) == ERROR) {
-		if (Verbose)
-			vstringf (_ ("send_pseudo %s: failed"),name);
-		else {
-			if (Verbose)
-				vstringf (_ ("send_pseudo %s: ok"),name);
-			Filcnt--;
-		}
-		vstring ("\r\n");
-		ret=1;
-	}
-	unlink (tmp);
-	free(tmp);
-	return ret;
-}
-
 static int
 wcsend (int argc, char *argp[])
 {
@@ -885,28 +791,6 @@ wcsend (int argc, char *argp[])
 		if (wcs (argp[n],NULL) == ERROR)
 			return ERROR;
 	}
-#if defined(ENABLE_TIMESYNC)
-	if (Rxflags2 & ZF1_TIMESYNC && enable_timesync) {
-		/* implement Peter Mandrellas extension */
-		char buf[60];
-		time_t t = time (NULL);
-		struct tm *tm = localtime (&t);		/* sets timezone */
-		strftime (buf, sizeof (buf) - 1, "%H:%M:%S", tm);
-		if (Verbose) {
-			vstring ("\r\n");
-			vstringf (_("Answering TIMESYNC at %s"),buf);
-		}
-#if defined(HAVE_TIMEZONE_VAR)
-		sprintf(buf+strlen(buf),"%ld\r\n", timezone / 60);
-		if (Verbose)
-			vstringf (" (%s %ld)\r\n", _ ("timezone"), timezone / 60);
-#else
-		if (Verbose)
-			vstringf (" (%s)\r\n", _ ("timezone unknown"));
-#endif
-		send_pseudo("/$time$.t",buf);
-	}
-#endif
 	Totsecs = 0;
 	if (Filcnt == 0) {			/* bitch if we couldn't open ANY files */
 		canit(STDOUT_FILENO);
@@ -1563,7 +1447,6 @@ getzrxinit(void)
 			continue;
 		case ZRINIT:
 			Rxflags = 0377 & Rxhdr[ZF0];
-			Rxflags2 = 0377 & Rxhdr[ZF1];
 			Txfcs32 = (Wantfcs32 && (Rxflags & CANFC32));
 			{
 				int old=Zctlesc;
