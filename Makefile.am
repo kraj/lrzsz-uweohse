@@ -3,6 +3,7 @@ EXTRA_DIST = m4/ChangeLog  check.lrzsz COMPATABILITY README.cvs README.isdn4linu
 	README.gettext rpmrc buildrpm fastcheck.sh README.tests \
 	beos-runpiped.c fastcheck.beos
 PR=@PACKAGE@-@VERSION@
+DISTCLEANFILES=fastcheck.done stamp-h
 CLEAN_FILES=fastcheck.done
 
 oldcheck-local:
