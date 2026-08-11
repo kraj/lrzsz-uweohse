@@ -54,7 +54,11 @@ lsyslog(int prio, const char *format, ...)
     }
 
     va_start(ap, format);
-    vasprintf(&s,format, ap);
+    if (vasprintf(&s,format, ap) < 0) {
+        /* most likely: out of memory */
+        va_end(ap);
+        return;
+    }
     va_end(ap);
     syslog(prio,"[%s] %s",username, s);
     free(s);

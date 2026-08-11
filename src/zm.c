@@ -420,7 +420,12 @@ zshhdr(int type, char *hdr)
 		s[len++]=021;
 	}
 	flushmo();
-	write(1,s,len);
+        if (write(1,s,len) < 0) { 
+            /* not much we can do here.
+             * retry (doing nothing will lead to that)
+             * or exit.
+             */
+        }
 }
 
 /*

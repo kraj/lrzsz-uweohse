@@ -39,8 +39,16 @@ canit (int fd)
 		24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 0
 	};
 	purgeline(fd);
-	write(fd,canistr,strlen(canistr));
-	if (fd==0)
-		write(1,canistr,strlen(canistr));
+	if (write(fd,canistr,strlen(canistr))<0) {
+                /* no much we can do: ignore and hope, or exit
+                 * in any other program i'd opt for exit, but serials 
+                 * ports play strange games.
+                 */
+        }
+	if (fd==0) {
+		if (write(1,canistr,strlen(canistr))<0) {
+                        /* no much we can do: ignore and hope, or exit */
+                }
+        }
 }
 
