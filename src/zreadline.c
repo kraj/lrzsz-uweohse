@@ -68,7 +68,7 @@ readline_internal(unsigned int timeout)
 		else if (n==0)
 			n=1;
 		if (Verbose > 5)
-			vstringf("Calling read: alarm=%d  Readnum=%d ",
+			vstringf("Calling read: alarm=%u  Readnum=%lu ",
 			  n, readline_readnum);
 		{
 			/* Install the handler without SA_RESTART so that the
@@ -83,7 +83,7 @@ readline_internal(unsigned int timeout)
 		alarm(n);
 	}
 	else if (Verbose > 5)
-		vstringf("Calling read: Readnum=%d ",
+		vstringf("Calling read: Readnum=%lu ",
 		  readline_readnum);
 
 	readline_ptr=readline_buffer;

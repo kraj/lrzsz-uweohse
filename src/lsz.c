@@ -64,27 +64,26 @@ static int no_unixmode;
 
 int Canseek=1; /* 1: can; 0: only rewind, -1: neither */
 
-static int zsendfile __P ((struct zm_fileinfo *zi, const char *buf, size_t blen));
-static int getnak __P ((void));
-static int wctxpn __P ((struct zm_fileinfo *));
-static int wcs __P ((const char *oname, const char *remotename));
-static size_t zfilbuf __P ((struct zm_fileinfo *zi));
-static size_t filbuf __P ((char *buf, size_t count));
-static int getzrxinit __P ((void));
-static int calc_blklen __P ((long total_sent));
-static int sendzsinit __P ((void));
-static int wctx __P ((struct zm_fileinfo *));
-static int zsendfdata __P ((struct zm_fileinfo *));
-static int getinsync __P ((struct zm_fileinfo *, int flag));
-static void countem __P ((int argc, char **argv));
-static void chkinvok __P ((const char *s));
-static void usage __P ((int exitcode, const char *what));
-static int zsendcmd __P ((const char *buf, size_t blen));
-static void saybibi __P ((void));
-static int install_signal_handler __P ((int sig));
-static int wcsend __P ((int argc, char *argp[]));
-static int wcputsec __P ((char *buf, int sectnum, size_t cseclen));
-static void usage1 __P ((int exitcode));
+static int zsendfile (struct zm_fileinfo *zi, const char *buf, size_t blen);
+static int getnak (void);
+static int wctxpn (struct zm_fileinfo *);
+static int wcs (const char *oname, const char *remotename);
+static size_t zfilbuf (struct zm_fileinfo *zi);
+static size_t filbuf (char *buf, size_t count);
+static int getzrxinit (void);
+static int calc_blklen (long total_sent);
+static int sendzsinit (void);
+static int wctx (struct zm_fileinfo *);
+static int zsendfdata (struct zm_fileinfo *);
+static int getinsync (struct zm_fileinfo *, int flag);
+static void countem (int argc, char **argv);
+static void chkinvok (const char *s);
+static void usage (int exitcode, const char *what);
+static int zsendcmd (const char *buf, size_t blen);
+static void saybibi (void);
+static int install_signal_handler (int sig);
+static int wcsend (int argc, char *argp[]);
+static int wcputsec (char *buf, int sectnum, size_t cseclen);
 
 #ifdef ENABLE_SYSLOG
 #define DO_SYSLOG(message) do { \
@@ -269,6 +268,7 @@ int Zctlesc;	/* Encode control characters */
 const char *program_name = "sz";
 int Zrwindow = 1400;	/* RX window size (controls garbage count) */
 
+#ifdef HAVE_GETOPT_LONG
 static struct option const long_options[] =
 {
   {"append", no_argument, NULL, '+'},
@@ -312,9 +312,10 @@ static struct option const long_options[] =
   {"unlink", no_argument, NULL, 'u'},
   {"unrestrict", no_argument, NULL, 'U'},
   {"verbose", no_argument, NULL, 'v'},
+  {"version", no_argument, 0, 'v'},
   {"windowsize", required_argument, NULL, 'w'},
   {"xmodem", no_argument, NULL, 'X'},
-  {"ymodem", no_argument, NULL, 1},
+  {"ymodem", no_argument, NULL, 'g'},
   {"zmodem", no_argument, NULL, 'Z'},
   {"overwrite", no_argument, NULL, 'y'},
   {"overwrite-or-skip", no_argument, NULL, 'Y'},
@@ -323,6 +324,7 @@ static struct option const long_options[] =
   {"no-unixmode", no_argument, NULL, 8},
   {NULL, 0, NULL, 0}
 };
+#endif
 
 static void
 show_version(void)
@@ -370,10 +372,11 @@ main(int argc, char **argv)
 	bindtextdomain (PACKAGE, LOCALEDIR);
 	textdomain (PACKAGE);
 
-	parse_long_options (argc, argv, show_version, usage1);
-
 	Rxtimeout = 600;
 
+#ifndef HAVE_GETOPT_LONG
+#define getopt_long(argc,argv,str,longopts,longind) getopt(argc,argv,str)
+#endif
 	while ((c = getopt_long (argc, argv, 
 		"2+48abB:C:c:dfeEghHi:kL:l:m:M:NnOopRrqsSt:TUuvw:XYy",
 		long_options, (int *) 0))!=EOF)
@@ -569,6 +572,7 @@ main(int argc, char **argv)
 		_("security violation: can't do that under restricted shell\n"));
 			break;
 		case 'v': ++Verbose; break;
+                case 'V': show_version(); break;
 		case 'w':
 			s_err = xstrtoul (optarg, NULL, 0, &tmp, NULL);
 			if (s_err != LONGINT_OK)
@@ -585,7 +589,7 @@ main(int argc, char **argv)
 				blkopt = Txwspac;
 			break;
 		case 'X': protocol=ZM_XMODEM; break;
-		case 1:   protocol=ZM_YMODEM; break;
+		case 'g': protocol=ZM_YMODEM; break;
 		case 'Z': protocol=ZM_ZMODEM; break;
 		case 'Y':
 			Lskipnocor = TRUE;
@@ -1093,6 +1097,8 @@ wcs(const char *oname, const char *remotename)
 			lsyslog(LOG_INFO, _("%s/%s: skipped"),protname(),shortname);
 #endif
 		return OK;
+        default: 
+                ;
 	}
 	if (!zmodem_requested && wctx(&zi)==ERROR)
 	{
@@ -1460,12 +1466,6 @@ zfilbuf (struct zm_fileinfo *zi)
 }
 
 static void
-usage1 (int exitcode)
-{
-	usage (exitcode, NULL);
-}
-
-static void
 usage(int exitcode, const char *what)
 {
 	FILE *f=stdout;
@@ -1474,7 +1474,7 @@ usage(int exitcode, const char *what)
 	{
 		if (what)
 			fprintf(stderr, "%s: %s\n",program_name,what);
-	    fprintf (stderr, _("Try `%s --help' for more information.\n"),
+	    fprintf (stderr, _("Try `%s -h' for more information.\n"),
             program_name);
 		exit(exitcode);
 	}
@@ -1530,15 +1530,19 @@ usage(int exitcode, const char *what)
 "  -u, --unlink                unlink file after transmission\n"
 "  -U, --unrestrict            turn off restricted mode (if allowed to)\n"
 "  -v, --verbose               be verbose, provide debugging information\n"
+"  -V, --version               show version information\n"
 "  -w, --windowsize N          Window is N bytes (Z)\n"
 "  -X, --xmodem                use XMODEM protocol\n"
 "  -y, --overwrite             overwrite existing files\n"
 "  -Y, --overwrite-or-skip     overwrite existing files, else skip\n"
-"      --ymodem                use YMODEM protocol\n"
+"  -g  --ymodem                use YMODEM protocol (yes, -1)\n"
 "  -Z, --zmodem                use ZMODEM protocol\n"
 "\n"
 "short options use the same arguments as the long ones\n"
 	),f);
+#ifndef HAVE_GETOPT_LONG
+	fputs(_("The long options (--...) are not available on your system (getopt_long is not available)\n"), f);
+#endif
 	exit(exitcode);
 }
 
@@ -1649,7 +1653,7 @@ getzrxinit(void)
 				blklen = Rxbuflen;
 			if (blkopt && blklen > blkopt)
 				blklen = blkopt;
-			vfile("Rxbuflen=%d blklen=%d", Rxbuflen, blklen);
+			vfile("Rxbuflen=%d blklen=%lu", Rxbuflen, blklen);
 			vfile("Txwindow = %u Txwspac = %d", Txwindow, Txwspac);
 			Rxtimeout=old_timeout;
 			return (sendzsinit());
@@ -1945,6 +1949,8 @@ zsendfdata (struct zm_fileinfo *zi)
 			case XOFF:			/* Wait a while for an XON */
 			case XOFF | 0200:
 				READLINE_PF (100);
+                        default:
+                                ;
 			}
 		}
 #endif
@@ -2335,6 +2341,8 @@ saybibi(void)
 		case ZCAN:
 		case TIMEOUT:
 			return;
+                default:
+                        ;
 		}
 	}
 }

@@ -5,6 +5,7 @@ EXTRA_DIST = m4/ChangeLog  check.lrzsz COMPATABILITY README.cvs README.isdn4linu
 PR=@PACKAGE@-@VERSION@
 DISTCLEANFILES=fastcheck.done stamp-h
 CLEAN_FILES=fastcheck.done
+ACLOCAL_AMFLAGS = -I m4
 
 oldcheck-local:
 	QUIET=-q $(srcdir)/check.lrzsz $(srcdir) `pwd`	
@@ -74,4 +75,3 @@ rpm: $(PR).tar.gz Specfile
 	$(srcdir)/buildrpm $(srcdir)
 
 
-ACLOCAL_AMFLAGS = -I m4

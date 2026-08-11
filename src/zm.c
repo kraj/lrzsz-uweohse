@@ -90,19 +90,19 @@ static const char *frametypes[] = {
 
 #define badcrc _("Bad CRC")
 /* static char *badcrc = "Bad CRC"; */
-static inline int noxrd7 __P ((void));
-static inline int zdlread __P ((void));
-static int zdlread2 __P ((int)) LRZSZ_ATTRIB_REGPARM(1);
-static inline int zgeth1 __P ((void));
-static void zputhex __P ((int c, char *pos));
-static inline int zgethex __P ((void));
-static int zrbhdr __P ((char *hdr));
-static int zrbhdr32 __P ((char *hdr));
-static int zrhhdr __P ((char *hdr));
+static inline int noxrd7 (void);
+static inline int zdlread (void);
+static int zdlread2 (int) LRZSZ_ATTRIB_REGPARM(1);
+static inline int zgeth1 (void);
+static void zputhex (int c, unsigned char *pos);
+static inline int zgethex (void);
+static int zrbhdr (char *hdr);
+static int zrbhdr32 (char *hdr);
+static int zrhhdr (char *hdr);
 static char zsendline_tab[256];
-static int zrdat32 __P ((char *buf, int length, size_t *));
-static void zsbh32 __P ((char *hdr, int type));
-static inline void zsendline_s __P((const char *s, size_t count));
+static int zrdat32 (char *buf, int length, size_t *);
+static void zsbh32 (char *hdr, int type);
+static inline void zsendline_s (const char *s, size_t count);
 
 extern int zmodem_requested;
 
@@ -128,6 +128,7 @@ noxrd7(void)
 		default:
 			if (Zctlesc && !(c & 0140))
 				continue;
+                        return c;
 		case '\r':
 		case '\n':
 		case ZDLE:
@@ -258,6 +259,7 @@ zsendline(int c)
 
 	switch(zsendline_tab[(unsigned) (c&=0377)])
 	{
+        default: // can't happen
 	case 0: 
 		xsendline(lastsent = c); 
 		break;
@@ -299,6 +301,7 @@ zsendline_s(const char *s, size_t count)
 		if (last_esc) {
 			int c=*s;
 			switch(last_esc) {
+                        default: // can't happen
 			case 0: 
 				xsendline(lastsent = c); 
 				break;
@@ -383,7 +386,7 @@ zshhdr(int type, char *hdr)
 {
 	register int n;
 	register unsigned short crc;
-	char s[30];
+	unsigned char s[30];
 	size_t len;
 
 	VPRINTF(3,("zshhdr: %s %lx", frametypes[(type & 0x7f)+FTOFFSET], rclhdr(hdr)));
@@ -454,7 +457,7 @@ zsda32(const char *buf, size_t length, int frameend)
 	int c;
 	unsigned long crc;
 	int i;
-	VPRINTF(3,("zsdat32: %d %s", length, Zendnames[(frameend-ZCRCE)&3]));
+	VPRINTF(3,("zsdat32: %lu %s", length, Zendnames[(frameend-ZCRCE)&3]));
 
 	crc = 0xFFFFFFFFL;
 	zsendline_s(buf,length);
@@ -696,7 +699,7 @@ gotcan:
 			goto again;
 		case ZCRCW:
 			c = ERROR;
-		/* **** FALL THRU TO **** */
+	        /* FALLTHROUGH */
 		case RCDO:
 			goto fifi;
 		default:
@@ -707,7 +710,7 @@ gotcan:
 			}
 			goto again;
 		}
-	/* **** FALL THRU TO **** */
+	/* FALLTHROUGH */
 	default:
 agn2:
 		if ( --max_garbage == 0) {
@@ -766,14 +769,14 @@ fifi:
 	switch (c) {
 	case GOTCAN:
 		c = ZCAN;
-	/* **** FALL THRU TO **** */
+	/* FALLTHROUGH */
 	case ZNAK:
 	case ZCAN:
 	case ERROR:
 	case TIMEOUT:
 	case RCDO:
 		zperr(_("Got %s"), frametypes[c+FTOFFSET]);
-	/* **** FALL THRU TO **** */
+	/* FALLTHROUGH */
 	default:
 		if (c >= -3 && c <= FRTYPES)
 			VPRINTF(3,("zgethdr: %s %lx", frametypes[c+FTOFFSET], (unsigned long) rxpos));
@@ -895,6 +898,8 @@ zrhhdr(char *hdr)
 	 	/* Throw away possible cr/lf */
 		READLINE_PF(1);
 		break;
+        default:
+                ;
 	}
 	protocol = ZM_ZMODEM;
 	zmodem_requested=TRUE;
@@ -903,7 +908,7 @@ zrhhdr(char *hdr)
 
 /* Write a byte as two hex digits */
 static void 
-zputhex(int c, char *pos)
+zputhex(int c, unsigned char *pos)
 {
 	static char	digits[]	= "0123456789abcdef";
 

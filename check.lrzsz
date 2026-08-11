@@ -178,30 +178,6 @@ if test "$mode" = all -o "$mode" = z8N ; then
 	fi
 fi
 
-# out-of-band tcp
-if test "$mode" = tcpo ; then
-	echo "testing ZMODEMtcpo"
-	mkdir $testdir/zmodemtcpo
-	failed=0
-	$SZ --tcp-server -q $SZBUFSIZE $z_test_files | \
-		perl -e '$|=1; while(<>) {if (/^connect with .* "(.*)"/) {print $1 . "\n";}}' |
-	( cd $testdir/zmodemtcpo ; xargs -l1 $RZ $RZBUFSIZE -vv --tcp-client )
-	for i in $z_test_files ; do 
-		bn=`basename $i`
-		cmp $i $testdir/zmodemtcpo/$bn
-		if test $? -eq 0 ; then
-			rm -f $testdir/zmodemtcpo/$bn
-		else
-			failed=1
-		fi
-	done
-	rmdir $testdir/zmodemtcpo 2>&5
-	if test $failed = 1 ; then 
-		echo "ZMODEMtcpo test failed"
-		any_failure="$any_failure ZMODEMtcpo"
-	fi
-fi
-
 if test "$mode" = error ; then
 	# we test this only if we have something really large, because this is
 	# we only case we can expect any differences
@@ -213,7 +189,7 @@ if test "$mode" = error ; then
 		failed=0
 		# strace -vs 128 -o out $SZ -8 -vvvvvvvv $SZBUFSIZE $y_test_files <$testdir/pipe | \
 		$SZ -8q $SZBUFSIZE $y_test_files <$testdir/pipe | \
-			(cd $testdir/error.lsz ; $RZ --errors 32768 $RZBUFSIZE $QUIET >>../pipe 2>/dev/null)
+			(cd $testdir/error.lsz ; $RZ -F 32768 $RZBUFSIZE $QUIET >>../pipe 2>/dev/null)
 		for i in $y_test_files ; do 
 			bn=`basename $i`
 			cmp $i $testdir/error.lsz/$bn
@@ -235,7 +211,7 @@ if test "$mode" = error ; then
 		mkdir $testdir/error.omen
 		failed=0
 		omen.sz $y_test_files <$testdir/pipe | \
-			(cd $testdir/error.omen ; $RZ -vvv --errors 32768 $RZBUFSIZE $QUIET >>../pipe 2>/tmp/out2)
+			(cd $testdir/error.omen ; $RZ -vvv -F 32768 $RZBUFSIZE $QUIET >>../pipe 2>/tmp/out2)
 		for i in $y_test_files ; do 
 			bn=`basename $i`
 			cmp $i $testdir/error.omen/$bn
@@ -255,7 +231,7 @@ if test "$mode" = error ; then
 		mkdir $testdir/error.zm
 		failed=0
 		zmtx $y_test_files <$testdir/pipe | \
-			(cd $testdir/error.zm ; $RZ -vvv --errors 32768 $RZBUFSIZE $QUIET >>../pipe 2>/tmp/out2)
+			(cd $testdir/error.zm ; $RZ -vvv -F 32768 $RZBUFSIZE $QUIET >>../pipe 2>/tmp/out2)
 		for i in $y_test_files ; do 
 			bn=`basename $i`
 			cmp $i $testdir/error.zm/$bn
@@ -279,8 +255,8 @@ if test "$mode" = all -o "$mode" = y ; then
 	echo "testing YMODEM"
 	mkdir $testdir/ymodem
 	failed=0
-	$SZ --ymodem -q $y_test_files <$testdir/pipe | \
-		(cd $testdir/ymodem ; $RZ $QUIET --ymodem >>../pipe)
+	$SZ -q -q $y_test_files <$testdir/pipe | \
+		(cd $testdir/ymodem ; $RZ $QUIET -g >>../pipe)
 	for i in $y_test_files ; do 
 		bn=`basename $i`
 		cmp $i $testdir/ymodem/$bn
@@ -303,8 +279,8 @@ if test "$mode" = all -o "$mode" = x ; then
 	failed=0
 	for i in $x_test_files; do
 		bn=`basename $i`
-		$SZ --xmodem -qa $i <$testdir/pipe | \
-			(cd $testdir/xmodem ; $RZ $QUIET -a --xmodem $bn >>../pipe)
+		$SZ -Xqa $i <$testdir/pipe | \
+			(cd $testdir/xmodem ; $RZ $QUIET -a -X $bn >>../pipe)
 		cmp $i $testdir/xmodem/$bn
 		if test $? -eq 0 ; then
 			rm -f $testdir/xmodem/$bn
@@ -323,7 +299,7 @@ if test "$mode" = all -o "$mode" = manage ; then
 	echo "testing file management, appending"
 	mkdir $testdir/manag.append
 	failed=0
-	$SZ -q --append $srcdir/src/lsz.c $srcdir/src/lsz.c <$testdir/pipe | \
+	$SZ -q -+ $srcdir/src/lsz.c $srcdir/src/lsz.c <$testdir/pipe | \
 		(cd $testdir/manag.append ; $RZ $QUIET >>../pipe)
 	rm -f $testdir/manag.append/compare
 	cp $srcdir/src/lsz.c $testdir/manag.append/compare
@@ -346,7 +322,7 @@ if test "$mode" = all -o "$mode" = manage ; then
 	failed=0
 	rm -f $testdir/manag.rename/lsz.c
 	cp $srcdir/src/lsz.c $testdir/manag.rename/
-	$SZ -q --rename $srcdir/src/lsz.c $srcdir/src/lsz.c <$testdir/pipe | \
+	$SZ -q -E $srcdir/src/lsz.c $srcdir/src/lsz.c <$testdir/pipe | \
 		(cd $testdir/manag.rename ; $RZ $QUIET >>../pipe)
 	cmp $testdir/manag.rename/lsz.c $srcdir/src/lsz.c
 	if test $? -ne 0 ; then

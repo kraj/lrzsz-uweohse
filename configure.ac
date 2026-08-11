@@ -6,16 +6,15 @@ AC_CONFIG_HEADERS(config.h)
 AC_USE_SYSTEM_EXTENSIONS
 
 
-dnl  is in AC_PROG_CC since 2.12
 AC_PREREQ([2.72])
 
 PACKAGE_VERSION="$PACKAGE-$VERSION"
 AC_DEFINE_UNQUOTED([PACKAGE], ["$PACKAGE"], [Name of package])
 AC_DEFINE_UNQUOTED([VERSION], ["$VERSION"], [Version number of package])
-AC_DEFINE_UNQUOTED([PACKAGE_VERSION], ["$PACKAGE_VERSION"], [The concatenation of the strings PACKAGE, "-", and VERSION.])
+#AC_DEFINE_UNQUOTED([PACKAGE_VERSION], ["$PACKAGE_VERSION"], [The concatenation of the strings PACKAGE, "-", and VERSION.])
 AC_SUBST(PACKAGE)
 AC_SUBST(VERSION)
-AC_SUBST(PACKAGE_VERSION)
+#AC_SUBST(PACKAGE_VERSION)
 
 ALL_LINGUAS="de"
 
@@ -78,39 +77,17 @@ dnl Checks for programs.
 AC_PROG_CC
 AC_PROG_CC_C_O
 AC_PROG_CPP
-if test "x$GCC" = xyes ; then
-    if test "x$old_cflags_empty" = x1 ; then
-        if test "x$_CFLAGS_OWG" != x  ; then
-            # each environment should contain at least one helpful hack :-)
-            CFLAGS="$_CFLAGS_OWG"
-        fi
-    fi
-fi
 AC_PROG_RANLIB
 AC_SEARCH_LIBS([strerror],[cposix])
 AC_C_CONST
 AC_C_INLINE
+AX_COMPILER_FLAGS_CFLAGS()
+AX_APPEND_COMPILE_FLAGS([ -Wunused-result -Wpendantic -Wcast-qual -Wmissing-braces -Wcomments], [WARN_CFLAGS])
+AX_APPEND_COMPILE_FLAGS([ -std=c11 -fforce-addr -falign-loops=2 -falign-jumps=2 -falign-functions=2 -g3], [LRZSZ_CFLAGS])
 
-if test `hostname` = tirka.ohse.de -a "$cross_compiling" = no ; then
-    test $prefix = NONE && prefix=/usr
-	if test -z "$CFLAGS" ; then 
-	    case "$CC" in 
-		*gcc*)
-			CFLAGS="-Wall -Wstrict-prototypes -Wmissing-prototypes"
-			# -Wnested_externs entfernt wegen dcgettext()
-			CFLAGS="$CFLAGS -Wpointer-arith -Wcast-qual -Wcast-align"
-			CFLAGS="$CFLAGS -Winline -Wwrite-strings -Wshadow -Wmissing-braces"
-			CFLAGS="$CFLAGS -Wcomments -fforce-mem -fforce-addr -O2 -m486 -pipe"
-			CFLAGS="$CFLAGS -malign-loops=2 -malign-jumps=2 -malign-functions=2 -g3"
-			;;
-		esac
-	fi
-fi
-case "$CFLAGS" in
-*-Wstrict-prototypes*)
-	AC_DEFINE([STRICT_PROTOTYPES], [], [Define to 1 if you want strict ANSI prototypes.])
-	;;
-esac
+echo "T0: $WARN_CFLAGS"
+echo "T1: $LRZSZ_CFLAGS"
+
 
 dnl Checks for libraries.
 dnl SCO needs this.
@@ -148,14 +125,11 @@ AC_CHECK_TYPES([struct utimbuf], [], [], [[#include <utime.h>]])
 
 AC_CHECK_FUNCS(gettimeofday settimeofday)
 AC_CHECK_FUNCS(strchr memcpy select vprintf setlocale)
-AC_CHECK_FUNCS(times rdchk utime syslog sigaction)
+AC_CHECK_FUNCS(times rdchk utime syslog sigaction nogetopt_long)
 AC_REPLACE_FUNCS(mkdir mktime strerror strstr strdup strtoul strtol strpbrk)
 AC_REPLACE_FUNCS(stpcpy strftime vasprintf)
 
-AC_CHECK_FUNC([getopt_long], [],
-  [AC_LIBOBJ([getopt1]) AC_LIBOBJ([getopt])])
-
-dnl O_NOFOLLOW is POSIX.1-2008; provide a fallback for ancient systems.
+dnl O_NOFOLLOW is POSIX.1-2008; this is to providea fallback for ancient systems.
 AH_TEMPLATE([HAVE_O_NOFOLLOW],
   [Define to 1 if your fcntl.h defines O_NOFOLLOW.])
 AC_MSG_CHECKING([for O_NOFOLLOW])
@@ -251,6 +225,7 @@ fi
 
 
 AC_SUBST(CFLAGS)
+AC_SUBST(LRZSZ_CFLAGS)
 AC_SUBST(LDFLAGS)
 AC_SUBST(LIBS)
 

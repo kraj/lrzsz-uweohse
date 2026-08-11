@@ -35,6 +35,7 @@ strtol_error
     {									\
       switch ((err))							\
 	{								\
+        default:                                                        \
 	case LONGINT_OK:						\
 	  abort ();							\
 									\

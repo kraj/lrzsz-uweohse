@@ -102,29 +102,28 @@ static int in_timesync=0;
 #if defined(F_GETFD) && defined(F_SETFD) && defined(O_SYNC)
 static int o_sync = 0;
 #endif
-static int rzfiles __P ((struct zm_fileinfo *));
-static int tryz __P ((void));
-static void checkpath __P ((const char *name));
-static void chkinvok __P ((const char *s));
-static void report __P ((int sct));
-static void uncaps __P ((char *s));
-static int IsAnyLower __P ((const char *s));
-static int putsec __P ((struct zm_fileinfo *zi, char *buf, size_t n));
-static int make_dirs __P ((char *pathname));
-static int procheader __P ((char *name, struct zm_fileinfo *));
-static int wcgetsec __P ((size_t *Blklen, char *rxbuf, unsigned int maxtime));
-static int wcrx __P ((struct zm_fileinfo *));
-static int wcrxpn __P ((struct zm_fileinfo *, char *rpn));
-static int wcreceive __P ((int argc, char **argp));
-static int rzfile __P ((struct zm_fileinfo *));
-static void usage __P ((int exitcode, const char *what));
-static void usage1 __P ((int exitcode));
-static int closeit __P ((struct zm_fileinfo *));
-static void ackbibi __P ((void));
-static void zmputs __P ((const char *s));
-static size_t getfree __P ((void));
-static int install_signal_handler __P ((int sig));
-static FILE *safe_open __P ((const char *path, const char *mode));
+static int rzfiles (struct zm_fileinfo *);
+static int tryz (void);
+static void checkpath (const char *name);
+static void chkinvok (const char *s);
+static void report (int sct);
+static void uncaps (char *s);
+static int IsAnyLower (const char *s);
+static int putsec (struct zm_fileinfo *zi, char *buf, size_t n);
+static int make_dirs (char *pathname);
+static int procheader (char *name, struct zm_fileinfo *);
+static int wcgetsec (size_t *Blklen, char *rxbuf, unsigned int maxtime);
+static int wcrx (struct zm_fileinfo *);
+static int wcrxpn (struct zm_fileinfo *, char *rpn);
+static int wcreceive (int argc, char **argp);
+static int rzfile (struct zm_fileinfo *);
+static void usage (int exitcode, const char *what);
+static int closeit (struct zm_fileinfo *);
+static void ackbibi (void);
+static void zmputs (const char *s);
+static size_t getfree (void);
+static int install_signal_handler (int sig);
+static FILE *safe_open (const char *path, const char *mode);
 
 static long buffersize=32768;
 static unsigned long min_bps=0;
@@ -219,6 +218,7 @@ install_signal_handler(int sig)
 #endif
 }
 
+#ifdef HAVE_GETOPT_LONG
 static struct option const long_options[] =
 {
 	{"append", no_argument, NULL, '+'},
@@ -231,7 +231,7 @@ static struct option const long_options[] =
 	{"help", no_argument, NULL, 'h'},
 	{"crc-check", no_argument, NULL, 'H'},
 	{"junk-path", no_argument, NULL, 'j'},
-	{"errors", required_argument, NULL, 3},
+	{"errors", required_argument, NULL, 'F'},
 	{"disable-timeouts", no_argument, NULL, 'O'},
 	{"disable-timeout", no_argument, NULL, 'O'}, /* i can't get it right */
 	{"min-bps", required_argument, NULL, 'm'},
@@ -251,7 +251,7 @@ static struct option const long_options[] =
 	{"windowsize", required_argument, NULL, 'w'},
 	{"with-crc", no_argument, NULL, 'c'},
 	{"xmodem", no_argument, NULL, 'X'},
-	{"ymodem", no_argument, NULL, 1},
+	{"ymodem", no_argument, NULL, 'g'},
 	{"zmodem", no_argument, NULL, 'Z'},
 	{"overwrite", no_argument, NULL, 'y'},
 	{"null", no_argument, NULL, 'D'},
@@ -261,11 +261,13 @@ static struct option const long_options[] =
 	{"o_sync", no_argument, NULL, 5},
 	{NULL,0,NULL,0}
 };
+#endif
 
 static void
 show_version(void)
 {
 	printf ("%s (GNU %s) %s\n", program_name, PACKAGE, VERSION);
+        exit(0);
 }
 
 int
@@ -304,11 +306,11 @@ main(int argc, char *argv[])
         setlocale (LC_TIME, "C"); /* do not translate just the timestamp of a syslog message. uh. */
 	bindtextdomain (PACKAGE, LOCALEDIR);
 	textdomain (PACKAGE);
-
-    parse_long_options (argc, argv, show_version, usage1);
-
+#ifndef HAVE_GETOPT_LONG
+#define getopt_long(argc,argv,str,longopts,longind) getopt(argc,argv,str)
+#endif
 	while ((c = getopt_long (argc, argv, 
-		"a+bB:cCDeEhm:M:OprRqs:St:uUvw:XZy",
+		"a+bB:cCDeEF:ghm:M:OprRqs:St:uUvw:XZy",
 		long_options, (int *) 0)) != EOF)
 	{
 		unsigned long int tmp;
@@ -438,8 +440,10 @@ main(int argc, char *argv[])
 			break;
 		case 'v':
 			++Verbose; break;
+		case 'V':
+			show_version();  break;
 		case 'X': protocol=ZM_XMODEM; break;
-		case 1:   protocol=ZM_YMODEM; break;
+		case 'g':   protocol=ZM_YMODEM; break;
 		case 'Z': protocol=ZM_ZMODEM; break;
 		case 'y':
 			Rxclob=TRUE; break;
@@ -459,7 +463,7 @@ main(int argc, char *argv[])
 #  endif
 #endif
 			break;
-		case 3:
+		case '3':
 			s_err = xstrtoul (optarg, NULL, 0, &tmp, "km");
 			if (s_err != LONGINT_OK)
 				STRTOL_FATAL_ERROR (optarg, _("bytes_per_error"), s_err);
@@ -469,7 +473,7 @@ main(int argc, char *argv[])
 			if (bytes_per_error<100)
 				usage(2,_("bytes-per-error should be >100"));
 			break;
-        case 4:
+                case 4:
 			s_err = xstrtoul (optarg, NULL, 0, &tmp, NULL);
 			if (s_err != LONGINT_OK)
 				STRTOL_FATAL_ERROR (optarg, _("startup delay"), s_err);
@@ -541,12 +545,6 @@ main(int argc, char *argv[])
 }
 
 static void
-usage1(int exitcode)
-{
-	usage(exitcode,NULL);
-}
-
-static void
 usage(int exitcode, const char *what)
 {
 	FILE *f=stdout;
@@ -555,7 +553,7 @@ usage(int exitcode, const char *what)
 	{
 		if (what)
 			fprintf(stderr, "%s: %s\n",program_name,what);
-		fprintf (stderr, _("Try `%s --help' for more information.\n"),
+		fprintf (stderr, _("Try `%s -h' for more information.\n"),
 			program_name);
 		exit(exitcode);
 	}
@@ -580,7 +578,7 @@ usage(int exitcode, const char *what)
 "      --delay-startup N       sleep N seconds before doing anything\n"
 "  -e, --escape                Escape control characters (Z)\n"
 "  -E, --rename                rename any files already existing\n"
-"      --errors N              generate CRC error every N bytes (debugging)\n"
+"  -F, --errors N              generate CRC error every N bytes (debugging)\n"
 "  -h, --help                  Help, print this usage message\n"
 "  -m, --min-bps N             stop transmission if BPS below N\n"
 "  -M, --min-bps-time N          for at least N seconds (default: 120)\n"
@@ -597,14 +595,18 @@ usage(int exitcode, const char *what)
 "  -u, --keep-uppercase        keep upper case filenames\n"
 "  -U, --unrestrict            disable restricted mode (if allowed to)\n"
 "  -v, --verbose               be verbose, provide debugging information\n"
+"  -V, --version               show version\n"
 "  -w, --windowsize N          Window is N bytes (Z)\n"
 "  -X  --xmodem                use XMODEM protocol\n"
 "  -y, --overwrite             Yes, clobber existing file if any\n"
-"      --ymodem                use YMODEM protocol\n"
+"  -g, --ymodem                use YMODEM protocol\n"
 "  -Z, --zmodem                use ZMODEM protocol\n"
 "\n"
 "short options use the same arguments as the long ones\n"
 	),f);
+#ifndef HAVE_GETOPT_LONG
+        fputs(_("The long options (--...) are not available on your system (getopt_long is not available)\n"), f);
+#endif
 	exit(exitcode);
 }
 
@@ -733,8 +735,8 @@ wcreceive(int argc, char **argp)
 		if ((fout=safe_open(Pathname, "w")) == NULL) {
 #ifdef ENABLE_SYSLOG
 			if (enable_syslog)
-				lsyslog(LOG_ERR,"%s/%s: cannot open: %m",
-					shortname,protname());
+				lsyslog(LOG_ERR,"%s/%s: cannot open: %s",
+					shortname,protname(), strerror(errno));
 #endif
 			return ERROR;
 		}
@@ -1158,9 +1160,9 @@ procheader(char *name, struct zm_fileinfo *zi)
 
 	nameend = name + 1 + strlen(name);
 	if (*nameend) {	/* file coming from Unix or DOS system */
-		long modtime = 0;
+		unsigned long modtime = 0;
 		long bytes_total = 0;
-		long mode = 0;
+		unsigned long mode = 0;
 		if (sscanf(nameend, "%ld%lo%lo", &bytes_total, &modtime, &mode) >= 1) {
 			zi->modtime = (time_t) modtime;
 			zi->bytes_total = (size_t) bytes_total;
@@ -1609,7 +1611,6 @@ static int
 tryz(void)
 {
 	register int c, n;
-	register int cmdzack1flg;
 	int zrqinits_received=0;
 	size_t bytes_in_block=0;
 
@@ -1692,7 +1693,6 @@ again:
 			zshhdr(ZACK, Txhdr);
 			goto again;
 		case ZCOMMAND:
-			cmdzack1flg = Rxhdr[ZF0];
 			if (zrdata(secbuf, MAX_BLOCK,&bytes_in_block) == GOTCRCW) {
 				if (Verbose) {
 					vstringf("%s: %s\n", program_name,
@@ -1885,6 +1885,7 @@ nxthdr:
 				vfile("rzfile: zgethdr returned %d", c);
 				return ERROR;
 			}
+                        /* FALLTHROUGH */
 		case ZFILE:
 			zrdata(secbuf, MAX_BLOCK,&bytes_in_block);
 			continue;
@@ -1962,6 +1963,8 @@ nxthdr:
 						else if (neu)
 							free(neu);
 					}
+                                default:
+                                        ;
 				}
 #endif
 				zmputs(Attn);  continue;
@@ -2065,6 +2068,8 @@ moredata:
 				putsec(zi, secbuf, bytes_in_block);
 				zi->bytes_received += bytes_in_block;
 				goto nxthdr;
+                        default:
+                                ;
 			}
 		}
 	}

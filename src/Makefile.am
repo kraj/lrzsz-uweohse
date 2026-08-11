@@ -6,6 +6,7 @@ noinst_HEADERS = timing.h zglobal.h zmodem.h
 LDADD = ../lib/libzmodem.a @LIBINTL@
 AM_CPPFLAGS = -I.. -I$(srcdir) -I$(top_srcdir)/src -I$(top_srcdir)/lib \
 	-DNFGVMIN -DLOCALEDIR=\"$(localedir)\"
+AM_CFLAGS = @WARN_CFLAGS@ -Werror @LRZSZ_CFLAGS@
 
 install-exec-local:
 	rm -f $(DESTDIR)/$(bindir)/`echo lsb | sed -e '$(transform)'`

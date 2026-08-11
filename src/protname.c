@@ -33,6 +33,7 @@ protname(void)
 	case ZM_YMODEM:
 		prot_name="YMODEM"; 
 		break;
+	case ZM_ZMODEM:
 	default: 
 		prot_name="ZMODEM";
 		break;

@@ -1305,6 +1305,11 @@ AS_IF([test "$am_cv_xargs_n_works" = yes], [am__xargs_n='xargs -n'], [dnl
 AC_SUBST(am__xargs_n)
 ])
 
+m4_include([m4/ax_append_compile_flags.m4])
+m4_include([m4/ax_append_flag.m4])
+m4_include([m4/ax_check_compile_flag.m4])
+m4_include([m4/ax_compiler_flags_cflags.m4])
+m4_include([m4/ax_require_defined.m4])
 m4_include([m4/build-to-host.m4])
 m4_include([m4/gettext.m4])
 m4_include([m4/host-cpu-c-abi.m4])

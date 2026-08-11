@@ -27,56 +27,40 @@
 #include <string.h>
 #endif
 
-#if __STDC__
-#  include <stdarg.h>
-#  define VA_START(args, lastarg) va_start(args, lastarg)
-#  define WAYTOGO
-#else
-#  include <varargs.h>
-#  define VA_START(args, lastarg) va_start(args)
-#endif
-
 void
-#ifdef WAYTOGO
 lsyslog(int prio, const char *format, ...)
-#else
-lsyslog(prio,format,va_alist) 
-	int prio; 
-	const char *format; 
-	va_dcl
-#endif
 {
 #ifdef ENABLE_SYSLOG
-	static char *username=NULL;
-	static char uid_string[20]=""; /* i'd really hate this function to fail! */
-	char *s=NULL;
-	static int init_done=0;
+    static char *username=NULL;
+    static char uid_string[20]=""; /* i'd really hate this function to fail! */
+    char *s=NULL;
+    static int init_done=0;
     va_list ap;
-	if (!enable_syslog)
-		return;
-	if (!init_done) {
-		uid_t uid;
-		struct passwd *pwd;
-		init_done=1;
-		uid=getuid();
-		pwd=getpwuid(uid);
-		if (pwd && pwd->pw_name && *pwd->pw_name) {
-			username=strdup(pwd->pw_name);
-		}
-		if (!username) {
-			username=uid_string;
-			sprintf(uid_string,"#%lu",(unsigned long) uid);
-		}
-	}
+    if (!enable_syslog)
+            return;
+    if (!init_done) {
+            uid_t uid;
+            struct passwd *pwd;
+            init_done=1;
+            uid=getuid();
+            pwd=getpwuid(uid);
+            if (pwd && pwd->pw_name && *pwd->pw_name) {
+                    username=strdup(pwd->pw_name);
+            }
+            if (!username) {
+                    sprintf(uid_string,"#%lu",(unsigned long) uid);
+                    username = uid_string;
+            }
+    }
 
-    VA_START(ap, format);
+    va_start(ap, format);
     vasprintf(&s,format, ap);
     va_end(ap);
-    syslog(prio,"[%s] %s",username,s);
-	free(s);
+    syslog(prio,"[%s] %s",username, s);
+    free(s);
 #else
-	(void) prio; /* get rid of warning */
-	(void) format; /* get rid of warning */
+    (void) prio; /* get rid of warning */
+    (void) format; /* get rid of warning */
 #endif
 }
 
