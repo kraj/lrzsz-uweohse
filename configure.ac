@@ -123,11 +123,8 @@ AC_FUNC_MMAP
 AC_FUNC_ALLOCA
 AC_CHECK_TYPES([struct utimbuf], [], [], [[#include <utime.h>]])
 
-AC_CHECK_FUNCS(gettimeofday settimeofday)
-AC_CHECK_FUNCS(select)
-AC_CHECK_FUNCS(times utime syslog sigaction nogetopt_long)
-AC_REPLACE_FUNCS(strerror strstr strdup strtoul strtol strpbrk)
-AC_REPLACE_FUNCS(stpcpy strftime vasprintf)
+AC_CHECK_FUNCS(gettimeofday sigaction nogetopt_long)
+AC_REPLACE_FUNCS(stpcpy vasprintf)
 
 dnl O_NOFOLLOW is POSIX.1-2008; this is to providea fallback for ancient systems.
 AH_TEMPLATE([HAVE_O_NOFOLLOW],

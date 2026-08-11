@@ -159,23 +159,8 @@ struct termios;
 # define _(Text) Text
 #endif
 
-#ifndef ENABLE_SYSLOG
-#  undef HAVE_SYSLOG
-#else
-#  ifdef HAVE_SYSLOG_H
-#    include <syslog.h>
-#  else
-#    if defined(HAVE_SYS_SYSLOG_H)
-#      include <sys/syslog.h>
-#    else
-#      undef HAVE_SYSLOG
-#    endif
-#  endif
-#endif
-#ifndef ENABLE_SYSLOG
-#  define openlog(name,pid,facility) /* void it */
-#  define setlogmask(x) /* void it */
-#else
+#ifdef ENABLE_SYSLOG
+#  include <syslog.h>
 extern int enable_syslog;
 #endif
 

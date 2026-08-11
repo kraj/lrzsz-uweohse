@@ -44,37 +44,9 @@ void (*error_print_progname) (
 /* This variable is incremented each time `error' is called.  */
 unsigned int error_message_count;
 
-#ifdef _LIBC
-/* In the GNU C library, there is a predefined variable for this.  */
-
-# define program_name program_invocation_name
-# include <errno.h>
-
-#else
-
 /* The calling program should define program_name and set it to the
    name of the executing program.  */
 extern char *program_name;
-
-# if HAVE_STRERROR
-#  ifndef strerror		/* On some systems, strerror is a macro */
-char *strerror ();
-#  endif
-# else
-static char *
-private_strerror (errnum)
-     int errnum;
-{
-  extern char *sys_errlist[];
-  extern int sys_nerr;
-
-  if (errnum > 0 && errnum <= sys_nerr)
-    return sys_errlist[errnum];
-  return _("Unknown system error");
-}
-#  define strerror private_strerror
-# endif	/* HAVE_STRERROR */
-#endif	/* _LIBC */
 
 /* Print the program name and error message MESSAGE, which is a printf-style
    format string with optional args.
