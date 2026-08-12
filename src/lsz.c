@@ -331,7 +331,7 @@ show_version(void)
 }
 
 
-int 
+int
 main(int argc, char **argv)
 {
 	char *cp;
@@ -375,7 +375,7 @@ main(int argc, char **argv)
 #ifndef HAVE_GETOPT_LONG
 #define getopt_long(argc,argv,str,longopts,longind) getopt(argc,argv,str)
 #endif
-	while ((c = getopt_long (argc, argv, 
+	while ((c = getopt_long (argc, argv,
 		"2+48abB:C:c:dfeEghHi:kL:l:m:M:NnOopRrqsSt:TUuvw:XYy",
 		long_options, (int *) 0))!=EOF)
 	{
@@ -420,7 +420,7 @@ main(int argc, char **argv)
 			use_mmap=0;
 #endif
 			break;
-		case 'C': 
+		case 'C':
 			s_err = xstrtoul (optarg, NULL, 0, &tmp, NULL);
 			if (s_err != LONGINT_OK)
 				STRTOL_FATAL_ERROR (optarg, _("command tries"), s_err);
@@ -504,11 +504,11 @@ main(int argc, char **argv)
 		case 'o': Wantfcs32 = FALSE; break;
 		case 'O': no_timeout = TRUE; break;
 		case 'p': Lzmanag = ZF1_ZMPROT;  break;
-		case 'r': 
-			if (Lzconv == ZCRESUM) 
+		case 'r':
+			if (Lzconv == ZCRESUM)
 				Lzmanag = ZF1_ZMCRC;
 			else
-				Lzconv = ZCRESUM; 
+				Lzconv = ZCRESUM;
 			break;
 		case 'R': Restricted = TRUE; break;
 		case 'q': Quiet=TRUE; Verbose=0; break;
@@ -536,7 +536,7 @@ main(int argc, char **argv)
 				stop_time=mktime(tm);
 				if (stop_time<t)
 					stop_time+=86400L; /* one day more */
-				if (stop_time - t <10) 
+				if (stop_time - t <10)
 					usage(2,_("stop time to small"));
 			} else {
 				s_err = xstrtoul (optarg, NULL, 0, &tmp, NULL);
@@ -659,7 +659,7 @@ main(int argc, char **argv)
 	npats = argc - optind;
 	patts=&argv[optind];
 
-	if (npats < 1 && !command_mode) 
+	if (npats < 1 && !command_mode)
 		usage(2,_("need at least one file to send"));
 	if (command_mode && Restricted) {
 		printf(_("Can't send command in restricted mode\n"));
@@ -675,7 +675,7 @@ main(int argc, char **argv)
 	{
 		/* we write max_blocklen (data) + 18 (ZModem protocol overhead)
 		 * + escape overhead (about 4 %), so buffer has to be
-		 * somewhat larger than max_blklen 
+		 * somewhat larger than max_blklen
 		 */
 		char *s=malloc(max_blklen+1024);
 		if (!s)
@@ -716,7 +716,7 @@ main(int argc, char **argv)
 			/* throw away any input already received. This doesn't harm
 			 * as we invite the receiver to send it's data again, and
 			 * might be useful if the receiver has already died or
-			 * if there is dirt left if the line 
+			 * if there is dirt left if the line
 			 */
 			struct timeval t;
 			unsigned char throwaway;
@@ -726,10 +726,10 @@ main(int argc, char **argv)
 
 			t.tv_sec = 0;
 			t.tv_usec = 0;
-				
+
 			FD_ZERO(&f);
 			FD_SET(io_mode_fd,&f);
-				
+
 			while (select(1,&f,NULL,NULL,&t)) {
 				if (0==read(io_mode_fd,&throwaway,1)) /* EOF ... */
 					break;
@@ -849,7 +849,7 @@ wcs(const char *oname, const char *remotename)
 				_("security violation: not allowed to upload from %s"),oname);
 		}
 	}
-	
+
 	if (0==strcmp(oname,"-")) {
 		char *p=getenv("ONAME");
 		name=alloca(PATH_MAX+1);
@@ -958,7 +958,7 @@ wcs(const char *oname, const char *remotename)
 			lsyslog(LOG_INFO, _("%s/%s: skipped"),protname(),shortname);
 #endif
 		return OK;
-        default: 
+        default:
                 ;
 	}
 	if (!zmodem_requested && wctx(&zi)==ERROR)
@@ -983,7 +983,7 @@ wcs(const char *oname, const char *remotename)
 			d=0.5;
 		bps=zi.bytes_sent/d;
 		vchar('\r');
-		if (Verbose > 1) 
+		if (Verbose > 1)
 			vstringf(_("Bytes Sent:%7ld   BPS:%-8ld                        \n"),
 				(long) zi.bytes_sent,bps);
 #ifdef ENABLE_SYSLOG
@@ -1051,7 +1051,7 @@ wctxpn(struct zm_fileinfo *zi)
 	p=q;
 	while (q < (txbuf + MAX_BLOCK))
 		*q++ = 0;
-	/* note that we may lose some information here in case mode_t is wider than an 
+	/* note that we may lose some information here in case mode_t is wider than an
 	 * int. But i believe sending %lo instead of %o _could_ break compatability
 	 */
 	if (!Ascii && (input_f!=stdin) && *zi->fname && fstat(fileno(input_f), &f)!= -1)
@@ -1084,7 +1084,7 @@ wctxpn(struct zm_fileinfo *zi)
 	return OK;
 }
 
-static int 
+static int
 getnak(void)
 {
 	int firstch;
@@ -1110,7 +1110,7 @@ getnak(void)
 			 * omen rz stops if it saw 5 of them */
 			if ((zrqinits_sent>1 || tries>1) && zrqinits_sent<4) {
 				/* if we already sent a ZRQINIT we are using zmodem
-				 * protocol and may send further ZRQINITs 
+				 * protocol and may send further ZRQINITs
 				 */
 				stohdr(0L);
 				zshhdr(ZRQINIT, Txhdr);
@@ -1139,7 +1139,7 @@ getnak(void)
 }
 
 
-static int 
+static int
 wctx(struct zm_fileinfo *zi)
 {
 	register size_t thisblklen;
@@ -1185,7 +1185,7 @@ wctx(struct zm_fileinfo *zi)
 		return OK;
 }
 
-static int 
+static int
 wcputsec(char *buf, int sectnum, size_t cseclen)
 {
 	int checksum, wcj;
@@ -1244,7 +1244,7 @@ cancan:
                         continue;
 		case NAK:
 			zperr(_("NAK on sector")); continue;
-		case ACK: 
+		case ACK:
 			firstsec=FALSE;
 			Totsecs += (cseclen>>7);
 			return OK;
@@ -1268,7 +1268,7 @@ cancan:
 }
 
 /* fill buf with count chars padding with ^Z for CPM */
-static size_t 
+static size_t
 filbuf(char *buf, size_t count)
 {
 	int c;
@@ -1410,7 +1410,7 @@ usage(int exitcode, const char *what)
 /*
  * Get the receiver's init parameters
  */
-static int 
+static int
 getzrxinit(void)
 {
 	static int dont_send_zrqinit=1;
@@ -1424,7 +1424,7 @@ getzrxinit(void)
 	/* XXX purgeline(io_mode_fd); this makes _real_ trouble. why? -- uwe */
 
 	for (n=10; --n>=0; ) {
-		/* we might need to send another zrqinit in case the first is 
+		/* we might need to send another zrqinit in case the first is
 		 * lost. But *not* if getting here for the first time - in
 		 * this case we might just get a ZRINIT for our first ZRQINIT.
 		 * Never send more then 4 ZRQINIT, because
@@ -1436,7 +1436,7 @@ getzrxinit(void)
 			zshhdr(ZRQINIT, Txhdr);
 		}
 		dont_send_zrqinit=0;
-		
+
 		switch (zgethdr(Rxhdr, 1,&rxpos)) {
 		case ZCHALLENGE:	/* Echo receiver's challenge numbr */
 			stohdr(rxpos);
@@ -1536,7 +1536,7 @@ getzrxinit(void)
 }
 
 /* Send send-init information */
-static int 
+static int
 sendzsinit(void)
 {
 	int c;
@@ -1567,14 +1567,14 @@ sendzsinit(void)
 }
 
 /* Send file name and related info */
-static int 
+static int
 zsendfile(struct zm_fileinfo *zi, const char *buf, size_t blen)
 {
 	unsigned long crc;
 	size_t rxpos;
 
 	/* we are going to send a ZFILE. There cannot be much useful
-	 * stuff in the line right now (*except* ZCAN?). 
+	 * stuff in the line right now (*except* ZCAN?).
 	 */
 #if 0
 	purgeline(io_mode_fd); /* might possibly fix stefan glasers problems */
@@ -1850,7 +1850,7 @@ zsendfdata (struct zm_fileinfo *zi)
 		} else if (bytcnt == Lastsync) {
 			e = ZCRCW;
 			if (Verbose>3)
-				vstringf("e=ZCRCW/bytcnt == Lastsync == %ld", 
+				vstringf("e=ZCRCW/bytcnt == Lastsync == %ld",
 					(unsigned long) Lastsync);
 		} else if (Txwindow && (Txwcnt += n) >= Txwspac) {
 			Txwcnt = 0;
@@ -1863,7 +1863,7 @@ zsendfdata (struct zm_fileinfo *zi)
 				vstring("e=ZCRCG");
 		}
 		if ((Verbose > 1 || min_bps || stop_time)
-			&& (not_printed > (min_bps ? 3 : 7) 
+			&& (not_printed > (min_bps ? 3 : 7)
 				|| zi->bytes_sent > last_bps / 2 + last_txpos)) {
 			int minleft = 0;
 			int secleft = 0;
@@ -1907,7 +1907,7 @@ zsendfdata (struct zm_fileinfo *zi)
 			if (Verbose > 1) {
 				vchar ('\r');
 				vstringf (_("Bytes Sent:%7ld/%7ld   BPS:%-8ld ETA %02d:%02d  "),
-					 (long) zi->bytes_sent, (long) zi->bytes_total, 
+					 (long) zi->bytes_sent, (long) zi->bytes_total,
 					last_bps, minleft, secleft);
 			}
 			last_txpos = zi->bytes_sent;
@@ -1952,7 +1952,7 @@ zsendfdata (struct zm_fileinfo *zi)
 		if (Txwindow) {
 			size_t tcount = 0;
 			while ((tcount = zi->bytes_sent - Lrxpos) >= Txwindow) {
-				vfile ("%ld (%ld,%ld) window >= %u", tcount, 
+				vfile ("%ld (%ld,%ld) window >= %u", tcount,
 					(long) zi->bytes_sent, (long) Lrxpos,
 					Txwindow);
 				if (e != ZCRCQ)
@@ -2025,7 +2025,7 @@ calc_blklen(long total_sent)
 	if (calcs_done++ < 5) {
 		if (error_count && start_blklen >1024)
 			return last_blklen=1024;
-		else 
+		else
 			last_blklen/=2;
 		return last_blklen=start_blklen;
 	}
@@ -2102,7 +2102,7 @@ calcit:
 		unsigned long transmitted;
 		ok=total_bytes / i + 1;
 		failed=((long) i + OVERHEAD) * ok / this_bytes_per_error;
-		transmitted=total_bytes + ok * OVERHEAD  
+		transmitted=total_bytes + ok * OVERHEAD
 			+ failed * ((long) i+OVERHEAD+OVER_ERR);
 		if (Verbose > 4)
 			vstringf(_("calc_blklen: blklen %d, ok %ld, failed %ld -> %lu\n"),
@@ -2125,7 +2125,7 @@ calcit:
 /*
  * Respond to receiver's complaint, get back in sync with receiver
  */
-static int 
+static int
 getinsync(struct zm_fileinfo *zi, int flag)
 {
 	size_t rxpos;
@@ -2208,7 +2208,7 @@ saybibi(void)
 }
 
 /* Send command and related info */
-static int 
+static int
 zsendcmd(const char *buf, size_t blen)
 {
 	int c;
