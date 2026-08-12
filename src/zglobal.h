@@ -150,7 +150,7 @@ struct termios;
 # include <locale.h>
 #endif
 
-#if ENABLE_NLS
+#ifdef ENABLE_NLS
 # include <libintl.h>
 # define _(Text) gettext (Text)
 #else
