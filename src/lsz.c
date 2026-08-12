@@ -1055,9 +1055,11 @@ wctxpn(struct zm_fileinfo *zi)
 	 * int. But i believe sending %lo instead of %o _could_ break compatability
 	 */
 	if (!Ascii && (input_f!=stdin) && *zi->fname && fstat(fileno(input_f), &f)!= -1)
-		sprintf(p, "%lu %lo %o 0 %d %ld", (long) f.st_size, f.st_mtime,
-		  (unsigned int)((no_unixmode) ? 0 : f.st_mode), 
-		  Filesleft, Totalleft);
+		sprintf(p, "%lu %llo %o 0 %d %ld",
+              (long) f.st_size,
+              (long long) f.st_mtime,
+              (unsigned int)((no_unixmode) ? 0 : f.st_mode),
+              Filesleft, Totalleft);
 	if (Verbose)
 		vstringf(_("Sending: %s\n"),txbuf);
 	Totalleft -= f.st_size;
