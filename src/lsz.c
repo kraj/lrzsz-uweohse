@@ -1016,8 +1016,10 @@ wctxpn(struct zm_fileinfo *zi)
 			vstringf(_("Sending %s, %ld blocks: "),
 			  zi->fname, (long) (f.st_size>>7));
 		}
-		vstringf(_("Give your local XMODEM receive command now."));
-		vstring("\r\n");
+                if (Verbose) {
+                    vstringf(_("Give your local XMODEM receive command now."));
+                    vstring("\r\n");
+                }
 		return OK;
 	}
 	if (!zmodem_requested)
