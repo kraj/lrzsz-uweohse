@@ -1576,6 +1576,7 @@ zsendfile(struct zm_fileinfo *zi, const char *buf, size_t blen)
 {
 	unsigned long crc;
 	size_t rxpos;
+        int zack_count=0;
 
 	/* we are going to send a ZFILE. There cannot be much useful
 	 * stuff in the line right now (*except* ZCAN?).
@@ -1606,6 +1607,13 @@ again:
 			/* **** FALL THRU TO **** */
 		default:
 			continue;
+		case ZACK:
+                        /* zmrx does this. it answers the ZCRCW for the ZFILE (filename etc). But this was never done by omen, which used the ZRPOS as ACK. */
+                        zack_count++;
+                        if (zack_count <=3) {
+                            goto again;
+                        }
+                        continue;
 		case ZRQINIT:  /* remote site is sender! */
 			if (Verbose)
 				vstringf(_("got ZRQINIT"));
