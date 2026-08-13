@@ -682,6 +682,7 @@ zgethdr(char *hdr, int eflag, size_t *Rxpos)
 	register int c, cancount;
 	unsigned int max_garbage; /* Max bytes before start of frame */
 	size_t rxpos=0; /* keep gcc happy */
+	int garbage_count = 0;
 
 	max_garbage = Zrwindow + Baudrate;
 	Rxframeind = Rxtype = 0;
@@ -717,8 +718,15 @@ gotcan:
 		}
 	/* FALLTHROUGH */
 	default:
-agn2:
+	agn2:
+		garbage_count++;
+		if (Verbose > 2 && (garbage_count <= 3 || garbage_count % 1000 == 0))
+			vfile("zgethdr: garbage[%d]=0x%02x, max_garbage_left=%u",
+			      garbage_count, c & 0xff, max_garbage);
 		if ( --max_garbage == 0) {
+			if (Verbose > 2)
+				vfile("zgethdr: garbage count exceeded after %d bytes",
+				      garbage_count);
 			zperr(_("Garbage count exceeded"));
 			return(ERROR);
 		}
@@ -771,6 +779,10 @@ splat:
 	rxpos = (rxpos<<8) + (hdr[ZP1] & 0377);
 	rxpos = (rxpos<<8) + (hdr[ZP0] & 0377);
 fifi:
+	if (Verbose > 2)
+		vfile("zgethdr: returning %d (%s) after %d garbage bytes, rxpos=%lx, readline_left=%d",
+		      c, (c >= -3 && c <= FRTYPES) ? frametypes[c+FTOFFSET] : "?",
+		      garbage_count, (unsigned long)rxpos, readline_left);
 	switch (c) {
 	case GOTCAN:
 		c = ZCAN;
