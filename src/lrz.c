@@ -2009,6 +2009,8 @@ moredata:
 				n = 20;
 				putsec(zi, secbuf, bytes_in_block);
 				zi->bytes_received += bytes_in_block;
+				vfile("GOTCRCW: bytes_received=%ld, block=%zu, readline_left=%d",
+				      (long)zi->bytes_received, bytes_in_block, readline_left);
 				stohdr(zi->bytes_received);
 				zshhdr(ZACK | 0x80, Txhdr);
 				goto nxthdr;
@@ -2016,6 +2018,8 @@ moredata:
 				n = 20;
 				putsec(zi, secbuf, bytes_in_block);
 				zi->bytes_received += bytes_in_block;
+				vfile("GOTCRCQ: bytes_received=%ld, block=%zu, readline_left=%d",
+				      (long)zi->bytes_received, bytes_in_block, readline_left);
 				stohdr(zi->bytes_received);
 				zshhdr(ZACK, Txhdr);
 				goto moredata;
@@ -2028,6 +2032,8 @@ moredata:
 				n = 20;
 				putsec(zi, secbuf, bytes_in_block);
 				zi->bytes_received += bytes_in_block;
+				vfile("GOTCRCE: bytes_received=%ld, block=%zu, readline_left=%d",
+				      (long)zi->bytes_received, bytes_in_block, readline_left);
 				goto nxthdr;
                         default:
                                 ;
