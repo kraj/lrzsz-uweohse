@@ -324,7 +324,7 @@ void canit (int fd);
 
 /* crctab.c */
 extern unsigned short crctab[256];
-#define updcrc(cp, crc) ( crctab[((crc >> 8) & 255)] ^ (crc << 8) ^ cp)
+#define updcrc(cp, crc) ( crctab[((crc >> 8) & 255)] ^ (( (unsigned int)(crc&0x00ffffff)) << 8) ^ cp)
 extern long cr3tab[];
 #define UPDC32(b, c) (cr3tab[((int)c ^ b) & 0xff] ^ ((c >> 8) & 0x00FFFFFF))
 
