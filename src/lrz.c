@@ -441,7 +441,7 @@ main(int argc, char *argv[])
 #  endif
 #endif
 			break;
-		case '3':
+		case 'F':
 			s_err = xstrtoul (optarg, NULL, 0, &tmp, "km");
 			if (s_err != LONGINT_OK)
 				STRTOL_FATAL_ERROR (optarg, _("bytes_per_error"), s_err);
