@@ -1365,7 +1365,7 @@ usage(int exitcode, const char *what)
 "  -8, --try-8k                go up to 8K blocksize\n"
 "      --start-8k              start with 8K blocksize\n"
 "  -a, --ascii                 ASCII transfer (change CR/LF to LF)\n"
-"  -b, --binary                binary transfer\n"
+"  -b, --binary                binary transfer (Z)\n"
 "  -B, --bufsize N             buffer N bytes (N==auto: buffer whole file)\n"
 "  -c, --command COMMAND       execute remote command COMMAND (Z)\n"
 "  -C, --command-tries N       try N times to execute a command (Z)\n"
