@@ -753,8 +753,10 @@ fubar:
 			shortname ? shortname : "no.name", protname());
 #endif
 	canit(STDOUT_FILENO);
-	if (fout)
+	if (fout) {
 		fclose(fout);
+                fout = NULL;
+        }
 
 	if (Restricted && Pathname) {
 		unlink(Pathname);
@@ -1158,12 +1160,14 @@ procheader(char *name, struct zm_fileinfo *zi)
 				DO_SYSLOG((LOG_ERR,"cannot fstat open file %s: %s",
 					name,strerror(e)));
 				fclose(fout);
+                                fout = NULL;
 				return ERROR;
 			}
 			if (zmanag == ZF1_ZMNEW) {
 				if (sta.st_mtime > zi->modtime) {
 					DO_SYSLOG((LOG_INFO,"skipping %s: newer file exists", name));
 					fclose(fout);
+                                        fout = NULL;
 					return ERROR; /* skips file */
 				}
 			} else {
@@ -1172,24 +1176,30 @@ procheader(char *name, struct zm_fileinfo *zi)
 					&& sta.st_mtime > zi->modtime) {
 					DO_SYSLOG((LOG_INFO,"skipping %s: longer+newer file exists", name));
 					fclose(fout);
+                                        fout = NULL;
 					return ERROR; /* skips file */
 				}
 			}
 			fclose(fout);
+                        fout = NULL;
 		} else if (zmanag==ZF1_ZMCRC) {
 			int r=do_crc_check(fout,zi->bytes_total,0);
 			if (r==ERROR) {
 				fclose(fout);
+                                fout = NULL;
 				return ERROR;
 			}
 			if (r!=ZCRC_DIFFERS) {
 				fclose(fout);
+                                fout = NULL;
 				return ERROR; /* skips */
 			}
 			fclose(fout);
+                        fout = NULL;
 		} else {
 			size_t namelen;
 			fclose(fout);
+                        fout = NULL;
 			if ((zmanag & ZF1_ZMMASK)!=ZF1_ZMCHNG) {
 				if (Verbose)
 					vstringf(_("file exists, skipped: %s\n"),name);
@@ -1267,7 +1277,8 @@ procheader(char *name, struct zm_fileinfo *zi)
                                 int r=do_crc_check(fout,zi->bytes_total,st.st_size);
                                 if (r==ERROR) {
                                         fclose(fout);
-                                        return ZFERR;
+                                        fout=NULL;
+                                        return ERROR;
                                 }
                                 if (r==ZCRC_DIFFERS) {
                                         can_resume=FALSE;
@@ -1281,7 +1292,8 @@ procheader(char *name, struct zm_fileinfo *zi)
                         if (can_resume) {
                                 if (fseek(fout, (long) zi->bytes_skipped, SEEK_SET)) {
                                         fclose(fout);
-                                        return ZFERR;
+                                        fout=NULL;
+                                        return ERROR;
                                 }
                         }
                         else
@@ -1289,8 +1301,10 @@ procheader(char *name, struct zm_fileinfo *zi)
                         goto buffer_it;
                 }
                 zi->bytes_skipped=0;
-                if (fout)
+                if (fout) {
                         fclose(fout);
+                        fout=NULL;
+                }
         }
         fout = safe_open(name_static, openmode);
 #ifdef ENABLE_MKDIR
@@ -2080,6 +2094,7 @@ closeit(struct zm_fileinfo *zi)
 {
 	int ret;
 	ret=fclose(fout);
+        fout = NULL;
 	if (ret) {
 		zpfatal(_("file close error"));
 		/* this may be any sort of error, including random data corruption */
