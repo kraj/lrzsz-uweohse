@@ -806,7 +806,7 @@ usage(const char *prog)
 {
     fprintf(stderr, "Usage: %s SUB [args...]\n", prog);
     fprintf(stderr, "       SUB typically is an (l)rz/sz/rb/sb/rx/sx command.\n");
-    fprintf(stderr, "       %s then will dump the protocol exchange to stderr\n");
+    fprintf(stderr, "       %s then will dump the protocol exchange to stderr\n",prog);
     exit(1);
 }
 
