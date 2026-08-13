@@ -705,9 +705,11 @@ wcreceive(int argc, char **argp)
 		else
 			shortname=*argp;
 #endif
-		vchar('\n');
-		vstringf(_("%s: ready to receive %s"), program_name, Pathname);
-		vstring("\r\n");
+                if (Verbose>1) {
+		    vchar('\n');
+                    vstringf(_("%s: ready to receive %s"), program_name, Pathname);
+                    vstring("\r\n");
+                }
 
 		if ((fout=safe_open(Pathname, "w")) == NULL) {
 #ifdef ENABLE_SYSLOG
