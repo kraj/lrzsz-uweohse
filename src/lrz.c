@@ -292,7 +292,7 @@ main(int argc, char *argv[])
 #define getopt_long(argc,argv,str,longopts,longind) getopt(argc,argv,str)
 #endif
 	while ((c = getopt_long (argc, argv, 
-		"a+bB:cCDeEF:ghm:M:OprRqs:St:uUvw:XZy",
+		"a+bB:cCDeEF:ghHm:M:OprRqs:St:uUvw:XZy",
 		long_options, (int *) 0)) != EOF)
 	{
 		unsigned long int tmp;
