@@ -1231,7 +1231,7 @@ procheader(char *name, struct zm_fileinfo *zi)
 			if ( *p == '/')
 				*p = '_';
 
-		if ( *--p == '.')		/* zap trailing period */
+		if (p > name_static && *--p == '.')		/* zap trailing period */
 			*p = 0;
 	}
 
