@@ -1,4 +1,6 @@
 noinst_LIBRARIES=libzmodem.a
+AM_CFLAGS = @WARN_CFLAGS@ @LRZSZ_CFLAGS@
+AM_LDFLAGS = @LRZSZ_LDFLAGS@
 
 EXTRA_DIST = alloca.c \
 	stpcpy.c \
