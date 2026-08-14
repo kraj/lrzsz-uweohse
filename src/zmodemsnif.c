@@ -105,9 +105,7 @@
 #define CAN     0x18
 #define CPMEOF  0x1a
 
-static void process_byte(struct parser *p, unsigned char c);
-
-/* --- Frame type names */
+/* --- Frame type names --- */
 
 static const char *frame_names[] = {
     "ZRQINIT", "ZRINIT", "ZSINIT", "ZACK",
@@ -212,9 +210,14 @@ struct parser {
     unsigned long  crc32;       /* running 32-bit CRC */
     unsigned char  crc_recv[4]; /* received CRC bytes */
     int            crc_recv_len;
+    /* ZFILE subframe data capture */
+    int            is_zfile;
+    unsigned char  data_buf[2048];
 };
 
-/* --- Timestamp */
+static void process_byte(struct parser *p, unsigned char c);
+
+/* --- Timestamp --- */
 
 static void
 print_ts(void)
@@ -409,6 +412,7 @@ emit_frame(struct parser *p)
         p->data_escaping = 0;
         p->data_term = 0;
         p->data_len = 0;
+        p->is_zfile = (p->hdr_type == ZFILE);
         p->crc_len = (p->frame_ind == ZBIN32) ? 4 : 2;
         /* Initialize data subframe CRC */
         if (p->frame_ind == ZBIN32)
@@ -629,6 +633,8 @@ process_byte(struct parser *p, unsigned char c)
                         p->crc32 = updc32(raw, p->crc32);
                     else
                         p->crc16 = updcrc(raw, p->crc16);
+                    if (p->is_zfile && p->data_len < sizeof(p->data_buf))
+                        p->data_buf[p->data_len] = raw;
                     p->data_len++;
                 }
             } else if (c == ZDLE) {
@@ -639,6 +645,8 @@ process_byte(struct parser *p, unsigned char c)
                     p->crc32 = updc32(c, p->crc32);
                 else
                     p->crc16 = updcrc(c, p->crc16);
+                if (p->is_zfile && p->data_len < sizeof(p->data_buf))
+                    p->data_buf[p->data_len] = c;
                 p->data_len++;
             }
             break;
@@ -690,6 +698,23 @@ process_byte(struct parser *p, unsigned char c)
                         p->data_term == ZCRCQ ? "ZCRCQ" :
                         p->data_term == ZCRCW ? "ZCRCW" : "?",
                         crc_bad ? " [BAD CRC]" : "");
+                if (p->is_zfile && p->data_len > 0 && !crc_bad) {
+                    /* Parse ZFILE metadata: filename\0 size mtime mode ... */
+                    size_t namelen = strnlen((char *)p->data_buf, p->data_len);
+                    const char *fname = (char *)p->data_buf;
+                    const char *rest = "";
+                    long size_val = 0;
+                    unsigned long mtime_val = 0, mode_val = 0;
+                    if (namelen < p->data_len) {
+                        rest = (char *)p->data_buf + namelen + 1;
+                        sscanf(rest, "%ld %lo %lo",
+                               &size_val, &mtime_val, &mode_val);
+                    }
+                    print_ts();
+                    print_dir(p->dir);
+                    fprintf(stderr, "    file=\"%s\" size=%ld mtime=%lu mode=0%lo\n",
+                            fname, size_val, mtime_val, mode_val);
+                }
                 if (p->data_term == ZCRCE || p->data_term == ZCRCW) {
                     p->state = PS_IDLE;
                 } else {
@@ -766,8 +791,9 @@ process_byte(struct parser *p, unsigned char c)
 static void
 parser_feed(struct parser *p, const unsigned char *buf, size_t len)
 {
-    for (size_t i = 0; i < len; i++)
+    for (size_t i = 0; i < len; i++) {
         process_byte(p, buf[i]);
+    }
 }
 
 /* --- Relay */
@@ -802,15 +828,6 @@ buf_write(int fd, struct buf *b)
     return n;
 }
 
-static void
-usage(const char *prog)
-{
-    fprintf(stderr, "Usage: %s SUB [args...]\n", prog);
-    fprintf(stderr, "       SUB typically is an (l)rz/sz/rb/sb/rx/sx command.\n");
-    fprintf(stderr, "       %s then will dump the protocol exchange to stderr\n",prog);
-    exit(1);
-}
-
 int
 main(int argc, char *argv[])
 {
@@ -826,8 +843,15 @@ main(int argc, char *argv[])
 
     init_crc_tables();
 
-    if (argc < 2)
-        usage(argv[0]);
+    /* put here so i'll not have to do some preprocessor magic to compile it with compilers
+     * insisting on noreturn
+     */
+    if (argc < 2) {
+        fprintf(stderr, "Usage: zmodemsnif SUB [args...]\n");
+        fprintf(stderr, "       SUB typically is an (l)rz/sz/rb/sb/rx/sx command.\n");
+        fprintf(stderr, "       zmodemsnif then will dump the protocol exchange to stderr\n");
+        exit(1);
+    }
 
     /* Create pipes for SUB's stdin and stdout */
     if (pipe(sub_stdin) < 0) {
@@ -883,24 +907,28 @@ main(int argc, char *argv[])
         if (!stdin_eof && to_sub.len < BUFSZ) {
             fds[nfds].fd = STDIN_FILENO;
             fds[nfds].events = POLLIN;
+            fds[nfds].revents = 0;
             pi_stdin = nfds;
             nfds++;
         }
         if (to_sub.len > 0) {
             fds[nfds].fd = sub_stdin[1];
             fds[nfds].events = POLLOUT;
+            fds[nfds].revents = 0;
             pi_subin = nfds;
             nfds++;
         }
         if (!sub_stdout_eof && to_stdout.len < BUFSZ) {
             fds[nfds].fd = sub_stdout[0];
             fds[nfds].events = POLLIN;
+            fds[nfds].revents = 0;
             pi_subout = nfds;
             nfds++;
         }
         if (to_stdout.len > 0) {
             fds[nfds].fd = STDOUT_FILENO;
             fds[nfds].events = POLLOUT;
+            fds[nfds].revents = 0;
             pi_stdout = nfds;
             nfds++;
         }
