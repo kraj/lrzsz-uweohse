@@ -1070,13 +1070,6 @@ wctxpn(struct zm_fileinfo *zi)
 	if (Totalleft < 0)
 		Totalleft = 0;
 
-	/* force 1k blocks if name won't fit in 128 byte block */
-	if (txbuf[125])
-		blklen=1024;
-	else {		/* A little goodie for IMP/KMD */
-		txbuf[127] = (f.st_size + 127) >>7;
-		txbuf[126] = (f.st_size + 127) >>15;
-	}
 	if (zmodem_requested)
 		return zsendfile(zi,txbuf, 1+strlen(p)+(p-txbuf));
 	if (wcputsec(txbuf, 0, 128)==ERROR) {
