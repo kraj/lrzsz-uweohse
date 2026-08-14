@@ -105,6 +105,8 @@
 #define CAN     0x18
 #define CPMEOF  0x1a
 
+static void process_byte(struct parser *p, unsigned char c);
+
 /* --- Frame type names */
 
 static const char *frame_names[] = {
@@ -439,7 +441,6 @@ emit_xmodem_byte(struct parser *p, unsigned char c, const char *desc)
     fprintf(stderr, "XMODEM: %s (0x%02x)\n", desc, c);
 }
 
-static void process_byte(struct parser *p, unsigned char c);
 
 static void
 process_byte(struct parser *p, unsigned char c)
