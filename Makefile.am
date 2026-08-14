@@ -8,9 +8,9 @@ CLEAN_FILES=fastcheck.done
 ACLOCAL_AMFLAGS = -I m4
 
 oldcheck-local:
-	QUIET=-q $(srcdir)/check.lrzsz $(srcdir) `pwd`	
+	QUIET=-q $(srcdir)/check.lrzsz $(srcdir) `pwd`
 
-fastcheck: 
+fastcheck:
 	if [ x`uname -s` = xBeOS ] ; then make fastcheck-beos ; else \
 		$(srcdir)/fastcheck.sh $(srcdir) `pwd` ; fi
 
@@ -63,7 +63,7 @@ vcheck-tmp:
 
 # Tag before making distribution.  Also, don't make a distribution if
 # checks fail.  Also, make sure the NEWS file is up-to-date.
-cvs-dist: 
+cvs-dist:
 	@if sed 1q NEWS | grep -e "$(VERSION)" > /dev/null; then :; else \
 		echo "NEWS not updated; not releasing" 1>&2; \
 		exit 1;                               \
@@ -74,4 +74,30 @@ cvs-dist:
 rpm: $(PR).tar.gz Specfile
 	$(srcdir)/buildrpm $(srcdir)
 
+openbsd-check: dist $(PR).tar.gz
+	scp ./remote-build-check.sh $(PR).tar.gz uwe@openbsd:
+	ssh uwe@openbsd sh ./remote-build-check.sh $(PR)
 
+qa: asan msan ubsan coverage
+
+SANITIZERS = asan msan ubsan
+$(SANITIZERS): CC_LIST = clang gcc
+msan: CC_LIST = clang
+$(SANITIZERS): %: src/*.c src/*.h
+	for i in $(CC_LIST) ; do if type -p "$$i" >/dev/null ; then \
+		echo "running clean/configure/vcheck with $$i --enable-$@"; \
+		make -s V=0 clean >/dev/null ; \
+		./configure CC="$$i" -q --enable-$@ || exit 1 ; \
+		make -s V=0 -j 4 || exit 1 ; \
+		QUIET=1 make -s V=0 vcheck || exit 1 ; \
+	fi ; done
+
+coverage: coverage/coverage.html
+coverage/coverage.html: src/*.c src/*.h
+	mkdir coverage 2>/dev/null || exit 0
+	make -s V=0 clean
+	./configure --enable-coverage -q
+	make -s V=0 -j 4
+	make -s V=0 vcheck
+	gcovr --html-details --output coverage/coverage.html src/
+	./configure -q
