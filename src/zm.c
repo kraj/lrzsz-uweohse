@@ -1,7 +1,7 @@
 /*
   zm.c - zmodem protocol handling lowlevelstuff
-  Copyright (C) until 1998 Chuck Forsberg (OMEN Technology Inc)
-  Copyright (C) 1996, 1997 Uwe Ohse
+  Copyright (C) until 1988 Chuck Forsberg (OMEN Technology Inc)
+  Copyright (C) 1996-1998,2026+ Uwe Ohse
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -20,21 +20,6 @@
 
   originally written by Chuck Forsberg
 */
-/* historical comment: -- uwe
- *   Z M . C
- *    ZMODEM protocol primitives
- *    05-09-88  Chuck Forsberg Omen Technology Inc
- *
- * Entry point Functions:
- *	zsbhdr(type, hdr) send binary header
- *	zshhdr(type, hdr) send hex header
- *	zgethdr(hdr, eflag) receive header - binary or hex
- *	zsdata(buf, len, frameend) send data
- *	zrdata(buf, len, bytes_received) receive data
- *	stohdr(pos) store position data in Txhdr
- *	long rclhdr(hdr) recover position offset from header
- */
-
 
 #include "zglobal.h"
 
