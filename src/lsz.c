@@ -376,7 +376,7 @@ main(int argc, char **argv)
 #define getopt_long(argc,argv,str,longopts,longind) getopt(argc,argv,str)
 #endif
 	while ((c = getopt_long (argc, argv,
-		"2+4589abB:C:c:dfeEghHi:kL:l:m:M:NnOopRrqsSt:TUuvw:XYy",
+		"2+4589abB:C:c:dfeEghHi:kL:l:m:M:NnOopRrqsSt:TUuvw:XYyZ",
 		long_options, (int *) 0))!=EOF)
 	{
 		unsigned long int tmp;
@@ -982,7 +982,8 @@ wcs(const char *oname, const char *remotename)
 		if (d==0) /* can happen if timing() uses time() */
 			d=0.5;
 		bps=zi.bytes_sent/d;
-		vchar('\r');
+                if (Verbose)
+                    vchar('\r');
 		if (Verbose > 1)
 			vstringf(_("Bytes Sent:%7ld   BPS:%-8ld                        \n"),
 				(long) zi.bytes_sent,bps);
