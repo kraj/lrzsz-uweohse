@@ -585,6 +585,8 @@ usage(int exitcode, const char *what)
 "  -J, --journal FILE          append transfer statistics to FILE\n"
 "  -m, --min-bps N             stop transmission if BPS below N\n"
 "  -M, --min-bps-time N          for at least N seconds (default: 120)\n"
+"  -n, --newer                 receive file if source newer (Z)\n"
+"  -N, --newer-or-longer       receive file if source newer or longer (Z)\n"
 "  -O, --disable-timeouts      disable timeout code, wait forever for data\n"
 "      --o-sync                open output file(s) in synchronous write mode\n"
 "  -p, --protect               protect existing files\n"

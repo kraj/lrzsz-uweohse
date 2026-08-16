@@ -210,6 +210,16 @@ certain time (see --min-bps-time option).
 .B "-M N, --min-bps-time"
 Used together with --min-bps. Default is 120 (seconds).
 .TP
+.B "-n, --newer"
+(ZMODEM) Accept file if the destination file does not exist.
+Otherwise, accept the file, overwriting the destination, if the
+source file is newer than the destination file.
+.TP
+.B "-N, --newer-or-longer"
+(ZMODEM) Accept file if the destination file does not exist.
+Otherwise, accept the file, overwriting the destination, if the
+source file is newer or longer than the destination file.
+.TP
 .B "-O, --disable-timeouts"
 Disable read timeout handling code. This makes lrz hang if the
 sender does not send any more, but increases performance (a bit)
