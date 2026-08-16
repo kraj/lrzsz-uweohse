@@ -60,15 +60,27 @@ static struct {
 	{1200,	B1200},
 	{2400,	B2400},
 	{4800,	B4800},
+#ifdef B7200
+        {7200,  B7200},
+#endif
 	{9600,	B9600},
+#ifdef B14400
+        {14400,  B14400},
+#endif
 #ifdef B19200
     {19200,  B19200},
+#endif
+#ifdef B28800
+        {28800,  B28800},
 #endif
 #ifdef B38400
     {38400,  B38400},
 #endif
 #ifdef B57600
     {57600,  B57600},
+#endif
+#ifdef B76800
+    {76800,  B76800},
 #endif
 #ifdef B115200
     {115200,  B115200},
@@ -79,6 +91,7 @@ static struct {
 #ifdef B460800
     {460800,  B460800},
 #endif
+
 #ifdef EXTA
 	{19200,	EXTA},
 #endif
@@ -88,9 +101,7 @@ static struct {
 	{0, 0}
 };
 
-static unsigned getspeed __P((speed_t));
-
-static unsigned
+unsigned
 getspeed(speed_t code)
 {
 	int n;
