@@ -1384,6 +1384,7 @@ usage(int exitcode, const char *what)
 "  -i, --immediate-command CMD send remote CMD, return immediately (Z)\n"
 "  -J, --journal FILE          append transfer statistics to FILE\n"
 "  -h, --help                  print this usage message\n"
+"  -H, --crc-check             accept and transfer files if lengths/CRCs differ (Z)\n"
 "      --no-unixmode           send mode 0 instead of Unix permission bits\n"
 "  -k, --1k                    send 1024 byte packets (X)\n"
 "  -L, --packetlen N           limit subpacket length to N bytes (Z)\n"

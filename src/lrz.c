@@ -582,6 +582,7 @@ usage(int exitcode, const char *what)
 "  -E, --rename                rename any files already existing\n"
 "  -F, --errors N              generate CRC error every N bytes (debugging)\n"
 "  -h, --help                  Help, print this usage message\n"
+"  -H, --crc-check             accept file if lengths and/or CRCs differ (Z)\n"
 "  -J, --journal FILE          append transfer statistics to FILE\n"
 "  -m, --min-bps N             stop transmission if BPS below N\n"
 "  -M, --min-bps-time N          for at least N seconds (default: 120)\n"
