@@ -90,6 +90,10 @@ readline_internal(unsigned int timeout)
 	readline_left=read(readline_fd, readline_ptr, readline_readnum);
 	if (!no_timeout)
 		alarm(0);
+        stat_for_file.net_read_ops++;
+        if (readline_left>=0) {
+            stat_for_file.net_bytes_in += readline_left;
+        }
 	if (readline_left>0 && bytes_per_error) {
 		static long ct=0;
 		static int mod=1;
