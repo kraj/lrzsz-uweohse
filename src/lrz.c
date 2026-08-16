@@ -499,6 +499,17 @@ main(int argc, char *argv[])
 
 	vfile("%s %s\n", program_name, VERSION);
 
+        {
+            struct timespec start_timespec;
+            int ret;
+            ret=clock_gettime(CLOCK_MONOTONIC, &start_timespec);
+            if (ret) {
+                stat_for_all.start_time=0;
+            } else {
+                stat_for_all.start_time=start_timespec.tv_sec+((double)start_timespec.tv_nsec/1e9);
+            }
+        }
+
 	io_mode(0,1);
 	readline_setup(0, MAX_BLOCK, MAX_BLOCK*2);
 	install_signal_handler(SIGINT);
@@ -519,6 +530,7 @@ main(int argc, char *argv[])
 		else
 			fputs(_("Transfer complete\n"),stderr);
 	}
+        stats_log(&stat_for_all,false);
 	exit(exitcode);
 }
 
@@ -625,6 +637,7 @@ wcreceive(int argc, char **argp)
 			if (c)
 				goto fubar;
 		} else {
+                        // YMODEM path.
 			for (;;) {
 				if (Verbose > 1
 #ifdef ENABLE_SYSLOG
@@ -641,6 +654,7 @@ wcreceive(int argc, char **argp)
 					return OK;
 				if (procheader(secbuf, &zi) == ERROR)
 					goto fubar;
+                                stats_set_filename(zi.fname);
 #ifdef ENABLE_SYSLOG
 				shortname=strrchr(zi.fname,'/');
 				if (shortname)
@@ -674,6 +688,8 @@ wcreceive(int argc, char **argp)
 							shortname,protname(),zi.bytes_received, bps);
 #endif
 				}
+                                stat_for_file.files_received++;
+                                stats_account_one();
 			}
 		}
 	} else {
@@ -697,76 +713,83 @@ wcreceive(int argc, char **argp)
 		if (!Pathname)
 			error(1,0,_("out of memory"));
 
-		checkpath(Pathname);
+                checkpath(Pathname);
+                stats_set_filename(Pathname);
 #ifdef ENABLE_SYSLOG
-		shortname=strrchr(*argp,'/');
-		if (shortname)
-			shortname++;
-		else
-			shortname=*argp;
+                shortname=strrchr(*argp,'/');
+                if (shortname)
+                    shortname++;
+                else
+                    shortname=*argp;
 #endif
                 if (Verbose>1) {
-		    vchar('\n');
+                    vchar('\n');
                     vstringf(_("%s: ready to receive %s"), program_name, Pathname);
                     vstring("\r\n");
                 }
 
-		if ((fout=safe_open(Pathname, "w")) == NULL) {
+                if ((fout=safe_open(Pathname, "w")) == NULL) {
 #ifdef ENABLE_SYSLOG
-			if (enable_syslog)
-				lsyslog(LOG_ERR,"%s/%s: cannot open: %s",
-					shortname,protname(), strerror(errno));
+                    if (enable_syslog)
+                        lsyslog(LOG_ERR,"%s/%s: cannot open: %s",
+                                shortname,protname(), strerror(errno));
 #endif
-			return ERROR;
-		}
-		if (wcrx(&zi)==ERROR) {
-			goto fubar;
-		}
-		if (Verbose > 1
+                    return ERROR;
+                }
+                if (wcrx(&zi)==ERROR) {
+                    goto fubar;
+                }
+                // stat_for_file.files_received++; done by wcrx.
+                stats_account_one();
+                if (Verbose > 1
 #ifdef ENABLE_SYSLOG
-			|| enable_syslog
+                        || enable_syslog
 #endif
-	 		) {
-			double d;
-			long bps;
-			d=timing(0,NULL);
-			if (d==0)
-				d=0.5; /* can happen if timing uses time() */
-			bps=(zi.bytes_received-zi.bytes_skipped)/d;
-			if (Verbose) {
-				vstringf(
-					_("\rBytes received: %7ld   BPS:%-6ld                \r\n"),
-					(long) zi.bytes_received, bps);
-			}
+                   ) {
+                    double d;
+                    long bps;
+                    d=timing(0,NULL);
+                    if (d==0)
+                        d=0.5; /* can happen if timing uses time() */
+                    bps=(zi.bytes_received-zi.bytes_skipped)/d;
+                    if (Verbose) {
+                        vstringf(
+                                _("\rBytes received: %7ld   BPS:%-6ld                \r\n"),
+                                (long) zi.bytes_received, bps);
+                    }
 #ifdef ENABLE_SYSLOG
-			if (enable_syslog)
-				lsyslog(LOG_INFO,"%s/%s: %ld Bytes, %ld BPS",
-					shortname,protname(),zi.bytes_received, bps);
+                    if (enable_syslog)
+                        lsyslog(LOG_INFO,"%s/%s: %ld Bytes, %ld BPS",
+                                shortname,protname(),zi.bytes_received, bps);
 #endif
-		}
-	}
-	return OK;
+                }
+        }
+        return OK;
 fubar:
 #ifdef ENABLE_SYSLOG
-	if (enable_syslog)
-		lsyslog(LOG_ERR,"%s/%s: got error", 
-			shortname ? shortname : "no.name", protname());
+        if (enable_syslog)
+            lsyslog(LOG_ERR,"%s/%s: got error", 
+                    shortname ? shortname : "no.name", protname());
 #endif
-	canit(STDOUT_FILENO);
-	if (fout) {
-		fclose(fout);
-                fout = NULL;
+        canit(STDOUT_FILENO);
+        if (fout) {
+            fclose(fout);
+            fout = NULL;
         }
 
-	if (Restricted && Pathname) {
-		unlink(Pathname);
-		vstringf(_("\r\n%s: %s removed.\r\n"), program_name, Pathname);
-	}
-	return ERROR;
+        if (Restricted && Pathname) {
+            unlink(Pathname);
+            vstringf(_("\r\n%s: %s removed.\r\n"), program_name, Pathname);
+        }
+        stat_for_file.files_failed++;
+        stats_account_one();
+        return ERROR;
 }
 
 
 /*
+ * this receives the YMODEM header.
+ *
  * Fetch a pathname from the other end as a C ctyle ASCIZ string.
  * Length is indeterminate as long as less than Blklen
  * A null string represents no more files (YMODEM)
@@ -774,88 +797,98 @@ fubar:
 static int 
 wcrxpn(struct zm_fileinfo *zi, char *rpn)
 {
-	register int c;
-	size_t Blklen=0;		/* record length of received packets */
+    register int c;
+    size_t Blklen=0;		/* record length of received packets */
 
-	READLINE_PF(1);
+    READLINE_PF(1);
 
 et_tu:
-	Firstsec=TRUE;
-	zi->eof_seen=FALSE;
-	sendline(Crcflg?WANTCRC:NAK);
-	flushmo();
-	purgeline(0); /* Do read next time ... */
-	while ((c = wcgetsec(&Blklen, rpn, 100)) != 0) {
-		if (c == WCEOT) {
-			zperr( _("Pathname fetch returned EOT"));
-			sendline(ACK);
-			flushmo();
-			purgeline(0);	/* Do read next time ... */
-			READLINE_PF(1);
-			goto et_tu;
-		}
-		return ERROR;
-	}
-	sendline(ACK);
-	flushmo();
-	return OK;
+    Firstsec=TRUE;
+    zi->eof_seen=FALSE;
+    sendline(Crcflg?WANTCRC:NAK);
+    flushmo();
+    purgeline(0); /* Do read next time ... */
+    while ((c = wcgetsec(&Blklen, rpn, 100)) != 0) {
+        if (c == WCEOT) {
+            zperr( _("Pathname fetch returned EOT"));
+            stat_for_file.out_of_sync_messages+=1;
+            sendline(ACK);
+            flushmo();
+            purgeline(0);	/* Do read next time ... */
+            READLINE_PF(1);
+            goto et_tu;
+        }
+        return ERROR;
+    }
+    sendline(ACK);
+    flushmo();
+    return OK;
 }
 
 /*
+ * this is the XMODEM receiver.
+ * this is the YMODEM body receiver.
+ *
+ * Historical note:
  * Adapted from CMODEM13.C, written by
  * Jack M. Wierda and Roderick W. Hart
  */
 static int 
 wcrx(struct zm_fileinfo *zi)
 {
-	register int sectnum, sectcurr;
-	register char sendchar;
-	size_t Blklen;
+    register int sectnum, sectcurr;
+    register char sendchar;
+    size_t Blklen;
 
-	Firstsec=TRUE;sectnum=0; 
-	zi->eof_seen=FALSE;
-	sendchar=Crcflg?WANTCRC:NAK;
+    Firstsec=TRUE;sectnum=0; 
+    zi->eof_seen=FALSE;
+    sendchar=Crcflg?WANTCRC:NAK;
 
-	for (;;) {
-		sendline(sendchar);	/* send it now, we're ready! */
-		flushmo();
-		purgeline(0);	/* Do read next time ... */
-		sectcurr=wcgetsec(&Blklen, secbuf, 
-			(unsigned int) ((sectnum&0177) ? 50 : 130));
-		if (sectcurr==((sectnum+1) &0377)) {
-			sectnum++;
-                        /* report the real section/block number, not sectcurr
-                         * this is (a) more correct, and
-                         * (b) avoid overwriting 255 with 0 to create 055…
-                         */
-		        report(sectnum);
-			/* if using xmodem we don't know how long a file is */
-			if (zi->bytes_total && R_BYTESLEFT(zi) < Blklen)
-				Blklen=R_BYTESLEFT(zi);
-			zi->bytes_received+=Blklen;
-			if (putsec(zi, secbuf, Blklen)==ERROR)
-				return ERROR;
-			sendchar=ACK;
-		}
-		else if (sectcurr==(sectnum&0377)) {
-			zperr( _("Received dup Sector"));
-			sendchar=ACK;
-		}
-		else if (sectcurr==WCEOT) {
-			if (closeit(zi))
-				return ERROR;
-			sendline(ACK);
-			flushmo();
-			purgeline(0);	/* Do read next time ... */
-			return OK;
-		}
-		else if (sectcurr==ERROR)
-			return ERROR;
-		else {
-			zperr( _("Sync Error"));
-			return ERROR;
-		}
-	}
+    for (;;) {
+        sendline(sendchar);	/* send it now, we're ready! */
+        flushmo();
+        purgeline(0);	/* Do read next time ... */
+        sectcurr=wcgetsec(&Blklen, secbuf, 
+                (unsigned int) ((sectnum&0177) ? 50 : 130));
+        if (sectcurr==((sectnum+1) &0377)) {
+            sectnum++;
+            /* report the real section/block number, not sectcurr
+             * this is (a) more correct, and
+             * (b) avoid overwriting 255 with 0 to create 055…
+             */
+            report(sectnum);
+            /* if using xmodem we don't know how long a file is */
+            if (zi->bytes_total && R_BYTESLEFT(zi) < Blklen)
+                Blklen=R_BYTESLEFT(zi);
+            zi->bytes_received+=Blklen;
+            if (putsec(zi, secbuf, Blklen)==ERROR)
+                return ERROR;
+            sendchar=ACK;
+        }
+        else if (sectcurr==(sectnum&0377)) {
+            zperr( _("Received dup Sector"));
+            sendchar=ACK;
+            stat_for_file.out_of_sync_messages+=1;
+        }
+        else if (sectcurr==WCEOT) {
+            if (closeit(zi)) {
+                stat_for_file.local_errors+=1;
+                return ERROR;
+            }
+            stat_for_file.files_received+=1;
+            sendline(ACK);
+            flushmo();
+            purgeline(0);	/* Do read next time ... */
+            return OK;
+        }
+        else if (sectcurr==ERROR) // wcgetsec accounted for stats.
+            return ERROR;
+        else {
+            zperr( _("Sync Error"));
+            stat_for_file.out_of_sync_messages+=1;
+            return ERROR;
+        }
+    }
 }
 
 /*
@@ -870,94 +903,108 @@ wcrx(struct zm_fileinfo *zi)
 static int
 wcgetsec(size_t *Blklen, char *rxbuf, unsigned int maxtime)
 {
-	register int checksum, wcj, firstch;
-	register unsigned short oldcrc;
-	register char *p;
-	int sectcurr;
+    register int checksum, wcj, firstch;
+    register unsigned short oldcrc;
+    register char *p;
+    int sectcurr;
 
-	for (Lastrx=errors=0; errors<RETRYMAX; errors++) {
+    for (Lastrx=errors=0; errors<RETRYMAX; errors++) {
 
-		if ((firstch=READLINE_PF(maxtime))==STX) {
-			*Blklen=1024; goto get2;
-		}
-		if (firstch==SOH) {
-			*Blklen=128;
+        if ((firstch=READLINE_PF(maxtime))==STX) {
+            *Blklen=1024; goto get2;
+        }
+        if (firstch==SOH) {
+            *Blklen=128;
 get2:
-			sectcurr=READLINE_PF(1);
-			if ((sectcurr+(oldcrc=READLINE_PF(1)))==0377) {
-				oldcrc=checksum=0;
-				for (p=rxbuf,wcj=*Blklen; --wcj>=0; ) {
-					if ((firstch=READLINE_PF(1)) < 0)
-						goto bilge;
-					oldcrc=updcrc(firstch, oldcrc);
-					checksum += (*p++ = firstch);
-				}
-				if ((firstch=READLINE_PF(1)) < 0)
-					goto bilge;
-				if (Crcflg) {
-					oldcrc=updcrc(firstch, oldcrc);
-					if ((firstch=READLINE_PF(1)) < 0)
-						goto bilge;
-					oldcrc=updcrc(firstch, oldcrc);
-					if (oldcrc & 0xFFFF)
-						zperr( _("CRC"));
-					else {
-						Firstsec=FALSE;
-						return sectcurr;
-					}
-				}
-				else if (((checksum-firstch)&0377)==0) {
-					Firstsec=FALSE;
-					return sectcurr;
-				}
-				else
-					zperr( _("Checksum"));
-			}
-			else
-				zperr(_("Sector number garbled"));
-		}
-		/* make sure eot really is eot and not just mixmash */
-		else if (firstch==EOT && READLINE_PF(1)==TIMEOUT)
-			return WCEOT;
-		else if (firstch==CAN) {
-			if (Lastrx==CAN) {
-				zperr( _("Sender Cancelled"));
-				return ERROR;
-			} else {
-				Lastrx=CAN;
-				continue;
-			}
-		}
-		else if (firstch==TIMEOUT) {
-			if (Firstsec)
-				goto humbug;
+            sectcurr=READLINE_PF(1);
+            if ((sectcurr+(oldcrc=READLINE_PF(1)))==0377) {
+                oldcrc=checksum=0;
+                for (p=rxbuf,wcj=*Blklen; --wcj>=0; ) {
+                    if ((firstch=READLINE_PF(1)) < 0)
+                        goto bilge;
+                    oldcrc=updcrc(firstch, oldcrc);
+                    checksum += (*p++ = firstch);
+                }
+                if ((firstch=READLINE_PF(1)) < 0)
+                    goto bilge;
+                if (Crcflg) {
+                    oldcrc=updcrc(firstch, oldcrc);
+                    stat_for_file.total_message_bytes+=*Blklen;
+                    if ((firstch=READLINE_PF(1)) < 0)
+                        goto bilge;
+                    oldcrc=updcrc(firstch, oldcrc);
+                    if (oldcrc & 0xFFFF) {
+                        stat_for_file.invalid_messages+=1;
+                        zperr( _("CRC"));
+                    } else {
+                        Firstsec=FALSE;
+                        stat_for_file.valid_messages+=1;
+                        return sectcurr;
+                    }
+                } else {
+                    stat_for_file.total_message_bytes+=*Blklen;
+                    if (((checksum-firstch)&0377)==0) {
+                        Firstsec=FALSE;
+                        stat_for_file.valid_messages+=1;
+                        return sectcurr;
+                    }
+                    else {
+                        stat_for_file.invalid_messages+=1;
+                        zperr( _("Checksum"));
+                    }
+                }
+            }
+            else {
+                stat_for_file.format_errors+=1;
+fprintf(stderr,"sector number garbled %d+%d=%d\n",sectcurr,oldcrc, sectcurr+oldcrc);
+                zperr(_("Sector number garbled"));
+            }
+        }
+        /* make sure eot really is eot and not just mixmash */
+        else if (firstch==EOT && READLINE_PF(1)==TIMEOUT)
+            return WCEOT;
+        else if (firstch==CAN) {
+            if (Lastrx==CAN) {
+                zperr( _("Sender Cancelled"));
+                stat_for_file.cancels+=1;
+                return ERROR;
+            } else {
+                Lastrx=CAN;
+                continue;
+            }
+        }
+        else if (firstch==TIMEOUT) {
+            if (Firstsec)
+                goto humbug;
 bilge:
-			zperr( _("TIMEOUT"));
-		}
-		else
-			zperr( _("Got 0%o sector header"), firstch);
+            stat_for_file.timeouts+=1;
+            zperr( _("TIMEOUT"));
+        } else {
+            zperr( _("Got 0%o sector header"), firstch);
+        }
 
 humbug:
-		Lastrx=0;
-		{
-			int cnt=1000;
-			while(cnt-- && READLINE_PF(1)!=TIMEOUT)
-				;
-		}
-		if (Firstsec) {
-			sendline(Crcflg?WANTCRC:NAK);
-			flushmo();
-			purgeline(0);	/* Do read next time ... */
-		} else {
-			maxtime=40;
-			sendline(NAK);
-			flushmo();
-			purgeline(0);	/* Do read next time ... */
-		}
-	}
-	/* try to stop the bubble machine. */
-	canit(STDOUT_FILENO);
-	return ERROR;
+        Lastrx=0;
+        {
+            int cnt=1000;
+            while(cnt-- && READLINE_PF(1)!=TIMEOUT)
+                ;
+        }
+        if (Firstsec) {
+            sendline(Crcflg?WANTCRC:NAK);
+            flushmo();
+            purgeline(0);	/* Do read next time ... */
+        } else {
+            maxtime=40;
+            sendline(NAK);
+            flushmo();
+            purgeline(0);	/* Do read next time ... */
+        }
+    }
+    /* try to stop the bubble machine. */
+    canit(STDOUT_FILENO);
+    stat_for_file.too_many_errors+=1;
+    return ERROR;
 }
 
 #define ZCRC_DIFFERS (ERROR+1)
@@ -970,60 +1017,69 @@ humbug:
 static int 
 do_crc_check(FILE *f, size_t remote_bytes, size_t check_bytes) 
 {
-	struct stat st;
-	unsigned long crc;
-	unsigned long rcrc;
-	size_t n;
-	int c;
-	int t1=0,t2=0;
-	if (-1==fstat(fileno(f),&st)) {
-		DO_SYSLOG((LOG_ERR,"cannot fstat open file: %s",strerror(errno)));
-		return ERROR;
-	}
-	if (check_bytes==0 && ((size_t) st.st_size)!=remote_bytes)
-		return ZCRC_DIFFERS; /* shortcut */
+    struct stat st;
+    unsigned long crc;
+    unsigned long rcrc;
+    size_t n;
+    int c;
+    int t1=0,t2=0;
+    if (-1==fstat(fileno(f),&st)) {
+        stat_for_file.local_errors+=1;
+        DO_SYSLOG((LOG_ERR,"cannot fstat open file: %s",strerror(errno)));
+        return ERROR;
+    }
+    if (check_bytes==0 && ((size_t) st.st_size)!=remote_bytes)
+        return ZCRC_DIFFERS; /* shortcut */
 
-	crc=0xFFFFFFFFL;
-	n=check_bytes;
-	if (n==0)
-		n=st.st_size;
-	while (n-- && ((c = getc(f)) != EOF))
-		crc = UPDC32(c, crc);
-	crc = ~crc;
-	clearerr(f);  /* Clear EOF */
-	fseek(f, 0L, 0);
+    crc=0xFFFFFFFFL;
+    n=check_bytes;
+    if (n==0)
+        n=st.st_size;
+    while (n-- && ((c = getc(f)) != EOF))
+        crc = UPDC32(c, crc);
+    crc = ~crc;
+    clearerr(f);  /* Clear EOF */
+    fseek(f, 0L, 0);
 
-	while (t1<3) {
-		stohdr(check_bytes);
-		zshhdr(ZCRC, Txhdr);
-		t2=0;
-		while(t2<3) {
-			size_t tmp;
-			c = zgethdr(Rxhdr, 0, &tmp);
-			rcrc=(unsigned long) tmp;
-			switch (c) {
-			default: /* ignore */
-				break;
-			case ZFIN:
-				return ERROR;
-			case ZRINIT:
-				return ERROR;
-			case ZCAN:
-				if (Verbose)
-					vstringf(_("got ZCAN"));
-				return ERROR;
-				break;
-			case ZCRC:
-				if (crc!=rcrc)
-					return ZCRC_DIFFERS;
-				return ZCRC_EQUAL;
-				break;
-			}
-			t2++;
-		}
-		t1++;
-	}
-	return ERROR;
+    while (t1<3) {
+        stohdr(check_bytes);
+        zshhdr(ZCRC, Txhdr);
+        t2=0;
+        while(t2<3) {
+            size_t tmp;
+            c = zgethdr(Rxhdr, 0, &tmp);
+            rcrc=(unsigned long) tmp;
+            switch (c) {
+                case TIMEOUT:
+                    stat_for_file.timeouts+=1;
+                    break;
+                case ERROR:
+                default: /* ignore */
+                    break;
+                case ZFIN:
+                    stat_for_file.out_of_sync_messages+=1;
+                    return ERROR;
+                case ZRINIT:
+                    stat_for_file.out_of_sync_messages+=1;
+                    return ERROR;
+                case ZCAN:
+                    if (Verbose)
+                        vstringf(_("got ZCAN"));
+                    stat_for_file.cancels+=1;
+                    return ERROR;
+                    break;
+                case ZCRC:
+                    if (crc!=rcrc)
+                        return ZCRC_DIFFERS;
+                    return ZCRC_EQUAL;
+                    break;
+            }
+            t2++;
+        }
+        t1++;
+    }
+    stat_for_file.too_many_errors+=1;
+    return ERROR;
 }
 
 /*
@@ -1031,230 +1087,240 @@ do_crc_check(FILE *f, size_t remote_bytes, size_t check_bytes)
  * path component.  Maps fopen-style mode strings to open() flags.
  * Returns a FILE* on success, NULL on error (errno set).
  */
-static FILE *
+    static FILE *
 safe_open(const char *path, const char *mode)
 {
-	int flags = 0;
-	int fd;
-	const char *p = mode;
+    int flags = 0;
+    int fd;
+    const char *p = mode;
 
-	for (; *p; p++) {
-		switch (*p) {
-		case 'r':
-			flags |= O_RDONLY;
-			break;
-		case 'w':
-			flags |= O_WRONLY | O_CREAT | O_TRUNC;
-			break;
-		case 'a':
-			flags |= O_WRONLY | O_CREAT | O_APPEND;
-			break;
-		case '+':
-			flags &= ~(O_RDONLY | O_WRONLY | O_APPEND);
-			flags |= O_RDWR;
-			break;
-		default:
-			break;
-		}
-	}
-	flags |= O_NOFOLLOW;
+    for (; *p; p++) {
+        switch (*p) {
+            case 'r':
+                flags |= O_RDONLY;
+                break;
+            case 'w':
+                flags |= O_WRONLY | O_CREAT | O_TRUNC;
+                break;
+            case 'a':
+                flags |= O_WRONLY | O_CREAT | O_APPEND;
+                break;
+            case '+':
+                flags &= ~(O_RDONLY | O_WRONLY | O_APPEND);
+                flags |= O_RDWR;
+                break;
+            default:
+                break;
+        }
+    }
+    flags |= O_NOFOLLOW;
 
-	fd = open(path, flags, 0666);
-	if (fd < 0)
-		return NULL;
-	return fdopen(fd, mode);
+    fd = open(path, flags, 0666);
+    if (fd < 0)
+        return NULL;
+    return fdopen(fd, mode);
 }
 
 /*
  * Process incoming file information header
+ * returns OK or ERROR.
  */
 static int
 procheader(char *name, struct zm_fileinfo *zi)
 {
-	const char *openmode;
-	char *p;
-	static char *name_static=NULL;
-	char *nameend;
+    const char *openmode;
+    char *p;
+    static char *name_static=NULL;
+    char *nameend;
+    stats_start_one();
 
-	if (name_static)
-		free(name_static);
-	if (junk_path) {
-		p=strrchr(name,'/');
-		if (p) {
-			p++;
-			if (!*p) {
-				/* alert - file name ended in with a / */
-				if (Verbose)
-					vstringf(_("file name ends with a /, skipped: %s\n"),name);
-				DO_SYSLOG((LOG_ERR,"file name ends with a /, skipped: %s", name));
-				return ERROR;
-			}
-			name=p;
-		}
-	}
-	name_static=malloc(strlen(name)+1);
-	if (!name_static)
-		error(1,0,_("out of memory"));
-	strcpy(name_static,name);
-	zi->fname=name_static;
-
-	if (Verbose>2) {
-		vstringf(_("zmanag=%d, Lzmanag=%d\n"),zmanag,Lzmanag);
-		vstringf(_("zconv=%d\n"),zconv);
-	}
-
-	/* set default parameters and overrides */
-	openmode = "w";
-	Thisbinary = (!Rxascii) || Rxbinary;
-	if (Lzmanag)
-		zmanag = Lzmanag;
-
-	/*
-	 *  Process ZMODEM remote file management requests
-	 */
-	if (!Rxbinary && zconv == ZCNL)	/* Remote ASCII override */
-		Thisbinary = 0;
-	if (zconv == ZCBIN)	/* Remote Binary override */
-		Thisbinary = TRUE;
-	if (Thisbinary && zconv == ZCBIN && try_resume)
-		zconv=ZCRESUM;
-	if (zmanag == ZF1_ZMAPND && zconv!=ZCRESUM)
-		openmode = "a";
-	if (skip_if_not_found)
-		openmode="r+";
-
-	zi->bytes_total = DEFBYTL;
-	zi->mode = 0; 
-	zi->eof_seen = 0; 
-	zi->modtime = 0;
-
-	nameend = name + 1 + strlen(name);
-	if (*nameend) {	/* file coming from Unix or DOS system */
-		unsigned long modtime = 0;
-		long bytes_total = 0;
-		unsigned long mode = 0;
-		if (sscanf(nameend, "%ld%lo%lo", &bytes_total, &modtime, &mode) >= 1) {
-			zi->modtime = (time_t) modtime;
-			zi->bytes_total = (size_t) bytes_total;
-			zi->mode = (mode_t) mode;
-			if (zi->mode & UNIXFILE)
-				++Thisbinary;
-                }
-	}
-
-	/* Check for existing file */
-	if (zconv != ZCRESUM && !Rxclob && (zmanag&ZF1_ZMMASK) != ZF1_ZMCLOB 
-		&& (zmanag&ZF1_ZMMASK) != ZF1_ZMAPND
-		&& (fout=safe_open(name, "r"))) {
-		struct stat sta;
-		char *tmpname;
-		char *ptr;
-		int i;
-		if (zmanag == ZF1_ZMNEW || zmanag==ZF1_ZMNEWL) {
-			if (-1==fstat(fileno(fout),&sta)) {
-#ifdef ENABLE_SYSLOG
-				int e=errno;
-#endif
-				if (Verbose)
-					vstringf(_("file exists, skipped: %s\n"),name);
-				DO_SYSLOG((LOG_ERR,"cannot fstat open file %s: %s",
-					name,strerror(e)));
-				fclose(fout);
-                                fout = NULL;
-				return ERROR;
-			}
-			if (zmanag == ZF1_ZMNEW) {
-				if (sta.st_mtime > zi->modtime) {
-					DO_SYSLOG((LOG_INFO,"skipping %s: newer file exists", name));
-					fclose(fout);
-                                        fout = NULL;
-					return ERROR; /* skips file */
-				}
-			} else {
-				/* newer-or-longer */
-				if (((size_t) sta.st_size) >= zi->bytes_total 
-					&& sta.st_mtime > zi->modtime) {
-					DO_SYSLOG((LOG_INFO,"skipping %s: longer+newer file exists", name));
-					fclose(fout);
-                                        fout = NULL;
-					return ERROR; /* skips file */
-				}
-			}
-			fclose(fout);
-                        fout = NULL;
-		} else if (zmanag==ZF1_ZMCRC) {
-			int r=do_crc_check(fout,zi->bytes_total,0);
-			if (r==ERROR) {
-				fclose(fout);
-                                fout = NULL;
-				return ERROR;
-			}
-			if (r!=ZCRC_DIFFERS) {
-				fclose(fout);
-                                fout = NULL;
-				return ERROR; /* skips */
-			}
-			fclose(fout);
-                        fout = NULL;
-		} else {
-			size_t namelen;
-			fclose(fout);
-                        fout = NULL;
-			if ((zmanag & ZF1_ZMMASK)!=ZF1_ZMCHNG) {
-				if (Verbose)
-					vstringf(_("file exists, skipped: %s\n"),name);
-				return ERROR;
-			}
-			/* try to rename */
-			namelen=strlen(name);
-			tmpname=alloca(namelen+5);
-			memcpy(tmpname,name,namelen);
-			ptr=tmpname+namelen;
-			*ptr++='.';
-			i=0;
-			do {
-				sprintf(ptr,"%d",i++);
-			} while (i<1000 && stat(tmpname,&sta)==0);
-			if (i==1000)
-				return ERROR;
-			free(name_static);
-			name_static=malloc(strlen(tmpname)+1);
-			if (!name_static)
-				error(1,0,_("out of memory"));
-			strcpy(name_static,tmpname);
-			zi->fname=name_static;
-		}
-	}
-
-	if (!*nameend) {		/* File coming from CP/M system */
-		for (p=name_static; *p; ++p)		/* change / to _ */
-			if ( *p == '/')
-				*p = '_';
-
-		if (p > name_static && *--p == '.')		/* zap trailing period */
-			*p = 0;
-	}
-
-	if (!zmodem_requested && MakeLCPathname && !IsAnyLower(name_static)
-	  && !(zi->mode&UNIXFILE))
-		uncaps(name_static);
-
-        if (protocol==ZM_XMODEM)
-                /* we don't have the filename yet */
-                return OK; /* dummy */
-        if (Pathname)
-                free(Pathname);
-
-        Pathname=strdup(name_static);
-        if (!Pathname)
-                error(1,0,_("out of memory"));
-        if (Verbose) {
-                /* overwrite the "waiting to receive" line */
-                vstring("\r                                                                     \r");
-                vstringf(_("Receiving: %s\n"), name_static);
+    if (name_static)
+        free(name_static);
+    if (junk_path) {
+        p=strrchr(name,'/');
+        if (p) {
+            p++;
+            if (!*p) {
+                /* alert - file name ended in with a / */
+                if (Verbose)
+                    vstringf(_("file name ends with a /, skipped: %s\n"),name);
+                DO_SYSLOG((LOG_ERR,"file name ends with a /, skipped: %s", name));
+                stat_for_file.policy_rejects+=1;
+                return ERROR;
+            }
+            name=p;
         }
+    }
+    name_static=malloc(strlen(name)+1);
+    if (!name_static)
+        error(1,0,_("out of memory"));
+    strcpy(name_static,name);
+    zi->fname=name_static;
 
-        checkpath(name_static);
+    if (Verbose>2) {
+        vstringf(_("zmanag=%d, Lzmanag=%d\n"),zmanag,Lzmanag);
+        vstringf(_("zconv=%d\n"),zconv);
+    }
+
+    /* set default parameters and overrides */
+    openmode = "w";
+    Thisbinary = (!Rxascii) || Rxbinary;
+    if (Lzmanag)
+        zmanag = Lzmanag;
+
+    /*
+     *  Process ZMODEM remote file management requests
+     */
+    if (!Rxbinary && zconv == ZCNL)	/* Remote ASCII override */
+        Thisbinary = 0;
+    if (zconv == ZCBIN)	/* Remote Binary override */
+        Thisbinary = TRUE;
+    if (Thisbinary && zconv == ZCBIN && try_resume)
+        zconv=ZCRESUM;
+    if (zmanag == ZF1_ZMAPND && zconv!=ZCRESUM)
+        openmode = "a";
+    if (skip_if_not_found)
+        openmode="r+";
+
+    zi->bytes_total = DEFBYTL;
+    zi->mode = 0; 
+    zi->eof_seen = 0; 
+    zi->modtime = 0;
+
+    nameend = name + 1 + strlen(name);
+    if (*nameend) {	/* file coming from Unix or DOS system */
+        unsigned long modtime = 0;
+        long bytes_total = 0;
+        unsigned long mode = 0;
+        if (sscanf(nameend, "%ld%lo%lo", &bytes_total, &modtime, &mode) >= 1) {
+            zi->modtime = (time_t) modtime;
+            zi->bytes_total = (size_t) bytes_total;
+            zi->mode = (mode_t) mode;
+            if (zi->mode & UNIXFILE)
+                ++Thisbinary;
+        }
+    }
+
+    /* Check for existing file */
+    if (zconv != ZCRESUM && !Rxclob && (zmanag&ZF1_ZMMASK) != ZF1_ZMCLOB 
+            && (zmanag&ZF1_ZMMASK) != ZF1_ZMAPND
+            && (fout=safe_open(name, "r"))) {
+        struct stat sta;
+        char *tmpname;
+        char *ptr;
+        int i;
+        if (zmanag == ZF1_ZMNEW || zmanag==ZF1_ZMNEWL) {
+            if (-1==fstat(fileno(fout),&sta)) {
+#ifdef ENABLE_SYSLOG
+                int e=errno;
+#endif
+                if (Verbose)
+                    vstringf(_("file exists, skipped: %s\n"),name);
+                DO_SYSLOG((LOG_ERR,"cannot fstat open file %s: %s",
+                            name,strerror(e)));
+                stat_for_file.local_errors+=1;
+                fclose(fout);
+                fout = NULL;
+                return ERROR;
+            }
+            if (zmanag == ZF1_ZMNEW) {
+                if (sta.st_mtime > zi->modtime) {
+                    DO_SYSLOG((LOG_INFO,"skipping %s: newer file exists", name));
+                    fclose(fout);
+                    fout = NULL;
+                    stat_for_file.skipped+=1;
+                    return ERROR; /* skips file */
+                }
+            } else {
+                /* newer-or-longer */
+                if (((size_t) sta.st_size) >= zi->bytes_total 
+                        && sta.st_mtime > zi->modtime) {
+                    DO_SYSLOG((LOG_INFO,"skipping %s: longer+newer file exists", name));
+                    fclose(fout);
+                    fout = NULL;
+                    stat_for_file.skipped+=1;
+                    return ERROR; /* skips file */
+                }
+            }
+            fclose(fout);
+            fout = NULL;
+        } else if (zmanag==ZF1_ZMCRC) {
+            int r=do_crc_check(fout,zi->bytes_total,0);
+            if (r==ERROR) {
+                fclose(fout);
+                fout = NULL;
+                return ERROR;
+            }
+            if (r!=ZCRC_DIFFERS) {
+                fclose(fout);
+                fout = NULL;
+                stat_for_file.skipped++;
+                return ERROR; /* skips */
+            }
+            fclose(fout);
+            fout = NULL;
+        } else {
+            size_t namelen;
+            fclose(fout);
+            fout = NULL;
+            if ((zmanag & ZF1_ZMMASK)!=ZF1_ZMCHNG) {
+                stat_for_file.skipped+=1;
+                if (Verbose)
+                    vstringf(_("file exists, skipped: %s\n"),name);
+                return ERROR;
+            }
+            /* try to rename */
+            namelen=strlen(name);
+            tmpname=alloca(namelen+5);
+            memcpy(tmpname,name,namelen);
+            ptr=tmpname+namelen;
+            *ptr++='.';
+            i=0;
+            do {
+                sprintf(ptr,"%d",i++);
+            } while (i<1000 && stat(tmpname,&sta)==0);
+            if (i==1000) {
+                stat_for_file.policy_rejects+=1;
+                return ERROR;
+            }
+            free(name_static);
+            name_static=malloc(strlen(tmpname)+1);
+            if (!name_static)
+                error(1,0,_("out of memory"));
+            strcpy(name_static,tmpname);
+            zi->fname=name_static;
+        }
+    }
+
+    if (!*nameend) {		/* File coming from CP/M system */
+        for (p=name_static; *p; ++p)		/* change / to _ */
+            if ( *p == '/')
+                *p = '_';
+
+        if (p > name_static && *--p == '.')		/* zap trailing period */
+            *p = 0;
+    }
+
+    if (!zmodem_requested && MakeLCPathname && !IsAnyLower(name_static)
+            && !(zi->mode&UNIXFILE))
+        uncaps(name_static);
+
+    if (protocol==ZM_XMODEM)
+        /* we don't have the filename yet */
+        return OK; /* dummy */
+    if (Pathname)
+        free(Pathname);
+
+    Pathname=strdup(name_static);
+    if (!Pathname)
+        error(1,0,_("out of memory"));
+    if (Verbose) {
+        /* overwrite the "waiting to receive" line */
+        vstring("\r                                                                     \r");
+        vstringf(_("Receiving: %s\n"), name_static);
+    }
+
+    checkpath(name_static);
         if (Nflag)
         {
                 /* cast because we might not have a prototyp for strdup :-/ */
@@ -1291,6 +1357,7 @@ procheader(char *name, struct zm_fileinfo *zi)
                         zi->bytes_skipped = st.st_size & ~(1023);
                         if (can_resume) {
                                 if (fseek(fout, (long) zi->bytes_skipped, SEEK_SET)) {
+                                        stat_for_file.local_errors+=1;
                                         fclose(fout);
                                         fout=NULL;
                                         return ERROR;
@@ -1318,6 +1385,7 @@ procheader(char *name, struct zm_fileinfo *zi)
 #ifdef ENABLE_SYSLOG
                 int e=errno;
 #endif
+                stat_for_file.local_errors+=1;
                 zpfatal(_("cannot open %s"), name_static);
                 DO_SYSLOG((LOG_ERR,"%s: cannot open: %s",
                         protname(),strerror(e)));
@@ -1602,7 +1670,7 @@ again:
 		case ZRQINIT:
 			/* getting one ZRQINIT is totally ok. Normally a ZFILE follows 
 			 * (and might be in our buffer, so don't purge it). But if we
-			 * get more ZRQINITs than the sender has started up before us
+			 * get more ZRQINITs the sender has started before us
 			 * and sent ZRQINITs while waiting. 
 			 */
 			zrqinits_received++;
@@ -1660,6 +1728,7 @@ again:
 						_("remote command execution denied"));
 					vstringf("%s: %s\n", program_name, secbuf);
 				}
+                                stohdr(1L); /* be nice and tell the other side that the execution failed. */
                                 zshhdr(ZCOMPL, Txhdr);
                                 DO_SYSLOG((LOG_INFO,"rexec denied: %s",secbuf));
                                 return ZCOMPL;
@@ -1719,29 +1788,31 @@ rzfiles(struct zm_fileinfo *zi)
 				DO_SYSLOG_FNAME((LOG_INFO, "%s/%s: %ld Bytes, %ld BPS",shortname,
 						   protname(), (long) zi->bytes_total,bps));
 			}
-			/* FALL THROUGH */
+                        stat_for_file.files_received++;
+                        stats_account_one();
+			break;
 		case ZSKIP:
-			if (c==ZSKIP)
-			{
-				if (Verbose) 
-					vstringf(_("Skipped"));
-				DO_SYSLOG_FNAME((LOG_INFO, "%s/%s: skipped",shortname,protname()));
-			}
-			switch (tryz()) {
-			case ZCOMPL:
-				return OK;
-			default:
-				return ERROR;
-			case ZFILE:
-				break;
-			}
-			continue;
-		default:
-			return c;
+                        stat_for_file.skipped++;
+                        stats_account_one();
+                        if (Verbose) 
+                                vstringf(_("Skipped"));
+                        DO_SYSLOG_FNAME((LOG_INFO, "%s/%s: skipped",shortname,protname()));
+			break;
+		default: 
 		case ERROR:
+                        stat_for_file.files_failed++;
+                        stats_account_one();
 			DO_SYSLOG_FNAME((LOG_INFO, "%s/%s: error",shortname,protname()));
 			return ERROR;
 		}
+                switch (tryz()) {
+                case ZCOMPL:
+                        return OK;
+                default:
+                        return ERROR;
+                case ZFILE:
+                        break;
+                }
 	}
 }
 
@@ -1775,6 +1846,7 @@ oosb_free(void)
 /*
  * Receive a file with ZMODEM protocol
  *  Assumes file name frame is in secbuf
+ * returns: ERROR ZSIKP ZEOF
  */
 static int
 rzfile(struct zm_fileinfo *zi)
@@ -1798,6 +1870,7 @@ rzfile(struct zm_fileinfo *zi)
 				   shortname,protname()));
 		return (tryzhdrtype = ZSKIP);
 	}
+        stats_set_filename(zi->fname);
 
 	for (;;) {
 		stohdr(zi->bytes_received);
