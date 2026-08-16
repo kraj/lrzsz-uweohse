@@ -237,6 +237,7 @@ static struct option const long_options[] =
 	{"zmodem", no_argument, NULL, 'Z'},
 	{"overwrite", no_argument, NULL, 'y'},
 	{"null", no_argument, NULL, 'D'},
+	{"version", no_argument, NULL, 'V'},
 	{"journal", required_argument, NULL, 'J'},
 	{"syslog", optional_argument, NULL , 2},
 	{"delay-startup", required_argument, NULL, 4},
@@ -293,7 +294,7 @@ main(int argc, char *argv[])
 #define getopt_long(argc,argv,str,longopts,longind) getopt(argc,argv,str)
 #endif
 	while ((c = getopt_long (argc, argv, 
-		"a+bB:cCDeEF:ghHJ:m:M:nNOprRqs:St:uUvw:XZy",
+		"a+bB:cCDeEF:ghHJ:m:M:nNOprRqs:St:uUvVw:XZy",
 		long_options, (int *) 0)) != EOF)
 	{
 		unsigned long int tmp;

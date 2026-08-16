@@ -310,7 +310,7 @@ static struct option const long_options[] =
   {"unlink", no_argument, NULL, 'u'},
   {"unrestrict", no_argument, NULL, 'U'},
   {"verbose", no_argument, NULL, 'v'},
-  {"version", no_argument, 0, 'v'},
+  {"version", no_argument, 0, 'V'},
   {"windowsize", required_argument, NULL, 'w'},
   {"xmodem", no_argument, NULL, 'X'},
   {"ymodem", no_argument, NULL, 'g'},
@@ -329,6 +329,7 @@ static void
 show_version(void)
 {
 	printf ("%s (%s) %s\n", program_name, PACKAGE, VERSION);
+        exit(0);
 }
 
 
@@ -377,7 +378,7 @@ main(int argc, char **argv)
 #define getopt_long(argc,argv,str,longopts,longind) getopt(argc,argv,str)
 #endif
 	while ((c = getopt_long (argc, argv,
-		"2+4589abB:C:c:dfeEghHi:J:kL:l:m:M:NnOopRrqsSt:TUuvw:XYyZ",
+		"2+4589abB:C:c:dfeEghHi:J:kL:l:m:M:NnOopRrqsSt:TUuvVw:XYyZ",
 		long_options, (int *) 0))!=EOF)
 	{
 		unsigned long int tmp;
