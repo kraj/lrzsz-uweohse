@@ -1,22 +1,35 @@
 #! /bin/sh
 
 testdir="testdir.lrzsz"
+
 srcdir="$1"
 if test $srcdir = . ; then
-	srcdir=`pwd`
+    srcdir=`pwd`
 fi
 if test $srcdir = .. ; then
-	srcdir=`pwd`/..
+    srcdir=`pwd`/..
 fi
 objdir="$2"
 if test $objdir = . ; then
-	objdir=`pwd`
+    objdir=`pwd`
 fi
 
+echo checking with srcdir = $1 and objdir = $2
+
+selectedtests=
 if test "x$3" = x ; then
-	mode=all
+    mode=all
 else
-	mode=$3
+    mode=$3
+    if test "$mode" = "select" ; then
+        mode=all
+        shift
+        shift
+        shift
+        for i in "$@" ; do
+            selectedtests="$selectedtests $i";
+        done
+    fi
 fi
 
 ECHO=echo 
@@ -30,8 +43,8 @@ RZBUFSIZE="-B 524288"
 SZ="$objdir/src/lsz"
 RZ="$objdir/src/lrz"
 SNIF="$objdir/src/zmodemsnif"
+SIMU="$objdir/src/linesimulator"
 
-echo checking with srcdir = $1 and objdir = $2
 
 # z_test_files: files to test zmodem with.
 # z8_test_files: files to test zmodem-8k with. Optional.
@@ -86,13 +99,44 @@ megabyte_binary="$testdir/megabyte_binary"
 # special files to test x/y binary transfers
 all_256_file=$testdir/all256.bin
 for i in $(seq 0 255); do printf "\\$(printf '%03o' "$i")"; done > $all_256_file
-sixteen_k_binary_file=$testdir/16k.bin
-for i in $(seq 1 64); do cat $all_256_file ; done >$sixteen_k_binary_file
+
+binary_256k=$testdir/256k.bin
+dd if="$megabyte_binary" of="$binary_256k" bs=1024 count=256 2>&5
+dd if="$all_256_file" of="$binary_256k" bs=1 seek=8192 conv=notrunc 2>&5
+
+binary_128k=$testdir/128k.bin
+dd if="$megabyte_binary" of="$binary_128k" bs=1024 count=128 2>&5
+dd if="$all_256_file" of="$binary_128k" bs=1 seek=8192 conv=notrunc 2>&5
+
+binary_64k=$testdir/64k.bin
+dd if="$megabyte_binary" of="$binary_64k" bs=1024 count=64 2>&5
+dd if="$all_256_file" of="$binary_64k" bs=1 seek=8192 conv=notrunc 2>&5
+
+binary_32k=$testdir/32k.bin
+dd if="$megabyte_binary" of="$binary_32k" bs=1024 count=32 2>&5
+dd if="$all_256_file" of="$binary_32k" bs=1 seek=8192 conv=notrunc 2>&5
+
+binary_16k=$testdir/16k.bin
+dd if="$megabyte_binary" of="$binary_16k" bs=1024 count=16 2>&5
+dd if="$all_256_file" of="$binary_16k" bs=1 seek=8192 conv=notrunc 2>&5
+
+binary_8k=$testdir/8k.bin
+dd if="$megabyte_binary" of="$binary_8k" bs=1024 count=8 2>&5
+dd if="$all_256_file" of="$binary_8k" bs=1 seek=1024 conv=notrunc 2>&5
+
+binary_4k=$testdir/4k.bin
+dd if="$megabyte_binary" of="$binary_4k" bs=1024 count=4 2>&5
+dd if="$all_256_file" of="$binary_4k" bs=1 seek=1024 conv=notrunc 2>&5
+
+binary_2k=$testdir/2k.bin
+dd if="$megabyte_binary" of="$binary_2k" bs=1024 count=2 2>&5
+dd if="$all_256_file" of="$binary_2k" bs=1 seek=1024 conv=notrunc 2>&5
 
 large_binary_file=$testdir/large.bin
 sz=$(wc -c <$objdir/src/lsz)
 blocks=$(expr $sz / 1024 )
 dd if=$objdir/src/lsz of=$large_binary_file bs=1024 count=$blocks 2>&5
+
 
 nocontrols_file=$testdir/nocontrols.txt
 for i in $(seq 64 95); do printf "\\$(printf '%03o' "$i")"; done > $nocontrols_file
@@ -112,21 +156,32 @@ pad=$(( 128 - (sz % 128) ))
 [ $pad -gt 0 ] && dd if=/dev/zero bs=1 count=$pad 2>/dev/null | tr '\0' '\032' >>$po_file_crlf_padded_128
 
 doit() {
-    key="$1"
+    doit_key="$1"
     title="$2"
     sz="$3"
     rz="$4"
     cmp="$5"
     files="$6"
 
-    if test "$ONLY" != "$key" -a -n "$ONLY"; then
+    if test "$ONLY" != "$doit_key" -a -n "$ONLY"; then
         # caller might have prepared something here.
-        rm -rf $testdir/$key 2>&5
+        rm -rf $testdir/$doit_key 2>&5
         return
     fi
-
-    mkdir $testdir/$key 2>/dev/null
-    $ECHO "$key - $title"
+    if test -n "$selectedtests" ; then
+        found=
+        for t in $selectedtests ; do
+            if test "$t" = "$doit_key" ; then
+                found=t
+            fi
+        done
+        if test -z "$found" ; then
+            rm -rf $testdir/$doit_key 2>&5
+            return
+        fi
+    fi
+    mkdir $testdir/$doit_key 2>/dev/null
+    $ECHO "$doit_key - $title"
     
 
     failed=0
@@ -136,36 +191,36 @@ doit() {
     if test -n "$ONLY" ; then
         MYSNIF="$SNIF"
     fi
-    ($sz $SZBUFSIZE $files ) <$testdir/pipe | (cd $testdir/$key ; exec $MYSNIF $rz >>../pipe )
+    ($sz $SZBUFSIZE $files ) <$testdir/pipe | (cd $testdir/$doit_key ; exec $FAULT $MYSNIF strace -vs 16384 -fo /tmp/o1 $rz >>../pipe )
     end=$(date +%s.%N)
-    for i in $files ; do 
-            bn=`basename $i`
+    for doit_i in $files ; do 
+            doit_bn=`basename $doit_i`
             if test -f $cmp ; then
-                cmp "$cmp" $testdir/$key/$bn
+                cmp "$cmp" $testdir/$doit_key/$doit_bn
             elif test "$cmp" = "missing" ; then
-                test ! -e "$testdir/$key/$bn"
+                test ! -e "$testdir/$doit_key/$doit_bn"
             else
-                $cmp $i $testdir/$key/$bn
+                $cmp $doit_i $testdir/$doit_key/$doit_bn
             fi
             if test $? -eq 0 ; then
-                    rm -f $testdir/$key/$bn
+                    rm -f $testdir/$doit_key/$doit_bn
             else
                     if test -f $cmp ; then
                         stat $cmp
                     else
-                        stat $i
+                        stat $doit_i
                     fi
-                    stat $testdir/$key/$bn
+                    stat $testdir/$doit_key/$doit_bn
                     failed=1
             fi
     done
     if test $failed = 1 ; then 
-            rmdir $testdir/$key 2>&5
-            echo "$key FAILED"
+            rmdir $testdir/$doit_key 2>&5
+            echo "$doit_key FAILED"
             echo "---- see $testdir/passfail.log for more information"
-            echo "$key FAILED" >>$testdir/failures.log
-            echo "$key FAILED" >>$testdir/passfail.log
-            any_failure="$any_failure $key"
+            echo "$doit_key FAILED" >>$testdir/failures.log
+            echo "$doit_key FAILED" >>$testdir/passfail.log
+            any_failure="$any_failure $doit_key"
             echo "-- debug information:" >>$testdir/passfail.log
             echo "-- sender: $sz" >>$testdir/passfail.log
             echo "-- receiver: $rz" >>$testdir/passfail.log
@@ -174,24 +229,23 @@ doit() {
                 echo "-- cmp stat:" >>$testdir/passfail.log
             fi
             echo -n "---- transferring" >>$testdir/passfail.log
-            for i in $files ; do 
-                echo -n " " $(basename $i) >>$testdir/passfail.log
+            for doit_i in $files ; do 
+                echo -n " " $(basename $doit_i) >>$testdir/passfail.log
             done
             echo >>$testdir/passfail.log
     else
-            rm -rf $testdir/$key 2>&5
-            $ECHO "$key PASSED"
-            echo "$key PASSED" >>$testdir/passfail.log
+            rm -rf $testdir/$doit_key 2>&5
+            $ECHO "$doit_key PASSED"
+            echo "$doit_key PASSED" >>$testdir/passfail.log
             bytes=0
-            for i in $files ; do
-                bytes=$(expr $bytes + $(stat --format='%s' $i))
-                # echo "$i: added $(stat --format='%s' $i) => $bytes"
+            for doit_t in $files ; do
+                bytes=$(expr $bytes + $(stat --format='%s' $doit_t))
             done
             dur=$(echo "$end - $start" | bc)
             durshort=$(echo "scale=3; $end - $start" | bc)
             bps=$(echo "scale=2; $bytes / $dur" | bc)
             mbps=$(echo "scale=2; $bps / 1000000.0" | bc)
-            echo "$bps byte/sec ($mbps MB/s): $key, $bytes bytes transmitted in $durshort seconds" >>$testdir/perf.log
+            echo "$bps byte/sec ($mbps MB/s): $doit_key, $bytes bytes transmitted in $durshort seconds" >>$testdir/perf.log
     fi
 }
 resume_cmp() {
@@ -212,6 +266,490 @@ resume_cmp() {
     echo "-- sender resumed, but files differ. This is really bad."
     return 1
 }
+FAULTS="not slightly moderately noticeably significantly very extremely"
+fault2num() {
+    case "$1" in
+    extremely) echo 1024 ; return ;;
+    very) echo 2048 ; return ;;
+    significantly) echo 4096 ; return ;;
+    noticeably) echo 16384 ; return ;;
+    moderately) echo 32768 ; return ;;
+    slightly) echo 65536 ; return ;;
+    *) echo 9999999999 ; return ;;
+    esac
+}
+
+xerrors() {
+    # start with the error handling tests
+    for i in $FAULTS ; do
+        # note: -f 1024 in average creates N errors per 1024 bytes,
+        #   with N= number_of_channels * number_of_error_classes
+        # 3 error classes (-e, -x, -g), 2 channels: 1 error every 170 bytes.
+
+        # xmodem IS slow, and it is incredibly slow with many errors on the line.
+        # switch to a smaller file with many errors.
+        bin=$binary_128k
+        if test $(fault2num $i) -lt 65536 ; then
+            bin=$binary_16k
+        fi
+        if test $(fault2num $i) -lt 16384 ; then
+            bin=$binary_4k
+        fi
+        bn=$(basename $bin)
+
+        FAULT="$SIMU -s 1 -f $(fault2num $i) -r 8m -e 2 -x 4 -g 1" # flip up to 2 bits, drop up to 4 bytes, garble one byte. quite fast.
+        app="-3e";
+        if test "$i" = "not"; then
+            app="";
+        fi
+        doit "xmodem-lsz-lrz-errorbase-crc-$i$app" "lsz sending to lrz, $i faulty line" "$SZ -q -X" "$RZ -q -b -X -c $bn" cmp "$bin" 
+
+        # 1k mode CANNOT cope with to high error rates. it just needs to be able transfer some sectors…
+        if test $(fault2num $i) -gt 2048  ; then
+            doit "xmodem-lsz-lrz-errorbase-crc-1k-$i$app" "lsz sending to lrz, $i faulty line" "$SZ -q -X -k" "$RZ -q -b -X -c $bn" cmp "$bin" 
+        fi
+
+        # we repeat that with just 1 error class.
+        if test "$i" != "not"; then
+            FAULT="$SIMU -s 1 -f $(fault2num $i) -r 8m -e 1" # flip 1 bit. quite fast.
+            doit "xmodem-lsz-lrz-errorbase-crc-$i-1e" "lsz sending to lrz, $i faulty line" "$SZ -q -X" "$RZ -q -b -X -c $bn" cmp "$bin" 
+            if test $(fault2num $i) -gt 2048  ; then
+                doit "xmodem-lsz-lrz-errorbase-crc-1k-$i-1e" "lsz sending to lrz, $i faulty line" "$SZ -q -X -k" "$RZ -q -b -X -c $bn" cmp "$bin" 
+            fi
+        fi
+
+    done
+    FAULT=
+}
+yerrors() {
+    for i in $FAULTS ; do
+        # note: -f 1024 in average creates N errors per 1024 bytes,
+        #   with N= number_of_channels * number_of_error_classes
+        # 3 error classes (-e, -x, -g), 2 channels: 1 error every 170 bytes.
+
+        # xmodem IS slow, and it is incredibly slow with many errors on the line.
+        # switch to a smaller file with many errors.
+        bin="$binary_128k $binary_16k $binary_4k"
+        if test $(fault2num $i) -lt 65536 ; then
+            bin="$binary_16k $binary_4k"
+        fi
+        if test $(fault2num $i) -lt 16384 ; then
+            bin="$binary_4k $all_256_file"
+        fi
+
+        FAULT="$SIMU -s 1 -f $(fault2num $i) -r 8m -e 2 -x 4 -g 1" # flip up to 2 bits, drop up to 4 bytes, garble one byte. quite fast.
+        app="-3e";
+        if test "$i" = "not"; then
+            app="";
+        fi
+        doit "ymodem-lsz-lrz-errorbase-crc-$i$app" "lsz sending to lrz, $i faulty line" "$SZ -q -g" "$RZ -q -b -g -c" cmp "$bin"
+
+        # 1k mode CANNOT cope with to high error rates. it just needs to be able transfer some sectors…
+        if test $(fault2num $i) -gt 2048  ; then
+            doit "ymodem-lsz-lrz-errorbase-crc-1k-$i$app" "lsz sending to lrz, $i faulty line" "$SZ -q -g -k" "$RZ -q -b -g -c" cmp "$bin" 
+        fi
+
+        # we repeat that with just 1 error class.
+        if test "$i" != "not"; then
+            FAULT="$SIMU -s 1 -f $(fault2num $i) -r 8m -e 1" # flip 1 bit. quite fast.
+            doit "ymodem-lsz-lrz-errorbase-crc-$i-1e" "lsz sending to lrz, $i faulty line" "$SZ -q -g" "$RZ -q -b -g -c" cmp "$bin" 
+            if test $(fault2num $i) -gt 2048  ; then
+                doit "ymodem-lsz-lrz-errorbase-crc-1k-$i-1e" "lsz sending to lrz, $i faulty line" "$SZ -q -X -g" "$RZ -q -b -g -c" cmp "$bin" 
+            fi
+        fi
+
+    done
+    FAULT=
+}
+zerrors() {
+    for thisfault in $FAULTS ; do
+
+            # 
+            speed=1m
+
+            # note: -f 1024 in average creates N errors per 1024 bytes,
+            #   with N= number_of_channels * number_of_error_classes
+            # 3 error classes (-e, -x, -g), 2 channels: 1 error every 170 bytes.
+
+            all_binaries="$binary_16k $binary_128k"
+            case $speed in
+            1m) all_binaries="$binary_16k $binary_128k";; 
+            esac
+            case "$thisfault" in
+            extremely) all_binaries="$all_256_file $binary_2k" ;;
+            very) all_binaries="$binary_2k $binary_4k" ;;
+            significantly) all_binaries="$binary_4k $binary_8k" ;;
+            noticeable) all_binaries="$binary_16k $binary_32k" ;;
+            moderately) all_binaries="$binary_32k $binary_64k" ;;
+            slightly) all_binaries="$binary_64k $binary_128k" ;;
+            no) all_binaries="$binary_64k $binary_128k" ;;
+            esac
+
+    #        if test $(fault2num $thisfault) -lt 16384 ; then
+    #            bin="$binary_4k $all_256_file"
+    #        fi
+            app="-3e";
+            if test "$thisfault" = "not"; then
+                app="";
+            fi
+            app="$app-$speed";
+
+            FAULT="$SIMU -s 1 -f $(fault2num $thisfault) -r $speed -e 2 -x 4 -g 1" # flip up to 2 bits, drop up to 4 bytes, garble one byte. quite fast.
+            doit "zmodem-lsz-lrz-errors-$thisfault$app" "lsz sending to lrz, $thisfault faulty line ($speed baud simulated)" "$SZ -q -Z" "$RZ -q -Z" cmp "$all_binaries"
+            doit "zmodem-lsz-lrz-errors-4k-$thisfault$app" "lsz sending to lrz, $thisfault faulty line ($speed baud simulated)" "$SZ -q -4 -Z" "$RZ -q -Z" cmp "$all_binaries" 
+            doit "zmodem-lsz-lrz-errors-8k-$thisfault$app" "lsz sending to lrz, $thisfault faulty line ($speed baud simulated)" "$SZ -q -8 -Z" "$RZ -q -Z" cmp "$all_binaries" 
+
+            # we repeat that with just 1 error class.
+            if test "$thisfault" != "not"; then
+                FAULT="$SIMU -s 1 -f $(fault2num $thisfault) -r $speed -e 1" # flip 1 bit. quite fast.
+                app="-1e";
+                if test "$thisfault" = "not"; then
+                    app="";
+                fi
+                app="$app-$speed";
+                doit "zmodem-lsz-lrz-errors-$thisfault$app" "lsz sending to lrz, $thisfault faulty line ($speed baud simulated)" "$SZ -q -Z" "$RZ -q -Z" cmp "$all_binaries"
+                doit "zmodem-lsz-lrz-errors-4k-$thisfault$app" "lsz sending to lrz, $thisfault faulty line ($speed baud simulated)" "$SZ -q -4 -Z" "$RZ -q -Z" cmp "$all_binaries" 
+                doit "zmodem-lsz-lrz-errors-8k-$thisfault$app" "lsz sending to lrz, $thisfault faulty line ($speed baud simulated)" "$SZ -q -8 -Zk" "$RZ -q -Zc" cmp "$all_binaries" 
+            fi
+    done
+    FAULT=
+}
+
+compat_traits() {
+    other="$1"
+    s_framelen_opt=""
+    s_4k_opt=""
+    s_8k_opt=""
+    s_turno_opt=""
+    r_error_opt=""
+    r_ymodem_opt=""
+    s_ymodem_opt=""
+    r_xmodem_opt=""
+    s_xmodem_opt=""
+    r_xmodem_crc_opt=""
+    r_can_xmodem_1k=""
+    s_1k_opt=""
+    r_ascii_opt="" 
+    s_ascii_opt="" 
+    r_binary_opt="" 
+    r_resume_opt="" 
+    s_resume_opt="" 
+    s_append_opt="" 
+    s_rename_opt="" 
+    r_rename_opt="" 
+    r_can_rename=""
+    s_can_rename=""
+    s_can_resume=""
+    r_can_4k=""
+    r_can_8k=""
+    can_escctl=""
+    s_16bit_crc_opt=""
+    r_can_16bit_crc=""
+
+    case "$other" in 
+    self)
+        TEST_SZ="$SZ -q"
+        TEST_SB="$SZ -q -g"
+        TEST_SX="$SZ -q -X"
+        TEST_RZ="$RZ -q"
+        TEST_RB="$RZ -q -g"
+        TEST_RX="$RZ -q -X"
+        s_framelen_opt=-l
+        r_error_opt="-F" # lrzsz lrz option to create errors, short form
+        r_ymodem_opt="-g" 
+        s_ymodem_opt="-g" 
+        r_xmodem_opt="-X" 
+        s_xmodem_opt="-X" 
+        r_xmodem_crc_opt="-c"
+        r_can_xmodem_1k="yes"
+        s_1k_opt="-k"
+        r_ascii_opt="-a" 
+        s_ascii_opt="-a" 
+        r_binary_opt="-b" 
+        r_resume_opt="-r" 
+        s_resume_opt="-r" 
+        s_append_opt="-+" 
+        s_rename_opt="-E" 
+        r_rename_opt="-E" 
+        r_can_rename=yes
+        s_can_rename=yes
+        s_can_resume=yes
+        r_can_4k="yes"
+        r_can_8k="yes"
+        otherrz="lrz"
+        othersz="lsz"
+        can_escctl="yes"
+        s_16bit_crc_opt="-o"
+        r_can_16bit_crc="yes"
+        ;;
+    lrzsz-0.12.21rc)
+        TEST_SZ=~/bin/lrzsz-0.12.21rc/lsz" -q"
+        TEST_SX=~/bin/lrzsz-0.12.21rc/lsz" -q --xmodem"
+        TEST_SB=~/bin/lrzsz-0.12.21rc/lsz" -q --ymodem"
+        TEST_RZ=~/bin/lrzsz-0.12.21rc/lrz" -q "
+        TEST_RX=~/bin/lrzsz-0.12.21rc/lrz" -q --xmodem"
+        TEST_RB=~/bin/lrzsz-0.12.21rc/lrz" -q --ymodem"
+        s_framelen_opt=-l
+        s_4k_opt="-4"
+        s_8k_opt="-8"
+        s_turno_opt="-T"
+        r_error_opt="--errors" #lrzsz lrz option to create errors
+        r_ymodem_opt="--ymodem"
+        s_ymodem_opt="--ymodem"
+        r_xmodem_opt="--xmodem"
+        s_xmodem_opt="--xmodem"
+        r_xmodem_crc_opt="-c"
+        r_can_xmodem_1k="yes"
+        s_1k_opt="-k"
+        r_ascii_opt="-a" 
+        s_ascii_opt="-a" 
+        r_binary_opt="-b" 
+        r_resume_opt="-r" 
+        s_resume_opt="-r" 
+        s_append_opt="-+" 
+        s_rename_opt="-E" 
+        r_rename_opt="-E" 
+        r_can_rename=yes
+        s_can_rename=yes
+        s_can_resume=yes
+        r_can_4k="yes"
+        r_can_8k="yes"
+        can_escctl="yes"
+        otherrz="lrz(0.12.21rc)"
+        othersz="lsz(0.12.21rc)"
+        s_16bit_crc_opt="-o"
+        r_can_16bit_crc="yes"
+        ;;
+
+    sexyz)
+        TEST_SZ=~/bin/sexyz" sz"
+        TEST_RZ=~/bin/sexyz" rz"
+        TEST_SX=~/bin/sexyz" sx"
+        TEST_RX=~/bin/sexyz" rx"
+        TEST_SB=~/bin/sexyz" sy"
+        TEST_RB=~/bin/sexyz" ry"
+        otherrz="sexyz"
+        othersz="sexyz"
+        s_1k_opt="-k"
+        r_can_4k="yes"
+        r_can_8k="yes"
+        s_4k_opt="-4"
+        s_8k_opt="-8"
+        r_binary_opt=" "  # always binary
+        ;;
+        
+    crzsz)
+        TEST_SZ=~/bin/crzsz/csz # no -q option
+        TEST_SB=~/bin/crzsz/csb # no -q option
+        TEST_SX=~/bin/crzsz/csx # no -q option
+        TEST_RZ=~/bin/crzsz/crz
+        TEST_RB=~/bin/crzsz/crb
+        TEST_RX=~/bin/crzsz/crx
+        otherrz="crz"
+        othersz="csz"
+        s_can_resume=yes
+        can_escctl="yes"
+        s_16bit_crc_opt="-o"
+        r_can_16bit_crc="yes"
+        s_1k_opt="-k"
+        ;;
+    zmtx-zmrx)
+        TEST_SZ=~/bin/zmtx # no -q option
+        TEST_RZ=~/bin/zmrx" -q"
+        otherrz="zmrx"
+        othersz="zmtx"
+        r_can_4k="yes"
+        r_can_8k="yes"
+        r_4k_opt="-q"
+        #s_can_resume=  : ZCRC is not implemented.
+        #can_escapectl= : ZESCCTL is not implemented
+        ;;
+    esac
+}
+xcompat() {
+    available="self"
+    if test -x ~/bin/lrzsz-0.12.21rc/lrz -a -x ~/bin/lrzsz-0.12.21rc/lsz ; then
+        available="$available lrzsz-0.12.21rc"
+    fi
+    if test -x ~/bin/crzsz/crz -a -x ~/bin/crzsz/csz ; then
+        available="$available crzsz"
+    fi
+    if test -x ~/bin/zmtx -a -x ~/bin/zmrx ; then
+        available="$available zmtx-zmrx"
+    fi
+    if test -x ~/bin/sexyz ; then
+        available="$available sexyz"
+    fi
+    for other in $available; do
+        compat_traits "$other"
+        if test -n "$r_xmodem_opt" ; then
+            bn=$(basename $all_256_file)
+            test -n "$r_binary_opt" && \
+                doit "xmodem-lsz-$otherrz-small-binary" "lsz sending to $otherrz" "$SZ -q -X" "$TEST_RX $r_binary_opt $bn" cmp "$all_256_file" 
+            bn=$(basename $binary_16k)
+            test -n "$r_binary_opt" && \
+                doit "xmodem-lsz-$otherrz-16k-binary" "lsz sending to $otherrz" "$SZ -q -X" "$TEST_RX $r_binary_opt $bn" cmp "$binary_16k" 
+            test -n "$r_binary_opt" && test -n "$r_xmodem_crc_opt" && \
+                doit "xmodem-lsz-$otherrz-16k-binary-crc" "lsz sending to $otherrz" "$SZ -q -X" "$TEST_RX $r_xmodem_crc_opt $r_binary_opt $bn" cmp "$binary_16k" 
+
+            bn=$(basename $large_binary_file)
+            test -n "$r_binary_opt" && test -n "$r_can_xmodem_1k" && \
+                doit "xmodem-lsz-$otherrz-large-binary-1k" "lsz sending to $otherrz" "$SZ -q -X -k" "$TEST_RX $r_binary_opt $bn" cmp "$large_binary_file" 
+            test -n "$r_binary_opt" && test -n "$r_can_xmodem_1k" && test -n "$r_xmodem_crc_opt" && \
+                doit "xmodem-lsz-$otherrz-large-binary-1k-crc" "lsz sending to $otherrz" "$SZ -q -X -k" "$TEST_RX $r_xmodem_crc_opt $r_binary_opt $bn" cmp "$large_binary_file" 
+            bn=$(basename $megabyte_binary)
+            test -n "$r_binary_opt" && test -n "$r_can_xmodem_1k" && test -n "$r_xmodem_crc_opt" && \
+                doit "xmodem-lsz-$otherrz-megabyte-binary-1k-crc" "lsz sending to $otherrz" "$SZ -q -X -k" "$TEST_RX $r_xmodem_crc_opt $r_binary_opt $bn" cmp "$megabyte_binary" 
+
+            bn=$(basename $nocontrols_file)
+            test -n "$r_ascii_opt" && \
+                doit "xmodem-lsz-$otherrz-small-ascii" "lsz sending to $otherrz" "$SZ -q -X" "$TEST_RX $r_ascii_opt $bn" cmp "$nocontrols_file" 
+            bn=$(basename $po_file)
+            test -n "$r_ascii_opt" && \
+                doit "xmodem-lsz-$otherrz-medium-ascii" "lsz sending to $otherrz" "$SZ -q -X" "$TEST_RX  $r_ascii_opt $bn" cmp "$po_file" 
+            test -n "$r_ascii_opt" && test -n "$r_xmodem_crc_opt" && \
+                doit "xmodem-lsz-$otherrz-medium-ascii-crc" "lsz sending to $otherrz" "$SZ -q -X" "$TEST_RX $r_xmodem_crc_opt $r_ascii_opt $bn" cmp "$po_file" 
+            test -n "$r_ascii_opt" && test -n "$r_can_xmodem_1k" && \
+                doit "xmodem-lsz-$otherrz-medium-ascii-1k" "lsz sending to $otherrz" "$SZ -k -q -X" "$TEST_RX $r_ascii_opt $bn" cmp "$po_file" 
+            test -n "$r_ascii_opt" && test -n "$r_xmodem_crc_opt" && test -n "$r_can_xmodem_1k" && \
+                doit "xmodem-lsz-$otherrz-medium-ascii-1k-crc" "lsz sending to $otherrz" "$SZ -q -k -X" "$TEST_RX $r_xmodem_crc_opt $r_ascii_opt $bn" cmp "$po_file" 
+
+            # sender -a option: \n => \r\n. because, well, featuritis?
+            # problem: rz -a removes the \r again. rz -b adds ^Zs. so we use a padded comparison file.
+            if test -n "$r_binary_opt"; then
+                bn=$(basename $po_file)
+                doit "xmodem-lsz-$otherrz-medium-crlf" "lsz sending to $otherrz" "$SZ -a -q -X" "$TEST_RX $r_binary_opt $bn" "$po_file_crlf_padded_128" "$po_file" 
+            fi
+
+        fi
+
+        if test "$other" != "self" -a -n "$TEST_SX"; then
+            bn=$(basename $all_256_file)
+            doit "xmodem-$othersz-lrz-small-binary" "XMODEM: small binary transfer: $othersz sending to lrz" "$TEST_SX -b" "$RZ -q -X -b $bn" cmp "$all_256_file" 
+
+            bn=$(basename $binary_16k)
+            doit "xmodem-$othersz-lrz-16k-binary" "XMODEM: 16k binary transfer: $otherrz sending to lrz" "$TEST_SX" "$RZ -q -X -b  $bn" cmp "$binary_16k" 
+            doit "xmodem-$othersz-lrz-16k-binary-crc" "XMODEM/CRC: 16k binary transfer: $otherrz sending to lrz" "$TEST_SX" "$RZ -q -X -b -c  $bn" cmp "$binary_16k" 
+
+            bn=$(basename $large_binary_file)
+            test -n "$s_1k_opt" && \
+                doit "xmodem-$othersz-lrz-large-binary-1k" "XMODEM/1k: large binary transfer: $otherrz sending to lrz" "$TEST_SX $s_1k_opt" "$RZ -q -X -b $bn" cmp "$large_binary_file" 
+            test -n "$s_1k_opt" && \
+                doit "xmodem-$othersz-lrz-large-binary-1k-crc" "XMODEM/1k/CRC: large binary transfer: $otherrz sending to lrz" "$TEST_SX $s_1k_opt" "$RZ -q -X -b -c $bn" cmp "$large_binary_file" 
+            bn=$(basename $megabyte_binary)
+            test -n "$s_1k_opt" && \
+                doit "xmodem-$othersz-lrz-megabyte-binary-1k-crc" "XMODEM/1k/CRC: megabyte binary transfer: $otherrz sending to lrz" "$TEST_SX $s_1k_opt" "$RZ -q -X -b -c $bn" cmp "$megabyte_binary" 
+
+            bn=$(basename $nocontrols_file)
+            doit "xmodem-$othersz-lrz-small-ascii" "XMODEM: small ascii transfer: $otherrz sending to lrz" "$TEST_SX" "$RZ -q -X -a $bn" cmp "$nocontrols_file" 
+            bn=$(basename $po_file)
+            doit "xmodem-$othersz-lrz-medium-ascii" "XMODEM: medium ascii transfer: $otherrz sending to lrz" "$TEST_SX" "$RZ -q -X -a $bn" cmp "$po_file" 
+            doit "xmodem-$othersz-lrz-medium-ascii-crc" "XMODEM/CRC: medium ascii transfer: $otherrz sending to lrz" "$TEST_SX" "$RZ -q -X -c -a $bn" cmp "$po_file" 
+
+            bn=$(basename $po_file)
+            test -n "$s_1k_opt" && \
+                doit "xmodem-$othersz-lrz-medium-ascii-1k" "XMODEM/1k: medium ascii transfer: $otherrz sending to lrz" "$TEST_SX $s_1k_opt" "$RZ -q -X -a $bn" cmp "$po_file" 
+            test -n "$s_1k_opt" && \
+                doit "xmodem-$othersz-lrz-medium-ascii-1k-crc" "XMODEM/1k/CRC: medium ascii transfer: $otherrz sending to lrz" "$TEST_SX $s_1k_opt" "$RZ -q -X -c -a $bn" cmp "$po_file" 
+
+            bn=$(basename $po_file)
+            test -n "$s_ascii_opt" && \
+                doit "xmodem-$othersz-lrz-medium-crlf" "XMODEM CR/LF conversion: medium ascii transfer: $otherrz sending to lrz" "$TEST_SX $s_ascii_opt" "$RZ -q -X -b $bn" "$po_file_crlf_padded_128" "$po_file" 
+        fi
+    done
+}
+ycompat() {
+    available="self"
+    if test -x ~/bin/lrzsz-0.12.21rc/lrz -a -x ~/bin/lrzsz-0.12.21rc/lsz ; then
+        available="$available lrzsz-0.12.21rc"
+    fi
+    if test -x ~/bin/crzsz/crz -a -x ~/bin/crzsz/csz ; then
+        available="$available crzsz"
+    fi
+    if test -x ~/bin/zmtx -a -x ~/bin/zmrx ; then
+        available="$available zmtx-zmrx"
+    fi
+    if test -x ~/bin/sexyz ; then
+        available="$available sexyz"
+    fi
+    for other in $available; do
+        compat_traits "$other"
+        # we here assume the Y is implemented like X. Which is quite reasonable.
+        # we also assume that all programs transfer binary by default. rzsz and descendants do, and to do something else would be stupid.
+        # we also do NO ascii tests.
+        all_binaries="$all_256_file $binary_16k $binary_128k $binary_256k $megabyte_binary"
+        if test -n "$TEST_RB" ; then
+            doit "ymodem-lsz-$otherrz-small-binary" "lsz sending to $otherrz" "$SZ -q -g" "$TEST_RB" cmp "$all_256_file" 
+            doit "ymodem-lsz-$otherrz-16k-binary" "lsz sending to $otherrz" "$SZ -q -g" "$TEST_RB" cmp "$binary_16k" 
+
+            # the next one checks the transfer of multiple files. we do another one with CRC and 1k.
+            doit "ymodem-lsz-$otherrz-multiple" "lsz sending to $otherrz" "$SZ -q -g" "$TEST_RB" cmp "$all_binaries" 
+
+            test -n "$r_xmodem_crc_opt" && doit "ymodem-lsz-$otherrz-crc" "lsz sending to $otherrz" "$SZ -q -g" "$TEST_RB $r_xmodem_crc_opt" cmp "$binary_256k" 
+            test -n "$r_can_xmodem_1k" && doit "ymodem-lsz-$otherrz-1k" "lsz sending to $otherrz" "$SZ -q -g -k" "$TEST_RB" cmp "$binary_256k" 
+
+            # second multiple file test
+            test -n "$r_can_xmodem_1k" && test -n "$r_xmodem_crc_opt" && \
+                doit "ymodem-lsz-$otherrz-1k-crc-multiple" "lsz sending to $otherrz" "$SZ -q -g -k" "$TEST_RB $r_xmodem_crc_opt" cmp "$all_binaries" 
+        fi
+
+        if test "$other" != "self" -a -n "$TEST_SB"; then
+            doit "ymodem-$othersz-lrz-small-binary" "$othersz sending to lrz" "$TEST_SB -b" "$RZ -q -g -b" cmp "$all_256_file" 
+            doit "ymodem-$othersz-lrz-16k-binary" "$otherrz sending to lrz" "$TEST_SB" "$RZ -q -g -b " cmp "$binary_16k" 
+
+            doit "ymodem-$othersz-lrz-multiple" "$otherrz sending to lrz" "$TEST_SB" "$RZ -q -g -b " cmp "$all_binaries" 
+
+            doit "ymodem-$othersz-lrz-crc" "$otherrz sending to lrz" "$TEST_SB" "$RZ -q -g -b -c " cmp "$binary_256k" 
+            test -n "$s_1k_opt" && \
+                doit "ymodem-$othersz-lrz-1k" "$otherrz sending to lrz" "$TEST_SB $s_1k_opt" "$RZ -q -g -b" cmp "$binary_256k" 
+
+            test -n "$s_1k_opt" && \
+                doit "ymodem-$othersz-lrz-1k-crc-multiple" "$otherrz sending to lrz" "$TEST_SB $s_1k_opt" "$RZ -q -g -b" cmp "$all_binaries" 
+        fi
+    done
+}
+
+
+echo "mode=$mode"
+if test "$mode" = all -o "$mode" = xerrors -o "$mode" = "errors"; then
+    xerrors
+fi
+if test "$mode" = all -o "$mode" = yerrors -o "$mode" = "errors"; then
+    yerrors
+fi
+if test "$mode" = all -o "$mode" = zerrors -o "$mode" = "errors"; then
+    zerrors
+fi
+if test "$mode" = all -o "$mode" = xcompat -o "$mode" = "compat"; then
+    xcompat
+fi
+if test "$mode" = all -o "$mode" = ycompat -o "$mode" = "compat"; then
+    ycompat
+fi
+
+
+
+if test -s "$testdir/failures.log" ; then
+    echo "Some tests failed. See $testdir/failures.log"
+    exit 1
+fi
+echo "All primary tests passed.\n";
+
+if test "$mode" = all -o "$mode" = abuse ; then
+    if test -z "$ONLY" ; then
+	echo "going to tests misuse. Errors are ok, hangs are not!"
+
+	echo "both sides sending:"
+	$SZ -q $z_test_files <$testdir/pipe | \
+		($SZ -q $z_test_files >>$testdir/pipe )
+
+	echo "both sides receiving:"
+	$RZ -q <$testdir/pipe | \
+		( $RZ -q >>$testdir/pipe )
+    fi
+fi
+echo "All tests passed.\n";
+exit 0
 
 available="self"
 if test -x ~/bin/lrzsz-0.12.21rc/lrz -a -x ~/bin/lrzsz-0.12.21rc/lsz ; then
@@ -223,7 +761,9 @@ fi
 if test -x ~/bin/zmtx -a -x ~/bin/zmrx ; then
     available="$available zmtx-zmrx"
 fi
-
+if test -x ~/bin/sexyz ; then
+    available="$available sexyz"
+fi
 for other in $available; do
     s_framelen_opt=""
     s_4k_opt=""
@@ -329,6 +869,22 @@ for other in $available; do
         r_can_16bit_crc="yes"
         ;;
 
+    sexyz)
+        TEST_SZ=~/bin/sexyz" sz"
+        TEST_RZ=~/bin/sexyz" rz"
+        TEST_SX=~/bin/sexyz" sx"
+        TEST_RX=~/bin/sexyz" rx"
+        TEST_SB=~/bin/sexyz" sy"
+        TEST_RB=~/bin/sexyz" ry"
+        otherrz="sexyz"
+        othersz="sexyz"
+        s_1k_opt="-k"
+        r_can_4k="yes"
+        r_can_8k="yes"
+        s_4k_opt="-4"
+        s_8k_opt="-8"
+        ;;
+        
     crzsz)
         TEST_SZ=~/bin/crzsz/csz # no -q option
         TEST_SB=~/bin/crzsz/csb # no -q option
@@ -342,6 +898,7 @@ for other in $available; do
         can_escctl="yes"
         s_16bit_crc_opt="-o"
         r_can_16bit_crc="yes"
+        s_1k_opt="-k"
         ;;
     zmtx-zmrx)
         TEST_SZ=~/bin/zmtx # no -q option
@@ -356,79 +913,84 @@ for other in $available; do
         ;;
     esac
 
+
     # start with the xmodem tests
     if test "$mode" = all -o "$mode" = x ; then
+        if test -n "$r_xmodem_opt" ; then
             bn=$(basename $all_256_file)
-            test -n "$r_xmodem_opt" && test -n "$r_binary_opt" && \
-                doit "xmodem-lsz-$otherrz-small-binary" "XMODEM: small binary transfer: lsz sending to $otherrz" "$SZ -q -X" "$TEST_RX $r_binary_opt $bn" cmp "$all_256_file" 
-            bn=$(basename $sixteen_k_binary_file)
-            test -n "$r_xmodem_opt" && test -n "$r_binary_opt" && \
-                doit "xmodem-lsz-$otherrz-16k-binary" "XMODEM: 16k binary transfer: lsz sending to $otherrz" "$SZ -q -X" "$TEST_RX $r_binary_opt $bn" cmp "$sixteen_k_binary_file" 
-            test -n "$r_xmodem_opt" && test -n "$r_binary_opt" && test -n "$r_xmodem_crc_opt" && \
-                doit "xmodem-lsz-$otherrz-16k-binary-crc" "XMODEM/CRC: 16k binary transfer: lsz sending to $otherrz" "$SZ -q -X" "$TEST_RX $r_xmodem_crc_opt $r_binary_opt $bn" cmp "$sixteen_k_binary_file" 
+            test -n "$r_binary_opt" && \
+                doit "xmodem-lsz-$otherrz-small-binary" "lsz sending to $otherrz" "$SZ -q -X" "$TEST_RX $r_binary_opt $bn" cmp "$all_256_file" 
+            bn=$(basename $binary_16k)
+            test -n "$r_binary_opt" && \
+                doit "xmodem-lsz-$otherrz-16k-binary" "lsz sending to $otherrz" "$SZ -q -X" "$TEST_RX $r_binary_opt $bn" cmp "$binary_16k" 
+            test -n "$r_binary_opt" && test -n "$r_xmodem_crc_opt" && \
+                doit "xmodem-lsz-$otherrz-16k-binary-crc" "lsz sending to $otherrz" "$SZ -q -X" "$TEST_RX $r_xmodem_crc_opt $r_binary_opt $bn" cmp "$binary_16k" 
 
             bn=$(basename $large_binary_file)
-            test -n "$r_xmodem_opt" && test -n "$r_binary_opt" && test -n "$r_can_xmodem_1k" && \
-                doit "xmodem-lsz-$otherrz-large-binary-1k" "XMODEM/1k: large binary transfer: lsz sending to $otherrz" "$SZ -q -X -k" "$TEST_RX $r_binary_opt $bn" cmp "$large_binary_file" 
-            test -n "$r_xmodem_opt" && test -n "$r_binary_opt" && test -n "$r_can_xmodem_1k" && test -n "$r_xmodem_crc_opt" && \
-                doit "xmodem-lsz-$otherrz-large-binary-1k-crc" "XMODEM/1k/crc: large binary transfer: lsz sending to $otherrz" "$SZ -q -X -k" "$TEST_RX $r_xmodem_crc_opt $r_binary_opt $bn" cmp "$large_binary_file" 
+            test -n "$r_binary_opt" && test -n "$r_can_xmodem_1k" && \
+                doit "xmodem-lsz-$otherrz-large-binary-1k" "lsz sending to $otherrz" "$SZ -q -X -k" "$TEST_RX $r_binary_opt $bn" cmp "$large_binary_file" 
+            test -n "$r_binary_opt" && test -n "$r_can_xmodem_1k" && test -n "$r_xmodem_crc_opt" && \
+                doit "xmodem-lsz-$otherrz-large-binary-1k-crc" "lsz sending to $otherrz" "$SZ -q -X -k" "$TEST_RX $r_xmodem_crc_opt $r_binary_opt $bn" cmp "$large_binary_file" 
             bn=$(basename $megabyte_binary)
-            test -n "$r_xmodem_opt" && test -n "$r_binary_opt" && test -n "$r_can_xmodem_1k" && test -n "$r_xmodem_crc_opt" && \
-                doit "xmodem-lsz-$otherrz-megabyte_binary-binary-1k-crc" "XMODEM/1k/crc: megabyte binary transfer: lsz sending to $otherrz" "$SZ -q -X -k" "$TEST_RX $r_xmodem_crc_opt $r_binary_opt $bn" cmp "$megabyte_binary" 
+            test -n "$r_binary_opt" && test -n "$r_can_xmodem_1k" && test -n "$r_xmodem_crc_opt" && \
+                doit "xmodem-lsz-$otherrz-megabyte-binary-1k-crc" "lsz sending to $otherrz" "$SZ -q -X -k" "$TEST_RX $r_xmodem_crc_opt $r_binary_opt $bn" cmp "$megabyte_binary" 
 
             bn=$(basename $nocontrols_file)
-            test -n "$r_xmodem_opt" && test -n "$r_ascii_opt" && \
-                doit "xmodem-lsz-$otherrz-small-ascii" "XMODEM: small ascii transfer: lsz sending to $otherrz" "$SZ -q -X" "$TEST_RX $r_ascii_opt $bn" cmp "$nocontrols_file" 
+            test -n "$r_ascii_opt" && \
+                doit "xmodem-lsz-$otherrz-small-ascii" "lsz sending to $otherrz" "$SZ -q -X" "$TEST_RX $r_ascii_opt $bn" cmp "$nocontrols_file" 
             bn=$(basename $po_file)
-            test -n "$r_xmodem_opt" && test -n "$r_ascii_opt" && \
-                doit "xmodem-lsz-$otherrz-medium-ascii" "XMODEM: medium ascii transfer: lsz sending to $otherrz" "$SZ -q -X" "$TEST_RX  $r_ascii_opt $bn" cmp "$po_file" 
-            test -n "$r_xmodem_opt" && test -n "$r_ascii_opt" && test -n "$r_xmodem_crc_opt" && \
-                doit "xmodem-lsz-$otherrz-medium-ascii-crc" "XMODEM/crc: medium ascii transfer: lsz sending to $otherrz" "$SZ -q -X" "$TEST_RX $r_xmodem_crc_opt $r_ascii_opt $bn" cmp "$po_file" 
-            test -n "$r_xmodem_opt" && test -n "$r_ascii_opt" && test -n "$r_can_xmodem_1k" && \
-                doit "xmodem-lsz-$otherrz-medium-ascii-1k" "XMODEM/1k: medium ascii transfer: lsz sending to $otherrz" "$SZ -k -q -X" "$TEST_RX $r_ascii_opt $bn" cmp "$po_file" 
-            test -n "$r_xmodem_opt" && test -n "$r_ascii_opt" && test -n "$r_xmodem_crc_opt" && test -n "$r_can_xmodem_1k" && \
-                doit "xmodem-lsz-$otherrz-medium-ascii-1k-crc" "XMODEM/1k/crc: medium ascii transfer: lsz sending to $otherrz" "$SZ -q -k -X" "$TEST_RX $r_xmodem_crc_opt $r_ascii_opt $bn" cmp "$po_file" 
+            test -n "$r_ascii_opt" && \
+                doit "xmodem-lsz-$otherrz-medium-ascii" "lsz sending to $otherrz" "$SZ -q -X" "$TEST_RX  $r_ascii_opt $bn" cmp "$po_file" 
+            test -n "$r_ascii_opt" && test -n "$r_xmodem_crc_opt" && \
+                doit "xmodem-lsz-$otherrz-medium-ascii-crc" "lsz sending to $otherrz" "$SZ -q -X" "$TEST_RX $r_xmodem_crc_opt $r_ascii_opt $bn" cmp "$po_file" 
+            test -n "$r_ascii_opt" && test -n "$r_can_xmodem_1k" && \
+                doit "xmodem-lsz-$otherrz-medium-ascii-1k" "lsz sending to $otherrz" "$SZ -k -q -X" "$TEST_RX $r_ascii_opt $bn" cmp "$po_file" 
+            test -n "$r_ascii_opt" && test -n "$r_xmodem_crc_opt" && test -n "$r_can_xmodem_1k" && \
+                doit "xmodem-lsz-$otherrz-medium-ascii-1k-crc" "lsz sending to $otherrz" "$SZ -q -k -X" "$TEST_RX $r_xmodem_crc_opt $r_ascii_opt $bn" cmp "$po_file" 
 
             # sender -a option: \n => \r\n. because, well, featuritis?
             # problem: rz -a removes the \r again. rz -b adds ^Zs. so we use a padded comparison file.
-            if test -n "$r_xmodem_opt" -a -n "$r_binary_opt"; then
+            if test -n "$r_binary_opt"; then
                 bn=$(basename $po_file)
-                doit "xmodem-lsz-$otherrz-medium-crlf" "XMODEM CR/LF conversion: medium ascii transfer: lsz sending to $otherrz" "$SZ -a -q -X" "$TEST_RX $r_binary_opt $bn" "$po_file_crlf_padded_128" "$po_file" 
+                doit "xmodem-lsz-$otherrz-medium-crlf" "lsz sending to $otherrz" "$SZ -a -q -X" "$TEST_RX $r_binary_opt $bn" "$po_file_crlf_padded_128" "$po_file" 
             fi
 
-            if test "$other" != "self" -a -n "$TEST_SX"; then
-                bn=$(basename $all_256_file)
-                doit "xmodem-$othersz-lrz-small-binary" "XMODEM: small binary transfer: $othersz sending to lrz" "$TEST_SX -b" "$RZ -q -X -b $bn" cmp "$all_256_file" 
+        fi
 
-                bn=$(basename $sixteen_k_binary_file)
-                doit "xmodem-$othersz-lrz-16k-binary" "XMODEM: 16k binary transfer: $otherrz sending to lrz" "$TEST_SX" "$RZ -q -X -b  $bn" cmp "$sixteen_k_binary_file" 
-                doit "xmodem-$othersz-lrz-16k-binary-crc" "XMODEM/CRC: 16k binary transfer: $otherrz sending to lrz" "$TEST_SX" "$RZ -q -X -b -c  $bn" cmp "$sixteen_k_binary_file" 
 
-                bn=$(basename $large_binary_file)
-                test -n "$s_1k_opt" && \
-                    doit "xmodem-$othersz-lrz-large-binary-1k" "XMODEM/1k: large binary transfer: $otherrz sending to lrz" "$TEST_SX $s_1k_opt" "$RZ -q -X -b $bn" cmp "$large_binary_file" 
-                test -n "$s_1k_opt" && \
-                    doit "xmodem-$othersz-lrz-large-binary-1k-crc" "XMODEM/1k/CRC: large binary transfer: $otherrz sending to lrz" "$TEST_SX $s_1k_opt" "$RZ -q -X -b -c $bn" cmp "$large_binary_file" 
-                bn=$(basename $megabyte_binary)
-                test -n "$s_1k_opt" && \
-                    doit "xmodem-$othersz-lrz-megabyte-binary-1k-crc" "XMODEM/1k/CRC: megabyte binary transfer: $otherrz sending to lrz" "$TEST_SX $s_1k_opt" "$RZ -q -X -b -c $bn" cmp "$megabyte_binary" 
+        if test "$other" != "self" -a -n "$TEST_SX"; then
+            bn=$(basename $all_256_file)
+            doit "xmodem-$othersz-lrz-small-binary" "XMODEM: small binary transfer: $othersz sending to lrz" "$TEST_SX -b" "$RZ -q -X -b $bn" cmp "$all_256_file" 
 
-                bn=$(basename $nocontrols_file)
-                doit "xmodem-$othersz-lrz-small-ascii" "XMODEM: small ascii transfer: $otherrz sending to lrz" "$TEST_SX" "$RZ -q -X -a $bn" cmp "$nocontrols_file" 
-                bn=$(basename $po_file)
-                doit "xmodem-$othersz-lrz-medium-ascii" "XMODEM: medium ascii transfer: $otherrz sending to lrz" "$TEST_SX" "$RZ -q -X -a $bn" cmp "$po_file" 
-                doit "xmodem-$othersz-lrz-medium-ascii-crc" "XMODEM/CRC: medium ascii transfer: $otherrz sending to lrz" "$TEST_SX" "$RZ -q -X -c -a $bn" cmp "$po_file" 
+            bn=$(basename $binary_16k)
+            doit "xmodem-$othersz-lrz-16k-binary" "XMODEM: 16k binary transfer: $otherrz sending to lrz" "$TEST_SX" "$RZ -q -X -b  $bn" cmp "$binary_16k" 
+            doit "xmodem-$othersz-lrz-16k-binary-crc" "XMODEM/CRC: 16k binary transfer: $otherrz sending to lrz" "$TEST_SX" "$RZ -q -X -b -c  $bn" cmp "$binary_16k" 
 
-                bn=$(basename $po_file)
-                test -n "$s_1k_opt" && \
-                    doit "xmodem-$othersz-lrz-medium-ascii-1k" "XMODEM/1k: medium ascii transfer: $otherrz sending to lrz" "$TEST_SX $s_1k_opt" "$RZ -q -X -a $bn" cmp "$po_file" 
-                test -n "$s_1k_opt" && \
-                    doit "xmodem-$othersz-lrz-medium-ascii-1k-crc" "XMODEM/1k/CRC: medium ascii transfer: $otherrz sending to lrz" "$TEST_SX $s_1k_opt" "$RZ -q -X -c -a $bn" cmp "$po_file" 
+            bn=$(basename $large_binary_file)
+            test -n "$s_1k_opt" && \
+                doit "xmodem-$othersz-lrz-large-binary-1k" "XMODEM/1k: large binary transfer: $otherrz sending to lrz" "$TEST_SX $s_1k_opt" "$RZ -q -X -b $bn" cmp "$large_binary_file" 
+            test -n "$s_1k_opt" && \
+                doit "xmodem-$othersz-lrz-large-binary-1k-crc" "XMODEM/1k/CRC: large binary transfer: $otherrz sending to lrz" "$TEST_SX $s_1k_opt" "$RZ -q -X -b -c $bn" cmp "$large_binary_file" 
+            bn=$(basename $megabyte_binary)
+            test -n "$s_1k_opt" && \
+                doit "xmodem-$othersz-lrz-megabyte-binary-1k-crc" "XMODEM/1k/CRC: megabyte binary transfer: $otherrz sending to lrz" "$TEST_SX $s_1k_opt" "$RZ -q -X -b -c $bn" cmp "$megabyte_binary" 
 
-                bn=$(basename $po_file)
-                test -n "$s_ascii_opt" && \
-                    doit "xmodem-$othersz-lrz-medium-crlf" "XMODEM CR/LF conversion: medium ascii transfer: $otherrz sending to lrz" "$TEST_SX $s_ascii_opt" "$RZ -q -X -b $bn" "$po_file_crlf_padded_128" "$po_file" 
-            fi
+            bn=$(basename $nocontrols_file)
+            doit "xmodem-$othersz-lrz-small-ascii" "XMODEM: small ascii transfer: $otherrz sending to lrz" "$TEST_SX" "$RZ -q -X -a $bn" cmp "$nocontrols_file" 
+            bn=$(basename $po_file)
+            doit "xmodem-$othersz-lrz-medium-ascii" "XMODEM: medium ascii transfer: $otherrz sending to lrz" "$TEST_SX" "$RZ -q -X -a $bn" cmp "$po_file" 
+            doit "xmodem-$othersz-lrz-medium-ascii-crc" "XMODEM/CRC: medium ascii transfer: $otherrz sending to lrz" "$TEST_SX" "$RZ -q -X -c -a $bn" cmp "$po_file" 
+
+            bn=$(basename $po_file)
+            test -n "$s_1k_opt" && \
+                doit "xmodem-$othersz-lrz-medium-ascii-1k" "XMODEM/1k: medium ascii transfer: $otherrz sending to lrz" "$TEST_SX $s_1k_opt" "$RZ -q -X -a $bn" cmp "$po_file" 
+            test -n "$s_1k_opt" && \
+                doit "xmodem-$othersz-lrz-medium-ascii-1k-crc" "XMODEM/1k/CRC: medium ascii transfer: $otherrz sending to lrz" "$TEST_SX $s_1k_opt" "$RZ -q -X -c -a $bn" cmp "$po_file" 
+
+            bn=$(basename $po_file)
+            test -n "$s_ascii_opt" && \
+                doit "xmodem-$othersz-lrz-medium-crlf" "XMODEM CR/LF conversion: medium ascii transfer: $otherrz sending to lrz" "$TEST_SX $s_ascii_opt" "$RZ -q -X -b $bn" "$po_file_crlf_padded_128" "$po_file" 
+        fi
     fi
     if test "$mode" = all -o "$mode" = y ; then
             test -n "$r_ymodem_opt" && doit "ymodem-lsz-$otherrz-basic" "YMODEM: lsz sending to $other ($TEST_RZ)" "$SZ -q -g" "$TEST_RZ $r_ymodem_opt" cmp "$y_test_files" 
@@ -465,7 +1027,7 @@ for other in $available; do
             cp $all_256_file $testdir/$key/16k.bin # this one is smaller
             touch -d 2001-02-03T04:05:06.07 $testdir/16k.bin # this one is old.
             cp $testdir/$key/16k.bin $testdir/$key/cmp
-            doit "$key" "lsz sending to $otherrz does not overwrite existing file" "$SZ -q" "$TEST_RZ" "$testdir/$key/cmp" $sixteen_k_binary_file
+            doit "$key" "lsz sending to $otherrz does not overwrite existing file" "$SZ -q" "$TEST_RZ" "$testdir/$key/cmp" $binary_16k
 
             #
             # test ZMNEW (5), ZMNEWL (1)
@@ -474,7 +1036,7 @@ for other in $available; do
             key="zmodem-lsz-$otherrz-MGMT-ZMNEW-fail-s"
             mkdir "$testdir/$key"
             cp $all_256_file $testdir/$key/test.bin
-            cp $sixteen_k_binary_file $testdir/test.bin
+            cp $binary_16k $testdir/test.bin
             touch -d 2001-02-03T04:05:06.07 $testdir/test.bin # this one is old.
             doit "$key" "lsz sending to $otherrz fails (sender initialized)" "$SZ -q -n" "$TEST_RZ" $all_256_file "$testdir/test.bin" 
 
@@ -482,20 +1044,20 @@ for other in $available; do
             mkdir "$testdir/$key"
             cp $all_256_file $testdir/$key/test.bin
             touch -d 2001-02-03T04:05:06.07 $testdir/$key/test.bin # this one is old.
-            cp $sixteen_k_binary_file $testdir/test.bin
-            doit "$key" "lsz sending to $otherrz succeeds (sender initialized)" "$SZ -q -n" "$TEST_RZ" $sixteen_k_binary_file "$testdir/test.bin" 
+            cp $binary_16k $testdir/test.bin
+            doit "$key" "lsz sending to $otherrz succeeds (sender initialized)" "$SZ -q -n" "$TEST_RZ" $binary_16k "$testdir/test.bin" 
 
             key="zmodem-lsz-$otherrz-MGMT-ZMNEWL-succes-s"
             mkdir "$testdir/$key"
             cp $all_256_file $testdir/$key/test.bin
-            cp $sixteen_k_binary_file $testdir/test.bin
+            cp $binary_16k $testdir/test.bin
             touch -d 2001-02-03T04:05:06.07 $testdir/test.bin # this one is old.
-            doit "$key" "lsz sending to $otherrz succeeds (sender initialized)" "$SZ -q -N" "$TEST_RZ" $sixteen_k_binary_file "$testdir/test.bin" 
+            doit "$key" "lsz sending to $otherrz succeeds (sender initialized)" "$SZ -q -N" "$TEST_RZ" $binary_16k "$testdir/test.bin" 
 
             key="zmodem-lsz-$otherrz-MGMT-ZMNEW-fail-r"
             mkdir "$testdir/$key"
             cp $all_256_file $testdir/$key/test.bin
-            cp $sixteen_k_binary_file $testdir/test.bin
+            cp $binary_16k $testdir/test.bin
             touch -d 2001-02-03T04:05:06.07 $testdir/test.bin # this one is old.
             doit "$key" "lsz sending to $otherrz fails (receiver initialized)" "$SZ -q" "$TEST_RZ -n" $all_256_file "$testdir/test.bin" 
 
@@ -503,15 +1065,15 @@ for other in $available; do
             mkdir "$testdir/$key"
             cp $all_256_file $testdir/$key/test.bin
             touch -d 2001-02-03T04:05:06.07 $testdir/$key/test.bin # this one is old.
-            cp $sixteen_k_binary_file $testdir/test.bin
-            doit "$key" "lsz sending to $otherrz succeeds (receiver initialized)" "$SZ -q" "$TEST_RZ -n" $sixteen_k_binary_file "$testdir/test.bin" 
+            cp $binary_16k $testdir/test.bin
+            doit "$key" "lsz sending to $otherrz succeeds (receiver initialized)" "$SZ -q" "$TEST_RZ -n" $binary_16k "$testdir/test.bin" 
 
             key="zmodem-lsz-$otherrz-MGMT-ZMNEWL-success-r"
             mkdir "$testdir/$key"
             cp $all_256_file $testdir/$key/test.bin
-            cp $sixteen_k_binary_file $testdir/test.bin
+            cp $binary_16k $testdir/test.bin
             touch -d 2001-02-03T04:05:06.07 $testdir/test.bin # this one is old, but longer
-            doit "$key" "lsz sending to $otherrz fails (receiver initialized)" "$SZ -q" "$TEST_RZ -N" $sixteen_k_binary_file "$testdir/test.bin" 
+            doit "$key" "lsz sending to $otherrz fails (receiver initialized)" "$SZ -q" "$TEST_RZ -N" $binary_16k "$testdir/test.bin" 
 
             #
             # ZMCRC (2)
@@ -703,6 +1265,7 @@ fi
 echo "All primary tests passed.\n";
 
 if test "$mode" = all -o "$mode" = abuse ; then
+    if test -z "$ONLY" ; then
 	echo "going to tests misuse. Errors are ok, hangs are not!"
 
 	echo "both sides sending:"
@@ -712,6 +1275,8 @@ if test "$mode" = all -o "$mode" = abuse ; then
 	echo "both sides receiving:"
 	$RZ -q <$testdir/pipe | \
 		( $RZ -q >>$testdir/pipe )
+    fi
 fi
 echo "All tests passed.\n";
 exit 0
+

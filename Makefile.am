@@ -1,4 +1,4 @@
-SUBDIRS = lib src po man testsuite
+SUBDIRS = lib src po man
 EXTRA_DIST = m4/ChangeLog  check.lrzsz COMPATABILITY README.cvs README.isdn4linux \
 	README.gettext rpmrc buildrpm fastcheck.sh README.tests \
 	beos-runpiped.c fastcheck.beos
@@ -6,13 +6,14 @@ PR=@PACKAGE@-@VERSION@
 DISTCLEANFILES=fastcheck.done stamp-h
 CLEAN_FILES=fastcheck.done
 ACLOCAL_AMFLAGS = -I m4
+QUICKCHECKS=xmodem-lsz-lrz-16k-binary xmodem-lsz-lrz-large-binary-1k-crc zmodem-lsz-lrz-MGMT-default-nonexisting zmodem-lsz-lrz-MGMT-ZMCRC-r \
+	zmodem-lsz-lrz-multiple zmodem-lsz-lrz-4k zmodem-lsz-lrz-8k-turbo
 
 oldcheck-local:
 	QUIET=-q $(srcdir)/check.lrzsz $(srcdir) `pwd`
 
-fastcheck:
-	if [ x`uname -s` = xBeOS ] ; then make fastcheck-beos ; else \
-		$(srcdir)/fastcheck.sh $(srcdir) `pwd` ; fi
+quickcheck:
+	$(srcdir)/check.lrzsz $(srcdir) `pwd` select $(QUICKCHECKS)
 
 fastcheck-beos: beos-runpiped
 	$(srcdir)/fastcheck.beos $(srcdir) `pwd`
@@ -24,42 +25,12 @@ vcheck:
 	$(srcdir)/check.lrzsz $(srcdir) `pwd`
 vcheck-%:
 	$(srcdir)/check.lrzsz $(srcdir) `pwd`	$(subst vcheck-,,$@)
-check-%:
-	QUIET=-q $(srcdir)/check.lrzsz $(srcdir) `pwd`	$(subst check-,,$@)
 vcheck-x:
 	$(srcdir)/check.lrzsz $(srcdir) `pwd`	x
 vcheck-y:
 	$(srcdir)/check.lrzsz $(srcdir) `pwd`	y
 vcheck-z:
 	$(srcdir)/check.lrzsz $(srcdir) `pwd` z
-vcheck-z8:
-	$(srcdir)/check.lrzsz $(srcdir) `pwd` z8
-vcheck-sz-r:
-	$(srcdir)/check.lrzsz $(srcdir) `pwd` sz-r
-vcheck-rz-r:
-	$(srcdir)/check.lrzsz $(srcdir) `pwd` rz-r
-vcheck-turbo:
-	$(srcdir)/check.lrzsz $(srcdir) `pwd` turbo
-vcheck-error:
-	$(srcdir)/check.lrzsz $(srcdir) `pwd` error
-vcheck-manag vcheck-manage:
-	$(srcdir)/check.lrzsz $(srcdir) `pwd` manage
-vcheck-zm-rz:
-	$(srcdir)/check.lrzsz $(srcdir) `pwd` zm-rz
-vcheck-zm-sz:
-	$(srcdir)/check.lrzsz $(srcdir) `pwd` zm-sz
-vcheck-orig-rz:
-	$(srcdir)/check.lrzsz $(srcdir) `pwd` orig-rz
-vcheck-orig-sz:
-	$(srcdir)/check.lrzsz $(srcdir) `pwd` orig-sz
-vcheck-orig-kombi:
-	$(srcdir)/check.lrzsz $(srcdir) `pwd` orig-kombi
-vcheck-abuse:
-	$(srcdir)/check.lrzsz $(srcdir) `pwd` abuse
-vcheck-startup:
-	$(srcdir)/check.lrzsz $(srcdir) `pwd` startup
-vcheck-tmp:
-	$(srcdir)/check.lrzsz $(srcdir) `pwd` tmp
 
 # Tag before making distribution.  Also, don't make a distribution if
 # checks fail.  Also, make sure the NEWS file is up-to-date.
@@ -99,5 +70,7 @@ coverage/coverage.html: src/*.c src/*.h
 	./configure --enable-coverage -q
 	make -s V=0 -j 4
 	make -s V=0 vcheck
-	gcovr --html-details --output coverage/coverage.html src/
+	type -p "gcovr" && gcovr --html-details --output coverage/coverage.html src/
 	./configure -q
+	make -s V=0 clean
+	make -s V=0 -j 4

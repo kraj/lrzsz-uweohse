@@ -20,6 +20,9 @@ not perfectly trustworthy senders.
   This was a security bug found by TristanInSec with an email
   domain gmail under the com tld.
 
+  Note: this stems from the original public domain rzsz
+  suite (80s).
+
 * the lrz pipe execution feature was removed.
   feature: invoked as 'lrztar' lrz would have called tar 
   through the shell with the (attacker controlled) filename as 
@@ -27,15 +30,18 @@ not perfectly trustworthy senders.
   execution.
   This feature/insecurity was only accessible if the installer
   appended some string to the lrz (or rz) commands name.
-
+  
   This was a security bug found by TristanInSec with an email
   domain gmail under the com tld.
 
+  Note: this stems from the original public domain rzsz
+  suite (80s).
+
 * CVE-2018-10195 fixed, in which lsz could leak information
-  to the receiving attacker if that turned of crc32.
+  to the receiving attacker if that turned off crc32.
   Impact: low to medium.
 
-* autotools updated. I can only hope it works.
+* autotools updated.
 
 * the TCP mode was removed (no authentication, no encryption).
 
@@ -57,21 +63,36 @@ not perfectly trustworthy senders.
 * an attacker could have created a setuid/setgid/sticky
   file through when restricted mode was not used.
 
+  Note: this stems from the original public domain rzsz
+  suite (80s).
+
 * the lrz path name check would have allowed to create 
   a filename `..`, which may or may not be a security
   problem with pre-created symlinks for `..`.
 
+  Note: this stems from the original public domain rzsz
+  suite (80s).
+
 * lrz in very restricted mode now disallows invisible
   leading directories, too (`dir/.subdir/filename` was allowed
   before).
+
+  Note: that will was possible stems from the original public 
+  domain rzsz suite (80s).
 
 * the lrz file CRC check could have run into an endless loop.
   This was a possible denial of service attack.
 
 * the timesync protocol support was removed. No other zmodem
   suite still in use implemented it, and the function to set
-  the receivers time needed root rights.
+  the receivers time needed root rights - which, given the 
+  facts listed above, lrz should not have.
 
+* a number of possible security problems have been fixed:
+  - double fclose in lrz.
+  - a write before a buffer in lrz (80s).
+  - a use of uninitialized memory in lsz (80s).
+ 
 Version 0.12.20 - December 1998, Uwe Ohse
 
 * works on BeOS and stone-aged SCO (sco-3.2v4.2)

@@ -1,19 +1,50 @@
 From "ease of use" onwards:
 
-"make fastcheck"
-	will do a simple self check, sending lsz, lrz, lsz.c and lrz.c
-	over a named pipe. 
-	This test just covers basic zmodem functionality, and it's
-	the only one which will work under BeOS: All other tests
-	need "real" named pipes, /pipe under BeOS simply hasn't
-	the right semantics.
+"make quickcheck"
+	will do a few quick checks.
+	This just covers basic xmodem and zmodem functionality.
 
-"make vcheck" and "make oldcheck-local"
-	will do a fast check of the most important features.
-	"vcheck" gives some more output, especially CPS-rates.
+"make vcheck"
+	will do many more tests.
+        this test suite is moderately complete. There are still some options
+        without tests, but all crucial ones are covered.
 
-"make check"
-	will do a _long_ regression test.
-	Some tests need special programs (omen.sz, omen.rz, zmtx, zmrx).
-	Some might only work on my system.
-	In any case you'll need dejagnu for this.
+"make qa"
+        will run something similar to
+             configure && make clean && make && make vcheck
+        multiple times:
+        - gcc and/and clang, if available, multiplied with
+        - ASan, MSan und UBSan.
+        and a final coverage run.
+        
+        If this runs through, a final
+             configure && make clean && make
+        is run.
+
+The checks will $TMP/testdir.lrzsz, and will not remove the directory
+afterwards. In it you will found, among things i didn't clean up:
+- passfail.log (shows all tests run with PASSED/FAILED info)
+- failures.log (shows all failed tests)
+- perf.log (performance data)
+
+Note that the tests are run over a pipe and a named pipe. The performance
+values are in no way comparable to a real serial interface (or even a 
+network connection).
+Having said that: in real life the number will change, but what is faster
+in the benchmark will most likely be faster over a real serial line.
+
+
+If you want to do compatibility checks:
+- if this condition is true, compatibility checks against zmtx-zmrx are
+  run:
+        test -x ~/bin/zmtx -a -x ~/bin/zmrx
+
+- if this condition is true, compatibility checks against lrzsz-0.12.21rc
+  are run:
+        test -x ~/bin/lrzsz-0.12.21rc/lrz -a -x ~/bin/lrzsz-0.12.21rc/lsz
+
+- if this condition is true, compatibility checks against crzsz are run:
+        test -x ~/bin/crzsz/crz -a -x ~/bin/crzsz/csz
+  crzsz was the latest omen technology x/y/zmodem for unix.
+
+
