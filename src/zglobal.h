@@ -214,6 +214,8 @@ extern int enable_syslog;
 #  define LRZSZ_FORMAT_PRINTF(fmt, arg)
 #endif
 
+#include "stats.h"
+
 #define OK 0
 #define FALSE 0
 #define TRUE 1
@@ -272,8 +274,9 @@ extern int under_rsh;
 
 void bibi (int n);
 
-#define sendline(c) putchar((c) & 0377)
-#define xsendline(c) putchar(c)
+#define sendline(c) do { putchar((c) & 0377); stat_for_file.net_bytes_out++; } while (0)
+#define xsendline(c) do { putchar(c) ; stat_for_file.net_bytes_out++; } while (0)
+#define flushmo() do { fflush(stdout); stat_for_file.net_write_ops++;} while(0)
 
 /* zreadline.c */
 extern char *readline_ptr; /* pointer for removing chars from linbuf */
@@ -317,7 +320,6 @@ int from_cu (void);
 int rdchk (int fd);
 int io_mode (int fd, int n);
 void sendbrk (int fd);
-#define flushmo() fflush(stdout)
 void purgeline (int fd);
 void canit (int fd);
 
@@ -361,7 +363,7 @@ long rclhdr (char *hdr);
 const char * protname (void);
 LRZSZ_FORMAT_PRINTF(2,3) void lsyslog (int, const char *,...);
 
-
+unsigned getspeed(speed_t code);
 
 
 #endif
