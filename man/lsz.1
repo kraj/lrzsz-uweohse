@@ -231,6 +231,29 @@ Wait
 .B N
 seconds before doing anything.
 .TP
+.B "--no-unixmode"
+Send a mode field of 0 in the ZMODEM file header instead of the
+file's Unix permission bits.
+By default,
+.B lsz
+transmits the full
+.I st_mode
+as returned by
+.BR fstat (2),
+including permission bits (rwx) and setuid, setgid, and sticky bits.
+The recipient may, and likely will, modify the mode before applying it
+\(em for example,
+.I lrz
+masks the received mode with
+.B 0777
+in normal operation (stripping setuid, setgid, and sticky) and with
+.B 0666
+under restricted shell (also stripping execute bits).
+Use
+.B --no-unixmode
+to leave permission selection entirely to the receiver's defaults 
+(or to keep that information for yourself).
+.TP
 .B "-e, --escape"
 Escape all control characters;
 normally XON, XOFF, DLE, CR-@-CR, and Ctrl-X are escaped.
