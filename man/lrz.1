@@ -194,6 +194,15 @@ name will have a dot and a number (0..999) appended.
 .B "-h, --help"
 give help screen.
 .TP
+.B "-J FILE, --journal FILE"
+Append a transfer-statistics line to
+.B FILE
+for each file received.
+The line consists of key=value pairs including timestamp, direction
+(dir=rx), filename, status, byte counts, duration, and throughput.
+The file is created if it does not exist and appended to on each
+invocation.
+.TP
 .B "-m N, --min-bps N"
 Stop transmission if BPS-Rate (Bytes Per Second) falls below N for a
 certain time (see --min-bps-time option).

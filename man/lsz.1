@@ -243,6 +243,15 @@ give help.
 Send COMMAND to the receiver for execution, return immediately
 upon the receiving program's successful reception of the command.
 .TP
+.B "-J FILE, --journal FILE"
+Append a transfer-statistics line to
+.B FILE
+for each file sent.
+The line consists of key=value pairs including timestamp, direction
+(dir=tx), filename, status, byte counts, duration, and throughput.
+The file is created if it does not exist and appended to on each
+invocation.
+.TP
 .B "-k, --1k"
 (XMODEM/YMODEM) Send files using 1024 byte blocks
 rather than the default 128 byte blocks.

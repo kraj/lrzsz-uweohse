@@ -237,6 +237,7 @@ static struct option const long_options[] =
 	{"zmodem", no_argument, NULL, 'Z'},
 	{"overwrite", no_argument, NULL, 'y'},
 	{"null", no_argument, NULL, 'D'},
+	{"journal", required_argument, NULL, 'J'},
 	{"syslog", optional_argument, NULL , 2},
 	{"delay-startup", required_argument, NULL, 4},
 	{"o-sync", no_argument, NULL, 5},
@@ -292,7 +293,7 @@ main(int argc, char *argv[])
 #define getopt_long(argc,argv,str,longopts,longind) getopt(argc,argv,str)
 #endif
 	while ((c = getopt_long (argc, argv, 
-		"a+bB:cCDeEF:ghHm:M:nNOprRqs:St:uUvw:XZy",
+		"a+bB:cCDeEF:ghHJ:m:M:nNOprRqs:St:uUvw:XZy",
 		long_options, (int *) 0)) != EOF)
 	{
 		unsigned long int tmp;
@@ -316,8 +317,11 @@ main(int argc, char *argv[])
 		case 'D': Nflag = TRUE; break;
 		case 'E': Lzmanag = ZF1_ZMCHNG; break;
 		case 'e': Zctlesc = 1; break;
-		case 'h': usage(0,NULL); break;
-		case 'H': Lzmanag= ZF1_ZMCRC; break;
+	case 'h': usage(0,NULL); break;
+	case 'J':
+		stats_journal_open(optarg);
+		break;
+	case 'H': Lzmanag= ZF1_ZMCRC; break;
 		case 'j': junk_path=TRUE; break;
 		case 'm':
 			s_err = xstrtoul (optarg, &tmpptr, 0, &tmp, "km");
@@ -509,6 +513,8 @@ main(int argc, char *argv[])
                 stat_for_all.start_time=start_timespec.tv_sec+((double)start_timespec.tv_nsec/1e9);
             }
         }
+        stat_for_all.direction = 'r';
+        stat_for_file.direction = 'r';
 
 	io_mode(0,1);
 	readline_setup(0, MAX_BLOCK, MAX_BLOCK*2);
@@ -531,6 +537,7 @@ main(int argc, char *argv[])
 			fputs(_("Transfer complete\n"),stderr);
 	}
         stats_log(&stat_for_all,false);
+        stats_journal_close();
 	exit(exitcode);
 }
 
@@ -570,6 +577,7 @@ usage(int exitcode, const char *what)
 "  -E, --rename                rename any files already existing\n"
 "  -F, --errors N              generate CRC error every N bytes (debugging)\n"
 "  -h, --help                  Help, print this usage message\n"
+"  -J, --journal FILE          append transfer statistics to FILE\n"
 "  -m, --min-bps N             stop transmission if BPS below N\n"
 "  -M, --min-bps-time N          for at least N seconds (default: 120)\n"
 "  -O, --disable-timeouts      disable timeout code, wait forever for data\n"
@@ -688,7 +696,7 @@ wcreceive(int argc, char **argp)
 							shortname,protname(),zi.bytes_received, bps);
 #endif
 				}
-                                stat_for_file.files_received++;
+                                stat_for_file.files_ok++;
                                 stats_account_one();
 			}
 		}
@@ -739,7 +747,7 @@ wcreceive(int argc, char **argp)
                 if (wcrx(&zi)==ERROR) {
                     goto fubar;
                 }
-                // stat_for_file.files_received++; done by wcrx.
+                // stat_for_file.files_ok++; done by wcrx.
                 stats_account_one();
                 if (Verbose > 1
 #ifdef ENABLE_SYSLOG
@@ -781,7 +789,7 @@ fubar:
             unlink(Pathname);
             vstringf(_("\r\n%s: %s removed.\r\n"), program_name, Pathname);
         }
-        stat_for_file.files_failed++;
+        stat_for_file.files_err++;
         stats_account_one();
         return ERROR;
 }
@@ -875,7 +883,7 @@ wcrx(struct zm_fileinfo *zi)
                 stat_for_file.local_errors+=1;
                 return ERROR;
             }
-            stat_for_file.files_received+=1;
+            stat_for_file.files_ok+=1;
             sendline(ACK);
             flushmo();
             purgeline(0);	/* Do read next time ... */
@@ -1788,7 +1796,7 @@ rzfiles(struct zm_fileinfo *zi)
 				DO_SYSLOG_FNAME((LOG_INFO, "%s/%s: %ld Bytes, %ld BPS",shortname,
 						   protname(), (long) zi->bytes_total,bps));
 			}
-                        stat_for_file.files_received++;
+                        stat_for_file.files_ok++;
                         stats_account_one();
 			break;
 		case ZSKIP:
@@ -1800,7 +1808,7 @@ rzfiles(struct zm_fileinfo *zi)
 			break;
 		default: 
 		case ERROR:
-                        stat_for_file.files_failed++;
+                        stat_for_file.files_err++;
                         stats_account_one();
 			DO_SYSLOG_FNAME((LOG_INFO, "%s/%s: error",shortname,protname()));
 			return ERROR;

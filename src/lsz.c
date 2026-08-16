@@ -318,6 +318,7 @@ static struct option const long_options[] =
   {"overwrite", no_argument, NULL, 'y'},
   {"overwrite-or-skip", no_argument, NULL, 'Y'},
 
+  {"journal", required_argument, NULL, 'J'},
   {"delay-startup", required_argument, NULL, 4},
   {"no-unixmode", no_argument, NULL, 8},
   {NULL, 0, NULL, 0}
@@ -376,7 +377,7 @@ main(int argc, char **argv)
 #define getopt_long(argc,argv,str,longopts,longind) getopt(argc,argv,str)
 #endif
 	while ((c = getopt_long (argc, argv,
-		"2+4589abB:C:c:dfeEghHi:kL:l:m:M:NnOopRrqsSt:TUuvw:XYyZ",
+		"2+4589abB:C:c:dfeEghHi:J:kL:l:m:M:NnOopRrqsSt:TUuvw:XYyZ",
 		long_options, (int *) 0))!=EOF)
 	{
 		unsigned long int tmp;
@@ -446,6 +447,9 @@ main(int argc, char **argv)
 		case 'E': Lzmanag = ZF1_ZMCHNG; break;
 		case 'h': usage(0,NULL); break;
 		case 'H': Lzmanag = ZF1_ZMCRC; break;
+		case 'J':
+			stats_journal_open(optarg);
+			break;
 		case 'k': start_blklen=1024; break;
 		case 'L':
 			s_err = xstrtoul (optarg, NULL, 0, &tmp, "ck");
@@ -672,6 +676,9 @@ main(int argc, char **argv)
 	}
 	vfile("%s %s\n", program_name, VERSION);
 
+	stat_for_all.direction = 's';
+	stat_for_file.direction = 's';
+
 	{
 		/* we write max_blocklen (data) + 18 (ZModem protocol overhead)
 		 * + escape overhead (about 4 %), so buffer has to be
@@ -773,6 +780,7 @@ main(int argc, char **argv)
 		else
 			fputs(_("Transfer complete\n"),stderr);
 	}
+	stats_journal_close();
 	exit(dm);
 	/*NOTREACHED*/
 }
@@ -1369,6 +1377,7 @@ usage(int exitcode, const char *what)
 "  -E, --rename                force receiver to rename files it already has\n"
 "  -f, --full-path             send full pathname (Y/Z)\n"
 "  -i, --immediate-command CMD send remote CMD, return immediately (Z)\n"
+"  -J, --journal FILE          append transfer statistics to FILE\n"
 "  -h, --help                  print this usage message\n"
 "  -k, --1k                    send 1024 byte packets (X)\n"
 "  -L, --packetlen N           limit subpacket length to N bytes (Z)\n"
