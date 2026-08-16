@@ -91,9 +91,6 @@ static inline void zsendline_s (const char *s, size_t count);
 
 extern int zmodem_requested;
 
-#define sendline(c) putchar((c) & 0377)
-#define xsendline(c) putchar(c)
-
 /*
  * Read a character from the modem line with timeout.
  *  Eat parity, XON and XOFF characters.
@@ -265,6 +262,7 @@ zsendline(int c)
 	}
 }
 
+/* is this really still useful in 2026? */
 static inline void 
 zsendline_s(const char *s, size_t count) 
 {
@@ -280,6 +278,7 @@ zsendline_s(const char *s, size_t count)
 		}
 		if (t!=s) {
 			fwrite(s,(size_t)(t-s),1,stdout);
+                        stat_for_file.net_bytes_out+=(unsigned long) (t-s);
 			lastsent=t[-1];
 			s=t;
 		}
@@ -564,10 +563,14 @@ crcfoo:
 					if ((c = zdlread()) & ~0377)
 						goto crcfoo;
 					crc = updcrc(c, crc);
+
+                                        stat_for_file.total_message_bytes += length - (end - buf);
 					if (crc & 0xFFFF) {
+                                                stat_for_file.invalid_messages++;
 						zperr(badcrc);
 						return ERROR;
 					}
+                                        stat_for_file.valid_messages++;
 					*bytes_received = length - (end - buf);
 					COUNT_BLK(*bytes_received);
 					VPRINTF(3,("zrdata: %lu  %s", (unsigned long) (*bytes_received), 
@@ -576,12 +579,15 @@ crcfoo:
 				}
 			case GOTCAN:
 				zperr(_("Sender Canceled"));
+                                stat_for_file.cancels++;
 				return ZCAN;
 			case TIMEOUT:
 				zperr(_("TIMEOUT"));
+                                stat_for_file.timeouts++;
 				return c;
 			default:
 				zperr(_("Bad data subpacket"));
+                                stat_for_file.format_errors++;
 				return c;
 			}
 		}
@@ -589,6 +595,7 @@ crcfoo:
 		crc = updcrc(c, crc);
 	}
 	zperr(_("Data subpacket too long"));
+        stat_for_file.format_errors++;
 	return ERROR;
 }
 
@@ -624,10 +631,13 @@ crcfoo:
 				if ((c = zdlread()) & ~0377)
 					goto crcfoo;
 				crc = UPDC32(c, crc);
+                                stat_for_file.total_message_bytes += length - (end - buf);
 				if (crc != 0xDEBB20E3) {
 					zperr(badcrc);
+                                        stat_for_file.invalid_messages++;
 					return ERROR;
 				}
+                                stat_for_file.valid_messages++;
 				*bytes_received = length - (end - buf);
 				COUNT_BLK(*bytes_received);
 				VPRINTF(3,("zrdat32: %lu %s", (unsigned long) *bytes_received, 
@@ -635,11 +645,14 @@ crcfoo:
 				return d;
 			case GOTCAN:
 				zperr(_("Sender Canceled"));
+                                stat_for_file.cancels++;
 				return ZCAN;
 			case TIMEOUT:
 				zperr(_("TIMEOUT"));
+                                stat_for_file.timeouts++;
 				return c;
 			default:
+                                stat_for_file.format_errors++;
 				zperr(_("Bad data subpacket"));
 				return c;
 			}
@@ -648,6 +661,7 @@ crcfoo:
 		crc = UPDC32(c, crc);
 	}
 	zperr(_("Data subpacket too long"));
+        stat_for_file.format_errors++;
 	return ERROR;
 }
 
@@ -745,29 +759,59 @@ splat:
 	case ZBIN:
 		Rxframeind = ZBIN;  Crc32 = FALSE;
 		c =  zrbhdr(hdr);
+                if (c==ERROR) {
+                    stat_for_file.invalid_messages++;
+                } else {
+                    stat_for_file.valid_messages++;
+                }
 		break;
 	case ZBIN32:
 		Crc32 = Rxframeind = ZBIN32;
 		c =  zrbhdr32(hdr);
+                if (c==ERROR) {
+                    stat_for_file.invalid_messages++;
+                } else {
+                    stat_for_file.valid_messages++;
+                }
 		break;
 	case ZHEX:
 		Rxframeind = ZHEX;  Crc32 = FALSE;
 		c =  zrhhdr(hdr);
+                if (c==ERROR) {
+                    stat_for_file.invalid_messages++;
+                } else {
+                    stat_for_file.valid_messages++;
+                }
 		break;
 	case CAN:
 		goto gotcan;
 	default:
+                stat_for_file.format_errors++;
 		goto agn2;
 	}
 	rxpos = hdr[ZP3] & 0377;
 	rxpos = (rxpos<<8) + (hdr[ZP2] & 0377);
 	rxpos = (rxpos<<8) + (hdr[ZP1] & 0377);
 	rxpos = (rxpos<<8) + (hdr[ZP0] & 0377);
+        stat_for_file.total_message_bytes+=4;
 fifi:
 	if (Verbose > 2)
 		vfile("zgethdr: returning %d (%s) after %d garbage bytes, rxpos=%lx, readline_left=%d",
 		      c, (c >= -3 && c <= FRTYPES) ? frametypes[c+FTOFFSET] : "?",
 		      garbage_count, (unsigned long)rxpos, readline_left);
+        /* error accounting */
+	switch (c) {
+	case GOTCAN:
+	case ZCAN:
+            stat_for_file.cancels++;
+            break;
+	case TIMEOUT:
+            stat_for_file.timeouts++;
+            break;
+        default:
+            /* nothing to do */
+        }
+
 	switch (c) {
 	case GOTCAN:
 		c = ZCAN;
