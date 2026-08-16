@@ -325,7 +325,7 @@ static struct option const long_options[] =
 };
 #endif
 
-static void
+LRZSZ_NORETURN static void
 show_version(void)
 {
 	printf ("%s (%s) %s\n", program_name, PACKAGE, VERSION);
@@ -554,7 +554,10 @@ main(int argc, char **argv)
 				stop_time = (time_t)tmp + time(0);
 			}
 			break;
-		case 'S': break; /* timesync removed, kept as no-op */
+		case 'S':
+			fprintf(stderr,
+				_("this option has been removed. See the manual page for more information.\n"));
+			exit(1);
 		case 'T': turbo_escape=1; break;
 		case 't':
 			s_err = xstrtoul (optarg, NULL, 0, &tmp, NULL);

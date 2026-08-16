@@ -391,7 +391,11 @@ main(int argc, char *argv[])
 				try_resume=TRUE;  
 			break;
 		case 'R': Restricted++;  break;
-		case 'S': break; /* timesync removed, kept as no-op */
+		case 'C':
+		case 'S':
+			fprintf(stderr,
+				_("this option has been removed. See the manual page for more information.\n"));
+			exit(1);
 		case 't':
 			s_err = xstrtoul (optarg, NULL, 0, &tmp, NULL);
 			if (s_err != LONGINT_OK)

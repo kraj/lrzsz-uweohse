@@ -381,3 +381,26 @@ requests.
 The default is protect (-p) and binary (-b).
 
 The Unix versions support ZMODEM command execution.
+.SH "HISTORICAL NOTES"
+The following options have been removed and are no longer functional.
+Using them prints an error message and exits.
+.TP
+.B "-C, --allow-commands"
+Allowed remote command execution via ZMODEM.
+Removed because of weak security: it relied on the parent process
+to only set this option when the remote user is perfectly trustworthy.
+.TP
+.B "-S, --timesync"
+Time synchronization.
+Removed because no other still-available implementation supported it,
+and setting the local time would have required root privileges.
+.TP
+.B PUBDIR
+The
+.B PUBDIR
+environment variable and the associated public directory feature
+(restricting file transfers to
+.IR PUBDIR ,
+usually
+.IR /var/spool/uucppublic )
+have been removed.
