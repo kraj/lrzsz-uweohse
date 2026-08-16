@@ -1,8 +1,8 @@
 bin_PROGRAMS=lrz lsz
-lrz_SOURCES=lrz.c timing.c zperr.c zreadline.c crctab.c rbsb.c zm.c protname.c lsyslog.c canit.c
-lsz_SOURCES=lsz.c timing.c zperr.c zreadline.c crctab.c rbsb.c zm.c protname.c lsyslog.c canit.c
+lrz_SOURCES=lrz.c timing.c zperr.c zreadline.c crctab.c rbsb.c zm.c protname.c lsyslog.c canit.c stats.c
+lsz_SOURCES=lsz.c timing.c zperr.c zreadline.c crctab.c rbsb.c zm.c protname.c lsyslog.c canit.c stats.c
 noinst_HEADERS = timing.h zglobal.h zmodem.h
-noinst_PROGRAMS = zmodemsnif
+noinst_PROGRAMS = zmodemsnif linesimulator
 
 LDADD = ../lib/libzmodem.a @LIBINTL@
 AM_CPPFLAGS = -I.. -I$(srcdir) -I$(top_srcdir)/src -I$(top_srcdir)/lib -DLOCALEDIR=\"$(localedir)\" -D_FORTIFY_SOURCE=2
