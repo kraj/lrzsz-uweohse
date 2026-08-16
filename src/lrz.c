@@ -294,7 +294,7 @@ main(int argc, char *argv[])
 #define getopt_long(argc,argv,str,longopts,longind) getopt(argc,argv,str)
 #endif
 	while ((c = getopt_long (argc, argv, 
-		"a+bB:cCDeEF:ghHJ:m:M:nNOprRqs:St:uUvVw:XZy",
+		"a+bB:cCDeEghHJ:m:M:nNOprRqs:St:uUvVw:XZy",
 		long_options, (int *) 0)) != EOF)
 	{
 		unsigned long int tmp;
@@ -450,16 +450,6 @@ main(int argc, char *argv[])
 #  endif
 #endif
 			break;
-		case 'F':
-			s_err = xstrtoul (optarg, NULL, 0, &tmp, "km");
-			if (s_err != LONGINT_OK)
-				STRTOL_FATAL_ERROR (optarg, _("bytes_per_error"), s_err);
-			if (tmp > INT_MAX)
-				usage(2,_("bytes-per-error out of range"));
-			bytes_per_error = (int)tmp;
-			if (bytes_per_error<100)
-				usage(2,_("bytes-per-error should be >100"));
-			break;
                 case 4:
 			s_err = xstrtoul (optarg, NULL, 0, &tmp, NULL);
 			if (s_err != LONGINT_OK)
@@ -580,7 +570,6 @@ usage(int exitcode, const char *what)
 "      --delay-startup N       sleep N seconds before doing anything\n"
 "  -e, --escape                Escape control characters (Z)\n"
 "  -E, --rename                rename any files already existing\n"
-"  -F, --errors N              generate CRC error every N bytes (debugging)\n"
 "  -h, --help                  Help, print this usage message\n"
 "  -H, --crc-check             accept file if lengths and/or CRCs differ (Z)\n"
 "  -J, --journal FILE          append transfer statistics to FILE\n"
