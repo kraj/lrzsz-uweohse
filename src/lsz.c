@@ -279,6 +279,7 @@ static struct option const long_options[] =
   {"binary", no_argument, NULL, 'b'},
   {"bufsize", required_argument, NULL, 'B'},
   {"cmdtries", required_argument, NULL, 'C'},
+  {"command-tries", required_argument, NULL, 'C'},
   {"command", required_argument, NULL, 'c'},
   {"immediate-command", required_argument, NULL, 'i'},
   {"dot-to-slash", no_argument, NULL, 'd'},
