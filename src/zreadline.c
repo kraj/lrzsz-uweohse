@@ -2,7 +2,7 @@
   zreadline.c - line reading stuff for lrzsz
   Copyright (C) until 1998 Chuck Forsberg (OMEN Technology Inc)
   Copyright (C) 1994 Matt Porter
-  Copyright (C) 1996, 1997 Uwe Ohse
+  Copyright (C) 1996, 1997, 2026+ Uwe Ohse
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -27,7 +27,6 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-#include <signal.h>
 #include <ctype.h>
 #include <errno.h>
 
@@ -43,57 +42,51 @@ static char *readline_buffer;
 int readline_left=0;
 char *readline_ptr;
 
-static void
-zreadline_alarm_handler(int dummy)
-{
-	(void) dummy;
-}
-
 /*
  * This version of readline is reasonably well suited for
  * reading many characters.
  *
  * timeout is in tenths of seconds
  */
-int 
+int
 readline_internal(unsigned int timeout)
 {
+	fd_set fds;
+	struct timeval tv;
+	struct timeval *tvp;
+	int rc;
 
-	if (!no_timeout)
-	{
-		unsigned int n;
-		n = timeout/10;
-		if (n < 2 && timeout!=1)
-			n = 3;
-		else if (n==0)
-			n=1;
-		if (Verbose > 5)
-			vstringf("Calling read: alarm=%u  Readnum=%lu ",
-			  n, readline_readnum);
-		{
-			/* Install the handler without SA_RESTART so that the
-			 * alarm interrupts the following read() instead of
-			 * restarting it. Replaces the deprecated siginterrupt(). */
-			struct sigaction sa;
-			sa.sa_handler = zreadline_alarm_handler;
-			sigemptyset(&sa.sa_mask);
-			sa.sa_flags = 0;
-			sigaction(SIGALRM, &sa, NULL);
-		}
-		alarm(n);
+	if (Verbose > 5)
+		vstringf("Calling read: timeout=%u/10s  Readnum=%lu ",
+		  timeout, readline_readnum);
+
+	if (no_timeout) {
+		tvp = NULL;
+	} else {
+		tv.tv_sec = timeout / 10;
+		tv.tv_usec = (long)(timeout % 10) * 100000L;
+		tvp = &tv;
 	}
-	else if (Verbose > 5)
-		vstringf("Calling read: Readnum=%lu ",
-		  readline_readnum);
+
+	FD_ZERO(&fds);
+	FD_SET(readline_fd, &fds);
+	rc = select(readline_fd + 1, &fds, NULL, NULL, tvp);
+	if (rc < 0) {
+		if (errno == EINTR)
+			return TIMEOUT;
+		if (Verbose > 5)
+			vstringf("select error: errno=%d:%s\n", errno, strerror(errno));
+		return TIMEOUT;
+	}
+	if (rc == 0)
+		return TIMEOUT;
 
 	readline_ptr=readline_buffer;
 	readline_left=read(readline_fd, readline_ptr, readline_readnum);
-	if (!no_timeout)
-		alarm(0);
-        stat_for_file.net_read_ops++;
-        if (readline_left>=0) {
-            stat_for_file.net_bytes_in += readline_left;
-        }
+	stat_for_file.net_read_ops++;
+	if (readline_left>=0) {
+		stat_for_file.net_bytes_in += readline_left;
+	}
 	if (Verbose > 5) {
 		vstringf("Read returned %d bytes\n", readline_left);
 		if (readline_left==-1)
@@ -132,6 +125,4 @@ void
 readline_purge(void)
 {
 	readline_left=0;
-	return;
 }
-
