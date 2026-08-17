@@ -46,7 +46,6 @@ static const char *frametypes[] = {
 	"Carrier Lost",		/* -3 */
 	"TIMEOUT",		/* -2 */
 	"ERROR",		/* -1 */
-#define FTOFFSET 3
 	"ZRQINIT",
 	"ZRINIT",
 	"ZSINIT",
@@ -66,11 +65,21 @@ static const char *frametypes[] = {
 	"ZCAN",
 	"ZFREECNT",
 	"ZCOMMAND",
-	"ZSTDERR",
-	"xxxxx"
-#define FRTYPES 22	/* Total number of frame types in this array */
-			/*  not including psuedo negative entries */
+	"ZSTDERR"
 };
+#define FTOFFSET 3
+#define FRMAX (sizeof(frametypes) / sizeof(frametypes[0]))
+
+static const char *
+frametype_to_string(int type)
+{
+	static char unknown[32];
+	unsigned int idx = (unsigned int)type + FTOFFSET;
+	if (idx < FRMAX)
+		return frametypes[idx];
+	snprintf(unknown, sizeof(unknown), "unknown frame type %x", type);
+	return unknown;
+}
 
 #define badcrc _("Bad CRC")
 /* static char *badcrc = "Bad CRC"; */
@@ -316,7 +325,7 @@ zsbhdr(int type, char *hdr)
 	register int n;
 	register unsigned short crc;
 
-	VPRINTF(3,("zsbhdr: %s %lx", frametypes[type+FTOFFSET], rclhdr(hdr)));
+	VPRINTF(3,("zsbhdr: %s %lx", frametype_to_string(type), rclhdr(hdr)));
 	if (type == ZDATA)
 		for (n = Znulls; --n >=0; )
 			xsendline(0);
@@ -372,7 +381,7 @@ zshhdr(int type, char *hdr)
 	unsigned char s[30];
 	size_t len;
 
-	VPRINTF(3,("zshhdr: %s %lx", frametypes[(type & 0x7f)+FTOFFSET], rclhdr(hdr)));
+	VPRINTF(3,("zshhdr: %s %lx", frametype_to_string(type & 0x7f), rclhdr(hdr)));
 	s[0]=ZPAD;
 	s[1]=ZPAD;
 	s[2]=ZDLE;
@@ -798,7 +807,7 @@ splat:
 fifi:
 	if (Verbose > 2)
 		vfile("zgethdr: returning %d (%s) after %d garbage bytes, rxpos=%lx, readline_left=%d",
-		      c, (c >= -3 && c <= FRTYPES) ? frametypes[c+FTOFFSET] : "?",
+		      c, frametype_to_string(c),
 		      garbage_count, (unsigned long)rxpos, readline_left);
         /* error accounting */
 	switch (c) {
@@ -822,13 +831,10 @@ fifi:
 	case ERROR:
 	case TIMEOUT:
 	case RCDO:
-		zperr(_("Got %s"), frametypes[c+FTOFFSET]);
+	zperr(_("Got %s"), frametype_to_string(c));
 	/* FALLTHROUGH */
-	default:
-		if (c >= -3 && c <= FRTYPES)
-			VPRINTF(3,("zgethdr: %s %lx", frametypes[c+FTOFFSET], (unsigned long) rxpos));
-		else
-			VPRINTF(3,("zgethdr: %d %lx", c, (unsigned long) rxpos));
+    default:
+		VPRINTF(3,("zgethdr: %s %lx", frametype_to_string(c), (unsigned long) rxpos));
 	}
 	if (Rxpos)
 		*Rxpos=rxpos;
