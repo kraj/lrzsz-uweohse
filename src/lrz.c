@@ -311,8 +311,11 @@ main(int argc, char *argv[])
 		case 'B': 
 			if (strcmp(optarg,"auto")==0) 
 				buffersize=-1;
-			else
+			else {
 				buffersize=strtol(optarg,NULL,10);
+				if (buffersize != -1 && buffersize < 0)
+					usage(2,_("buffer size out of range"));
+			}
 			break;
 		case 'c': Crcflg=TRUE; break;
 		case 'D': Nflag = TRUE; break;
