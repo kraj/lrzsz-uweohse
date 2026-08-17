@@ -1097,6 +1097,7 @@ safe_open(const char *path, const char *mode)
 {
     int flags = 0;
     int fd;
+    FILE *fp;
     const char *p = mode;
 
     for (; *p; p++) {
@@ -1123,7 +1124,10 @@ safe_open(const char *path, const char *mode)
     fd = open(path, flags, 0666);
     if (fd < 0)
         return NULL;
-    return fdopen(fd, mode);
+    fp = fdopen(fd, mode);
+    if (!fp)
+        close(fd);
+    return fp;
 }
 
 /*
