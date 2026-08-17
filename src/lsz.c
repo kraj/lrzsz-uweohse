@@ -48,8 +48,6 @@ void *mm_addr=NULL;
 #endif
 #include "timing.h"
 #include "long-options.h"
-#include "xstrtoul.h"
-#include "error.h"
 
 unsigned Baudrate=2400;	/* Default, should be set by first mode() call */
 unsigned Txwindow;	/* Control the size of the transmitted window */
@@ -219,10 +217,7 @@ bibi(int n)
 	canit(STDOUT_FILENO);
 	fflush(stdout);
 	io_mode(io_mode_fd, 0);
-	if (n == 99)
-		error(0, 0, _("io_mode(,2) in rbsb.c not implemented\n"));
-	else
-		error(0, 0, _("caught signal %d; exiting"), n);
+        lrzsz_warning(0, 0, _("caught signal %d; exiting"), n);
 	if (n == SIGQUIT)
 		abort();
 	exit(128 + n);
@@ -263,7 +258,6 @@ onintr(int n)
 }
 
 int Zctlesc;	/* Encode control characters */
-const char *program_name = "sz";
 unsigned int Zrwindow = 1400;	/* RX window size (controls garbage count) */
 
 #ifdef HAVE_GETOPT_LONG
@@ -329,7 +323,7 @@ static struct option const long_options[] =
 LRZSZ_NORETURN static void
 show_version(void)
 {
-	printf ("%s (%s) %s\n", program_name, PACKAGE, VERSION);
+	printf ("%s (%s) %s\n", lrzsz_progname, PACKAGE, VERSION);
         exit(0);
 }
 
@@ -346,6 +340,9 @@ main(int argc, char **argv)
 	int c;
 	const char *Cmdstr=NULL;		/* Pointer to the command string */
 	unsigned int startup_delay=0;
+	const char *journal_filename;
+
+        lrzsz_set_progname (argv[0], "lsz"); /* needed for the error handling => early */
 
 	if (((cp = getenv("ZNULLS")) != NULL) && *cp)
 		Znulls = atoi(cp);
@@ -364,8 +361,13 @@ main(int argc, char **argv)
 	from_cu();
 	chkinvok(argv[0]);
 
+        journal_filename=getenv("journal_filename");
+        if (journal_filename && *journal_filename) {
+            stats_journal_open(journal_filename);
+        }
+
 #ifdef ENABLE_SYSLOG
-	openlog(program_name,LOG_PID,ENABLE_SYSLOG);
+	openlog(lrzsz_progname,LOG_PID,ENABLE_SYSLOG);
 #endif
 
 	setlocale (LC_ALL, "");
@@ -382,10 +384,6 @@ main(int argc, char **argv)
 		"2+4589abB:C:c:dfeEghHi:J:kL:l:m:M:NnOopRrqsSt:TUuvVw:XYyZ",
 		long_options, (int *) 0))!=EOF)
 	{
-		unsigned long int tmp;
-		char *tmpptr;
-		enum strtol_error s_err;
-
 		switch (c)
 		{
 		case 0:
@@ -424,12 +422,7 @@ main(int argc, char **argv)
 #endif
 			break;
 		case 'C':
-			s_err = xstrtoul (optarg, NULL, 0, &tmp, NULL);
-			if (s_err != LONGINT_OK)
-				STRTOL_FATAL_ERROR (optarg, _("command tries"), s_err);
-			if (tmp > INT_MAX)
-				usage(2,_("command tries out of range"));
-			Cmdtries = (int)tmp;
+                        Cmdtries = lrzsz_strtoul( "-C / --command-tries", optarg, NULL, 0, 0);
 			break;
 		case 'i':
 			Cmdack1 = ZCACK1;
@@ -454,56 +447,16 @@ main(int argc, char **argv)
 			break;
 		case 'k': start_blklen=1024; break;
 		case 'L':
-			s_err = xstrtoul (optarg, NULL, 0, &tmp, "ck");
-			if (s_err != LONGINT_OK)
-				STRTOL_FATAL_ERROR (optarg, _("packetlength"), s_err);
-			if (tmp > UINT_MAX)
-				usage(2,_("packetlength out of range"));
-			blkopt = (unsigned)tmp;
-			if (blkopt<24 || blkopt>MAX_BLOCK)
-			{
-				char meld[256];
-				sprintf(meld,
-					_("packetlength out of range 24..%ld"),
-					(long) MAX_BLOCK);
-				usage(2,meld);
-			}
+                        blkopt = (unsigned int) lrzsz_strtoul( "-L / --packetlen", optarg, "ck", 24, MAX_BLOCK);
 			break;
 		case 'l':
-			s_err = xstrtoul (optarg, NULL, 0, &tmp, "ck");
-			if (s_err != LONGINT_OK)
-				STRTOL_FATAL_ERROR (optarg, _("framelength"), s_err);
-			if (tmp > UINT_MAX)
-				usage(2,_("framelength out of range"));
-			Tframlen = (unsigned)tmp;
-			if (Tframlen<32 || Tframlen>MAX_BLOCK)
-			{
-				char meld[256];
-				sprintf(meld,
-					_("framelength out of range 32..%ld"),
-					(long) MAX_BLOCK);
-				usage(2,meld);
-			}
+                        Tframlen = (unsigned int) lrzsz_strtoul( "-l / --framelen", optarg, "ck", 32, MAX_BLOCK);
 			break;
-        case 'm':
-			s_err = xstrtoul (optarg, &tmpptr, 0, &tmp, "km");
-			if (s_err != LONGINT_OK)
-				STRTOL_FATAL_ERROR (optarg, _("min_bps"), s_err);
-			if (tmp > LONG_MAX)
-				usage(2,_("min_bps out of range"));
-			min_bps = (long)tmp;
-			if (min_bps<0)
-				usage(2,_("min_bps must be >= 0"));
+                case 'm':
+                        min_bps = (unsigned int) lrzsz_strtoul( "-m / --min-pbs", optarg, "km", 0, 0);
 			break;
-        case 'M':
-			s_err = xstrtoul (optarg, NULL, 0, &tmp, NULL);
-			if (s_err != LONGINT_OK)
-				STRTOL_FATAL_ERROR (optarg, _("min_bps_time"), s_err);
-			if (tmp > LONG_MAX)
-				usage(2,_("min_bps_time out of range"));
-			min_bps_time = (long)tmp;
-			if (min_bps_time<=1)
-				usage(2,_("min_bps_time must be > 1"));
+                case 'M':
+                        min_bps_time = (unsigned int) lrzsz_strtoul( "-m / --min-pbs", optarg, "km", 1, 0);
 			break;
 		case 'N': Lzmanag = ZF1_ZMNEWL;  break;
 		case 'n': Lzmanag = ZF1_ZMNEW;  break;
@@ -545,14 +498,7 @@ main(int argc, char **argv)
 				if (stop_time - t <10)
 					usage(2,_("stop time to small"));
 			} else {
-				s_err = xstrtoul (optarg, NULL, 0, &tmp, NULL);
-				if (s_err != LONGINT_OK)
-					STRTOL_FATAL_ERROR (optarg, _("stop-at"), s_err);
-				if (tmp > LONG_MAX)
-					usage(2,_("stop time out of range"));
-				if (tmp<10)
-					usage(2,_("stop time to small"));
-				stop_time = (time_t)tmp + time(0);
+                                stop_time = time(0) + (time_t) lrzsz_strtoul( "-s / --stop-at", optarg, NULL, 10, 0);
 			}
 			break;
 		case 'S':
@@ -561,34 +507,20 @@ main(int argc, char **argv)
 			exit(1);
 		case 'T': turbo_escape=1; break;
 		case 't':
-			s_err = xstrtoul (optarg, NULL, 0, &tmp, NULL);
-			if (s_err != LONGINT_OK)
-				STRTOL_FATAL_ERROR (optarg, _("timeout"), s_err);
-			if (tmp > UINT_MAX)
-				usage(2,_("timeout out of range 10..1000"));
-			Rxtimeout = (unsigned int)tmp;
-			if (Rxtimeout<10 || Rxtimeout>1000)
-				usage(2,_("timeout out of range 10..1000"));
+                        Rxtimeout = (unsigned int) lrzsz_strtoul( "-t / --timeout", optarg, NULL, 10, 1000);
 			break;
 		case 'u': ++Unlinkafter; break;
 		case 'U':
 			if (!under_rsh)
 				Restricted=0;
 			else
-				error(1,0,
-		_("security violation: can't do that under restricted shell\n"));
+				fatal_error(1,0,
+                                _("security violation: can't do that under restricted shell\n"));
 			break;
 		case 'v': ++Verbose; break;
                 case 'V': show_version(); break;
 		case 'w':
-			s_err = xstrtoul (optarg, NULL, 0, &tmp, NULL);
-			if (s_err != LONGINT_OK)
-				STRTOL_FATAL_ERROR (optarg, _("window size"), s_err);
-			if (tmp > UINT_MAX)
-				usage(2,_("window size out of range"));
-			Txwindow = (unsigned)tmp;
-			if (Txwindow < 256)
-				Txwindow = 256;
+                        Txwindow = (unsigned int) lrzsz_strtoul( "-w / --windowsize", optarg, NULL, 256, 0);
 			Txwindow = (Txwindow/64) * 64;
 			Txwspac = Txwindow/4;
 			if (blkopt > Txwspac
@@ -610,24 +542,19 @@ main(int argc, char **argv)
 			if (optarg && (!strcmp(optarg,"off") || !strcmp(optarg,"no")))
 			{
 				if (under_rsh)
-					error(0,0, _("cannot turnoff syslog"));
+					fatal_error(0,0, _("cannot turnoff syslog"));
 				else
 					enable_syslog=FALSE;
 			}
 			else
 				enable_syslog=TRUE;
 #  else
-			error(0,0, _("cannot turnoff syslog"));
+			fatal_error(0,0, _("cannot turnoff syslog"));
 #  endif
 #endif
 			break;
 		case 4:
-			s_err = xstrtoul (optarg, NULL, 0, &tmp, NULL);
-			if (s_err != LONGINT_OK)
-				STRTOL_FATAL_ERROR (optarg, _("startup delay"), s_err);
-			if (tmp > UINT_MAX)
-				usage(2,_("startup delay out of range"));
-			startup_delay = (unsigned int)tmp;
+                        startup_delay = (unsigned int) lrzsz_strtoul( "--delay-startup", optarg, NULL, 1, 0);
 			break;
 		case 8: no_unixmode=1; break;
 		default:
@@ -637,12 +564,12 @@ main(int argc, char **argv)
 	}
 
 	if (getuid()!=geteuid()) {
-		error(1,0,
+		fatal_error(1,0,
 		_("this program was never intended to be used setuid\n"));
 	}
 
 	txbuf=malloc(MAX_BLOCK);
-	if (!txbuf) error(1,0,_("out of memory"));
+	if (!txbuf) fatal_error(1,0,_("out of memory"));
 
 	zsendline_init();
 
@@ -679,7 +606,7 @@ main(int argc, char **argv)
 		if (Verbose == 0)
 			Verbose = 2;
 	}
-	vfile("%s %s\n", program_name, VERSION);
+	vfile("%s %s\n", lrzsz_progname, VERSION);
 
 	stat_for_all.direction = 's';
 	stat_for_file.direction = 's';
@@ -891,7 +818,7 @@ wcs(const char *oname, const char *remotename)
 #endif
 	} else if ((input_f=fopen(oname, "r"))==NULL) {
 		int e=errno;
-		error(0,e, _("cannot open %s"),oname);
+		lrzsz_warning(e, _("cannot open %s"),oname);
 		++errcnt;
 		return OK;	/* pass over it, there may be others */
 	} else {
@@ -942,7 +869,7 @@ wcs(const char *oname, const char *remotename)
 	c = f.st_mode & S_IFMT;
 	if (c == S_IFDIR || c == S_IFBLK) {
 #endif
-		error(0,0, _("is not a file: %s"),name);
+		fatal_error(0,0, _("is not a file: %s"),name);
 		fclose(input_f);
 		return OK;
 	}
@@ -979,7 +906,7 @@ wcs(const char *oname, const char *remotename)
 #endif
 		return ERROR;
 	case ZSKIP:
-		error(0,0, _("skipped: %s"),name);
+		lrzsz_warning(0, _("skipped: %s"),name);
 #ifdef ENABLE_SYSLOG
 		if (enable_syslog)
 			lsyslog(LOG_INFO, _("%s/%s: skipped"),protname(),shortname);
@@ -1025,7 +952,7 @@ wcs(const char *oname, const char *remotename)
 violation:
 	canit(STDOUT_FILENO);
 	vchar('\r');
-	error(1,0,
+	fatal_error(1,0,
 		_("security violation: not allowed to upload from %s"),oname);
 	exit(1);
 }
@@ -1366,18 +1293,18 @@ usage(int exitcode, const char *what)
 	if (exitcode)
 	{
 		if (what)
-			fprintf(stderr, "%s: %s\n",program_name,what);
+			fprintf(stderr, "%s: %s\n",lrzsz_progname,what);
 	    fprintf (stderr, _("Try `%s -h' for more information.\n"),
-            program_name);
+            lrzsz_progname);
 		exit(exitcode);
 	}
 
-	fprintf(f, _("%s version %s\n"), program_name,
+	fprintf(f, _("%s version %s\n"), lrzsz_progname,
 		VERSION);
 
 	fprintf(f,_("Usage: %s [options] file ...\n"),
-		program_name);
-	fprintf(f,_("   or: %s [options] -{c|i} COMMAND\n"),program_name);
+		lrzsz_progname);
+	fprintf(f,_("   or: %s [options] -{c|i} COMMAND\n"),lrzsz_progname);
 	fputs(_("Send file(s) with ZMODEM/YMODEM/XMODEM protocol\n"),f);
 	fputs(_(
 		"    (X) = option applies to XMODEM only\n"
@@ -2309,7 +2236,6 @@ chkinvok (const char *s)
 		Verbose = 1;
 		++s;
 	}
-	program_name = s;
 	if (*s == 'l')
 		s++;					/* lsz -> sz */
 	protocol = ZM_ZMODEM;

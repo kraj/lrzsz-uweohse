@@ -39,8 +39,6 @@
 
 #include "timing.h"
 #include "long-options.h"
-#include "xstrtoul.h"
-#include "error.h"
 
 #ifndef HAVE_O_NOFOLLOW
 #define O_NOFOLLOW 0
@@ -62,7 +60,6 @@ int Readnum = MAX_BLOCK;	/* Number of bytes to ask for in read() from modem */
 int skip_if_not_found;
 
 char *Pathname;
-const char *program_name;		/* the name by which we were called */
 
 int MakeLCPathname=TRUE;	/* make received pathname lower case */
 int Verbose=0;
@@ -165,14 +162,14 @@ bibi_sighandler(int n)
 }
 
 /* called from normal control flow (checkpath, rbsb) to clean things up */
-void
+LRZSZ_NORETURN void
 bibi(int n)
 {
 	if (zmodem_requested)
 		zmputs(Attn);
 	canit(STDOUT_FILENO);
 	io_mode(0,0);
-	error(128+n,0,_("caught signal %d; exiting"), n);
+	fatal_error(128+n,0,_("caught signal %d; exiting"), n);
 }
 
 static int
@@ -250,7 +247,7 @@ static struct option const long_options[] =
 LRZSZ_NORETURN static void
 show_version(void)
 {
-	printf ("%s (GNU %s) %s\n", program_name, PACKAGE, VERSION);
+	printf ("%s (GNU %s) %s\n", lrzsz_progname, PACKAGE, VERSION);
         exit(0);
 }
 
@@ -263,6 +260,9 @@ main(int argc, char *argv[])
 	int exitcode=0;
 	int c;
 	unsigned int startup_delay=0;
+        const char *journal_filename;
+    
+        lrzsz_set_progname (argv[0], "lrz"); /* needed for the error handling => early */
 
 	Rxtimeout = 100;
 	setbuf(stderr, NULL);
@@ -282,8 +282,16 @@ main(int argc, char *argv[])
 	from_cu();
 	chkinvok(argv[0]);	/* if called as [-]rzCOMMAND set flag */
 
+	journal_filename=getenv("LRZ_JOURNAL");
+        if (!journal_filename || !*journal_filename) {
+	    journal_filename=getenv("LRZSZ_JOURNAL");
+        }
+        if (journal_filename && *journal_filename) {
+            stats_journal_open(journal_filename);
+        }
+
 #ifdef ENABLE_SYSLOG
-	openlog(program_name,LOG_PID,ENABLE_SYSLOG);
+	openlog(lrzsz_progname,LOG_PID,ENABLE_SYSLOG);
 #endif
 
 	setlocale (LC_ALL, "");
@@ -297,10 +305,6 @@ main(int argc, char *argv[])
 		"a+bB:cCDeEghHJ:m:M:nNOprRqs:St:uUvVw:XZy",
 		long_options, (int *) 0)) != EOF)
 	{
-		unsigned long int tmp;
-		char *tmpptr;
-		enum strtol_error s_err;
-
 		switch (c)
 		{
 		case 0:
@@ -328,20 +332,10 @@ main(int argc, char *argv[])
 	case 'H': Lzmanag= ZF1_ZMCRC; break;
 		case 'j': junk_path=TRUE; break;
 		case 'm':
-			s_err = xstrtoul (optarg, &tmpptr, 0, &tmp, "km");
-			if (s_err != LONGINT_OK)
-				STRTOL_FATAL_ERROR (optarg, _("min_bps"), s_err);
-			min_bps = tmp;
+			min_bps = lrzsz_strtoul( _("-m / --min-bps"), optarg, "km", 0, 0);
 			break;
 		case 'M':
-			s_err = xstrtoul (optarg, NULL, 0, &tmp, NULL);
-			if (s_err != LONGINT_OK)
-				STRTOL_FATAL_ERROR (optarg, _("min_bps_time"), s_err);
-			if (tmp > LONG_MAX)
-				usage(2,_("min_bps_time out of range"));
-			min_bps_time = tmp;
-			if (min_bps_time<=1)
-				usage(2,_("min_bps_time must be > 1"));
+			min_bps_time = lrzsz_strtoul( _("-M / --min-bps-time"), optarg, "km", 1, LONG_MAX);
 			break;
 		case 'N': Lzmanag = ZF1_ZMNEWL;  break;
 		case 'n': Lzmanag = ZF1_ZMNEW;  break;
@@ -360,29 +354,22 @@ main(int argc, char *argv[])
 					usage(2,_("hour to large (0..23)"));
 				if (*nex!=':')
 					usage(2, _("unparsable stop time\n"));
-			nex++;
-			mm = strtoul(nex, &nex, 10);
-			if (mm>59)
-				usage(2,_("minute to large (0..59)"));
-			
-			t=time(NULL);
-			tm=localtime(&t);
-			tm->tm_hour=hh;
-			tm->tm_min=mm;
+                                nex++;
+                                mm = strtoul(nex, &nex, 10);
+                                if (mm>59)
+                                        usage(2,_("minute to large (0..59)"));
+                                
+                                t=time(NULL);
+                                tm=localtime(&t);
+                                tm->tm_hour=hh;
+                                tm->tm_min=mm;
 				stop_time=mktime(tm);
 				if (stop_time<t)
 					stop_time+=86400L; /* one day more */
 				if (stop_time - t <10)
 					usage(2,_("stop time to small"));
 			} else {
-				s_err = xstrtoul (optarg, NULL, 0, &tmp, NULL);
-				if (s_err != LONGINT_OK)
-					STRTOL_FATAL_ERROR (optarg, _("stop-at"), s_err);
-				if (tmp > LONG_MAX)
-					usage(2,_("stop time out of range"));
-				if (tmp<10)
-					usage(2,_("stop time to small"));
-				stop_time = (time_t)tmp + time(0);
+			        stop_time = (time(0)) + (time_t) lrzsz_strtoul( _("-s / --stop-at"), optarg, NULL, 1, LONG_MAX);
 			}
 			break;
 
@@ -400,22 +387,10 @@ main(int argc, char *argv[])
 				_("this option has been removed. See the manual page for more information.\n"));
 			exit(1);
 		case 't':
-			s_err = xstrtoul (optarg, NULL, 0, &tmp, NULL);
-			if (s_err != LONGINT_OK)
-				STRTOL_FATAL_ERROR (optarg, _("timeout"), s_err);
-			if (tmp > UINT_MAX)
-				usage(2,_("timeout out of range 10..1000"));
-			Rxtimeout = (unsigned int)tmp;
-			if (Rxtimeout<10 || Rxtimeout>1000)
-				usage(2,_("timeout out of range 10..1000"));
+                        Rxtimeout = (unsigned int) lrzsz_strtoul( "-t / --timeout", optarg, NULL, 10, 1000);
 			break;
 		case 'w':
-			s_err = xstrtoul (optarg, NULL, 0, &tmp, NULL);
-			if (s_err != LONGINT_OK)
-				STRTOL_FATAL_ERROR (optarg, _("window size"), s_err);
-			if (tmp < 1 || tmp > MAX_BLOCK)
-				usage(2,_("window size out of range 1..8192"));
-			Zrwindow = (unsigned int)tmp;
+                        Zrwindow = (unsigned int) lrzsz_strtoul( "-w / --windowsize", optarg, NULL, 1, 8192);
 			break;
 		case 'u':
 			MakeLCPathname=FALSE; break;
@@ -424,7 +399,7 @@ main(int argc, char *argv[])
 				Restricted=0;
 			else  {
 				DO_SYSLOG((LOG_INFO,"--unrestrict option used under restricted shell"));
-				error(1,0,
+				fatal_error(1,0,
 	_("security violation: can't do that under restricted shell\n"));
 			}
 			break;
@@ -442,30 +417,25 @@ main(int argc, char *argv[])
 #  ifndef ENABLE_SYSLOG_FORCE
 			if (optarg && (!strcmp(optarg,"off") || !strcmp(optarg,"no"))) {
 				if (under_rsh)
-					error(0,0, _("cannot turnoff syslog"));
+					fatal_error(0,0, _("cannot turnoff syslog"));
 				else
 					enable_syslog=FALSE;
 			}
 			else
 				enable_syslog=TRUE;
 #  else
-			error(0,0, _("cannot turnoff syslog"));
+			fatal_error(0,0, _("cannot turnoff syslog"));
 #  endif
 #endif
 			break;
                 case 4:
-			s_err = xstrtoul (optarg, NULL, 0, &tmp, NULL);
-			if (s_err != LONGINT_OK)
-				STRTOL_FATAL_ERROR (optarg, _("startup delay"), s_err);
-			if (tmp > UINT_MAX)
-				usage(2,_("startup delay out of range"));
-			startup_delay = (unsigned int)tmp;
+                        startup_delay = (unsigned int) lrzsz_strtoul( "-w / --windowsize", optarg, NULL, 0, 0);
 			break;
 		case 5:
 #if defined(F_GETFD) && defined(F_SETFD) && defined(O_SYNC)
 			o_sync=1;
 #else
-			error(0,0, _("O_SYNC not supported by the kernel"));
+			fatal_error(0,0, _("O_SYNC not supported by the kernel"));
 #endif
 			break;
 		default:
@@ -475,12 +445,12 @@ main(int argc, char *argv[])
 	}
 
 	if (getuid()!=geteuid()) {
-		error(1,0,
+		fatal_error(1,0,
 		_("this program was never intended to be used setuid\n"));
 	}
 
 	secbuf=malloc(1+MAX_BLOCK);
-	if (!secbuf) error(1,0,_("out of memory"));
+	if (!secbuf) fatal_error(1,0,_("out of memory"));
 
 	/* initialize zsendline tab */
 	zsendline_init();
@@ -499,7 +469,7 @@ main(int argc, char *argv[])
 			Verbose = 2;
 	}
 
-	vfile("%s %s\n", program_name, VERSION);
+	vfile("%s %s\n", lrzsz_progname, VERSION);
 
         {
             struct timespec start_timespec;
@@ -547,16 +517,16 @@ usage(int exitcode, const char *what)
 	if (exitcode)
 	{
 		if (what)
-			fprintf(stderr, "%s: %s\n",program_name,what);
+			fprintf(stderr, "%s: %s\n",lrzsz_progname,what);
 		fprintf (stderr, _("Try `%s -h' for more information.\n"),
-			program_name);
+			lrzsz_progname);
 		exit(exitcode);
 	}
 
-	fprintf(f, _("%s version %s\n"), program_name,
+	fprintf(f, _("%s version %s\n"), lrzsz_progname,
 		VERSION);
 
-	fprintf(f,_("Usage: %s [options] [filename.if.xmodem]\n"), program_name);
+	fprintf(f,_("Usage: %s [options] [filename.if.xmodem]\n"), lrzsz_progname);
 	fputs(_("Receive files with ZMODEM/YMODEM/XMODEM protocol\n"),f);
 	fputs(_(
 		"    (X) = option applies to XMODEM only\n"
@@ -631,7 +601,7 @@ wcreceive(int argc, char **argp)
 	if (protocol!=ZM_XMODEM || argc==0) {
 		Crcflg=1;
 		if ( !Quiet)
-			vstringf(_("%s waiting to receive."), program_name);
+			vstringf(_("%s waiting to receive."), lrzsz_progname);
 		if ((c=tryz())!=0) {
 			if (c == ZCOMPL)
 				return OK;
@@ -719,7 +689,7 @@ wcreceive(int argc, char **argp)
 		errno=0;
 		Pathname=strdup(*argp);
 		if (!Pathname)
-			error(1,0,_("out of memory"));
+			fatal_error(1,0,_("out of memory"));
 
                 checkpath(Pathname);
                 stats_set_filename(Pathname);
@@ -732,7 +702,7 @@ wcreceive(int argc, char **argp)
 #endif
                 if (Verbose>1) {
                     vchar('\n');
-                    vstringf(_("%s: ready to receive %s"), program_name, Pathname);
+                    vstringf(_("%s: ready to receive %s"), lrzsz_progname, Pathname);
                     vstring("\r\n");
                 }
 
@@ -787,7 +757,7 @@ fubar:
 
         if (Restricted && Pathname) {
             unlink(Pathname);
-            vstringf(_("\r\n%s: %s removed.\r\n"), program_name, Pathname);
+            vstringf(_("\r\n%s: %s removed.\r\n"), lrzsz_progname, Pathname);
         }
         stat_for_file.files_err++;
         stats_account_one();
@@ -1165,7 +1135,7 @@ procheader(char *name, struct zm_fileinfo *zi)
     }
     name_static=malloc(strlen(name)+1);
     if (!name_static)
-        error(1,0,_("out of memory"));
+        fatal_error(1,0,_("out of memory"));
     strcpy(name_static,name);
     zi->fname=name_static;
 
@@ -1298,7 +1268,7 @@ procheader(char *name, struct zm_fileinfo *zi)
             free(name_static);
             name_static=malloc(strlen(tmpname)+1);
             if (!name_static)
-                error(1,0,_("out of memory"));
+                fatal_error(1,0,_("out of memory"));
             strcpy(name_static,tmpname);
             zi->fname=name_static;
         }
@@ -1325,7 +1295,7 @@ procheader(char *name, struct zm_fileinfo *zi)
 
     Pathname=strdup(name_static);
     if (!Pathname)
-        error(1,0,_("out of memory"));
+        fatal_error(1,0,_("out of memory"));
     if (Verbose) {
         /* overwrite the "waiting to receive" line */
         vstring("\r                                                                     \r");
@@ -1340,7 +1310,7 @@ procheader(char *name, struct zm_fileinfo *zi)
                 name_static=(char *) strdup("/dev/null");
                 if (!name_static)
                 {
-                        fprintf(stderr,"%s: %s\n", program_name, _("out of memory"));
+                        fprintf(stderr,"%s: %s\n", lrzsz_progname, _("out of memory"));
                         exit(1);
                 }
         }
@@ -1582,7 +1552,6 @@ chkinvok(const char *s)
 	if (*s == 'v') {
 		Verbose=1; ++s;
 	}
-	program_name = s;
 	if (*s == 'l') 
 		s++; /* lrz -> rz */
 	protocol=ZM_ZMODEM;
@@ -1610,7 +1579,7 @@ checkpath(const char *name)
 			canit(STDOUT_FILENO);
 			vstring("\r\n");
 			vstringf(_("%s: %s exists\n"),
-				program_name, name);
+				lrzsz_progname, name);
 			bibi(-1);
 		}
 	}
@@ -1641,7 +1610,7 @@ checkpath(const char *name)
 violation:
 	canit(STDOUT_FILENO);
 	vstring("\r\n");
-	vstringf(_("%s:\tSecurity Violation"), program_name);
+	vstringf(_("%s:\tSecurity Violation"), lrzsz_progname);
 	vstring("\r\n");
 	bibi(-1);
 }
@@ -1736,9 +1705,9 @@ again:
 		case ZCOMMAND:
 			if (zrdata(secbuf, MAX_BLOCK,&bytes_in_block) == GOTCRCW) {
 				if (Verbose) {
-					vstringf("%s: %s\n", program_name,
+					vstringf("%s: %s\n", lrzsz_progname,
 						_("remote command execution denied"));
-					vstringf("%s: %s\n", program_name, secbuf);
+					vstringf("%s: %s\n", lrzsz_progname, secbuf);
 				}
                                 stohdr(1L); /* be nice and tell the other side that the execution failed. */
                                 zshhdr(ZCOMPL, Txhdr);

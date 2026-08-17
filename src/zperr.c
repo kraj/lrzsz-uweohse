@@ -48,7 +48,7 @@ zpfatal(const char *fmt, ...)
 
 	if (Verbose<=0)
 		return;
-	fprintf(stderr,"%s: ",program_name);
+	fprintf(stderr,"%s: ",lrzsz_progname);
     va_start(ap, fmt);
     vfprintf(stderr,fmt, ap);
     va_end(ap);

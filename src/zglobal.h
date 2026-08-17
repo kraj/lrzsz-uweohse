@@ -181,6 +181,7 @@ extern int enable_syslog;
 #endif
 
 #include "stats.h"
+#include "util.h"
 
 #define OK 0
 #define FALSE 0
