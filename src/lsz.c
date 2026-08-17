@@ -1187,7 +1187,7 @@ wctx(struct zm_fileinfo *zi)
 		sendline(EOT);
 		flushmo();
 		++attempts;
-	} while ((firstch=(READLINE_PF(Rxtimeout)) != ACK) && attempts < RETRYMAX);
+	} while ((firstch = READLINE_PF(Rxtimeout)) != ACK && attempts < RETRYMAX);
 	if (attempts == RETRYMAX) {
 		zperr(_("No ACK on EOT"));
 		return ERROR;
