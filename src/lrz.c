@@ -1540,7 +1540,7 @@ uncaps(char *s)
 {
 	for ( ; *s; ++s)
 		if (isupper((unsigned char)(*s)))
-			*s = tolower(*s);
+			*s = tolower((unsigned char)(*s));
 }
 /*
  * IsAnyLower returns TRUE if string s has lower case letters.
