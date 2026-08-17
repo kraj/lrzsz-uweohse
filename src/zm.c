@@ -590,6 +590,7 @@ crcfoo:
 				return c;
 			}
 		}
+		if (buf == end) break;
 		*buf++ = c;
 		crc = updcrc(c, crc);
 	}
@@ -656,6 +657,7 @@ crcfoo:
 				return c;
 			}
 		}
+		if (buf == end) break;
 		*buf++ = c;
 		crc = UPDC32(c, crc);
 	}
