@@ -264,7 +264,7 @@ onintr(int n)
 
 int Zctlesc;	/* Encode control characters */
 const char *program_name = "sz";
-int Zrwindow = 1400;	/* RX window size (controls garbage count) */
+unsigned int Zrwindow = 1400;	/* RX window size (controls garbage count) */
 
 #ifdef HAVE_GETOPT_LONG
 static struct option const long_options[] =

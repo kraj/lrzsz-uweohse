@@ -337,7 +337,7 @@ extern unsigned int Rxtimeout;        /* Tenths of seconds to wait for something
 /* Globals used by ZMODEM functions */
 extern int Rxframeind;     /* ZBIN ZBIN32, or ZHEX type of frame received */
 extern int Rxtype;     /* Type of header received */
-extern int Zrwindow;       /* RX window size (controls garbage count) */
+extern unsigned int Zrwindow;       /* RX window size (controls garbage count) */
 /* extern int Rxcount; */       /* Count of data bytes received */
 extern char Rxhdr[4];      /* Received header */
 extern char Txhdr[4];      /* Transmitted header */

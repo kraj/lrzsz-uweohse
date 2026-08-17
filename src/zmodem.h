@@ -127,7 +127,7 @@
 #if 0
 extern int Rxframeind;	/* ZBIN ZBIN32, or ZHEX type of frame received */
 extern int Rxtype;		/* Type of header received */
-extern int Zrwindow;	/* RX window size (controls garbage count) */
+extern unsigned int Zrwindow;	/* RX window size (controls garbage count) */
 extern char Rxhdr[4];	/* Received header */
 extern char Txhdr[4];	/* Transmitted header */
 extern long Txpos;	/* Transmitted file position */

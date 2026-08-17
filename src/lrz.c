@@ -116,7 +116,7 @@ char zconv;		/* ZMODEM file conversion request */
 char zmanag;		/* ZMODEM file management request */
 char ztrans;		/* ZMODEM file transport request */
 int Zctlesc;		/* Encode control characters */
-int Zrwindow = 1400;	/* RX window size (controls garbage count) */
+unsigned int Zrwindow = 1400;	/* RX window size (controls garbage count) */
 
 int tryzhdrtype=ZRINIT;	/* Header type to send corresponding to Last rx close */
 time_t stop_time;
@@ -410,9 +410,9 @@ main(int argc, char *argv[])
 			s_err = xstrtoul (optarg, NULL, 0, &tmp, NULL);
 			if (s_err != LONGINT_OK)
 				STRTOL_FATAL_ERROR (optarg, _("window size"), s_err);
-			if (tmp > INT_MAX)
-				usage(2,_("window size out of range"));
-			Zrwindow = (int)tmp;
+			if (tmp < 1 || tmp > MAX_BLOCK)
+				usage(2,_("window size out of range 1..8192"));
+			Zrwindow = (unsigned int)tmp;
 			break;
 		case 'u':
 			MakeLCPathname=FALSE; break;
