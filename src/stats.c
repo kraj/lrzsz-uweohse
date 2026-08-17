@@ -17,9 +17,7 @@ static FILE *journal_fp = NULL;
 static void
 write_stats_line(FILE *out, struct lrzsz_stat *st, bool forone)
 {
-#ifdef USE_TERMIOS
     struct termios tty;
-#endif
     struct timespec end_timespec;
     double end;
     double dur=-1;
@@ -84,7 +82,6 @@ write_stats_line(FILE *out, struct lrzsz_stat *st, bool forone)
         fprintf(out," brutto-bps=%.3f",(8.0*st->net_bytes_in)/dur);
     }
 
-#ifdef USE_TERMIOS
     if (0==tcgetattr(0,&tty)) {
         int ibaud = getspeed(cfgetispeed(&tty));
         if (0==tcgetattr(1,&tty)) {
@@ -96,7 +93,6 @@ write_stats_line(FILE *out, struct lrzsz_stat *st, bool forone)
             }
         }
     }
-#endif
     fprintf(out,"\n");
 }
 

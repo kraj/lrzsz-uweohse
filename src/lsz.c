@@ -1839,11 +1839,7 @@ zsendfdata (struct zm_fileinfo *zi)
 		 *  rdchk(fdes) returns non 0 if a character is available
 		 */
 		while (rdchk (io_mode_fd)) {
-#ifdef READCHECK_READS
-			switch (checked)
-#else
 			switch (READLINE_PF (1))
-#endif
 			{
 			case CAN:
 			case ZPAD:
@@ -1969,11 +1965,7 @@ zsendfdata (struct zm_fileinfo *zi)
 		 */
 		fflush (stdout);
 		while (rdchk (io_mode_fd)) {
-#ifdef READCHECK_READS
-			switch (checked)
-#else
 			switch (READLINE_PF (1))
-#endif
 			{
 			case CAN:
 			case ZPAD:
