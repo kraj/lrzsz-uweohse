@@ -37,9 +37,6 @@ if test -n "$QUIET" ; then
     ECHO=":"
 fi
 
-#SZBUFSIZE="-B 524288"
-RZBUFSIZE="-B 524288"
-
 SZ="$objdir/src/lsz"
 RZ="$objdir/src/lrz"
 SNIF="$objdir/src/zmodemsnif"
@@ -91,6 +88,10 @@ rm -rf $testdir
 mkdir $testdir
 exec 5>$testdir/error.log
 (mkfifo $testdir/pipe || mknod $testdir/pipe p) 2>&5
+
+runlog=$testdir/run.log
+LRZSZ_JOURNAL=$(pwd)/$testdir/journal.log
+export LRZSZ_JOURNAL
 
 megabyte_binary=$(find /usr/bin/ /usr/lib -size +1100000c -a -size -5000000c |xargs ls -S1 | tail -n1)
 dd if="$megabyte_binary" of="$testdir/megabyte_binary" bs=1024 count=1024 2>&5
@@ -155,6 +156,10 @@ pad=$(( 128 - (sz % 128) ))
 [ $pad -eq 1024 ] && pad=0
 [ $pad -gt 0 ] && dd if=/dev/zero bs=1 count=$pad 2>/dev/null | tr '\0' '\032' >>$po_file_crlf_padded_128
 
+# $$ is the main, not the sub shell
+getpid(){
+    echo $(exec sh -c 'echo "$PPID"')
+}
 doit() {
     doit_key="$1"
     title="$2"
@@ -183,7 +188,6 @@ doit() {
     mkdir $testdir/$doit_key 2>/dev/null
     $ECHO "$doit_key - $title"
     
-
     failed=0
     start=$(date +%s.%N)
     
@@ -191,8 +195,15 @@ doit() {
     if test -n "$ONLY" ; then
         MYSNIF="$SNIF"
     fi
-    ($sz $SZBUFSIZE $files ) <$testdir/pipe | (cd $testdir/$doit_key ; exec $FAULT $MYSNIF strace -vs 16384 -fo /tmp/o1 $rz >>../pipe )
+    if test -n "$NOSNIF" ; then
+        MYSNIF=""
+    fi
+    echo "$doit_key - $title" >>$runlog
+    echo "pid: $$" >>$runlog
+    echo "cmd: ($sz $files ) <$testdir/pipe | (cd $testdir/$doit_key ; exec $FAULT $MYSNIF $rz >>../pipe )" >>$runlog
+    (echo "pid-sender: " $(getpid) >>$runlog ; exec $sz $files ) <$testdir/pipe | (echo "pid-receiver: $(getpid)" >>$runlog ; cd $testdir/$doit_key ; exec $FAULT $MYSNIF $rz >>../pipe )
     end=$(date +%s.%N)
+    echo "cmp: $cmp" >>$runlog
     for doit_i in $files ; do 
             doit_bn=`basename $doit_i`
             if test -f $cmp ; then
@@ -203,50 +214,46 @@ doit() {
                 $cmp $doit_i $testdir/$doit_key/$doit_bn
             fi
             if test $? -eq 0 ; then
+                    echo "filecheck-success: $doit_i" >>$runlog
                     rm -f $testdir/$doit_key/$doit_bn
             else
+                    echo "filecheck-fail: $doit_i" >>$runlog
+                    echo "status:" >>$runlog
                     if test -f $cmp ; then
-                        stat $cmp
+                        stat $cmp >>$runlog
                     else
-                        stat $doit_i
+                        stat $doit_i >>$runlog
                     fi
-                    stat $testdir/$doit_key/$doit_bn
+                    stat $testdir/$doit_key/$doit_bn >>$runlog
                     failed=1
             fi
     done
     if test $failed = 1 ; then 
             rmdir $testdir/$doit_key 2>&5
             echo "$doit_key FAILED"
-            echo "---- see $testdir/passfail.log for more information"
-            echo "$doit_key FAILED" >>$testdir/failures.log
-            echo "$doit_key FAILED" >>$testdir/passfail.log
+            echo "---- see $testdir/run.log for more information"
+            echo "summary: $doit_key FAILED" >>$runlog
+            echo "summary: $doit_key FAILED" >>$testdir/failures.log
             any_failure="$any_failure $doit_key"
-            echo "-- debug information:" >>$testdir/passfail.log
-            echo "-- sender: $sz" >>$testdir/passfail.log
-            echo "-- receiver: $rz" >>$testdir/passfail.log
-            echo "-- cmp: $cmp" >>$testdir/passfail.log
-            if test -f "$cmp" ; then
-                echo "-- cmp stat:" >>$testdir/passfail.log
-            fi
-            echo -n "---- transferring" >>$testdir/passfail.log
-            for doit_i in $files ; do 
-                echo -n " " $(basename $doit_i) >>$testdir/passfail.log
-            done
-            echo >>$testdir/passfail.log
+            echo "sender: $sz" >>$runlog
+            echo "receiver: $sz" >>$runlog
     else
             rm -rf $testdir/$doit_key 2>&5
             $ECHO "$doit_key PASSED"
-            echo "$doit_key PASSED" >>$testdir/passfail.log
+            echo "summary: $doit_key PASSED" >>$runlog
             bytes=0
             for doit_t in $files ; do
-                bytes=$(expr $bytes + $(stat --format='%s' $doit_t))
+                # wc, because stat -f is not portable (OpenBSD, i greet you. And i hate you).
+                bytes=$(expr $bytes + $(wc -c <$doit_t))
             done
             dur=$(echo "$end - $start" | bc)
             durshort=$(echo "scale=3; $end - $start" | bc)
             bps=$(echo "scale=2; $bytes / $dur" | bc)
             mbps=$(echo "scale=2; $bps / 1000000.0" | bc)
             echo "$bps byte/sec ($mbps MB/s): $doit_key, $bytes bytes transmitted in $durshort seconds" >>$testdir/perf.log
+            echo "$bps byte/sec ($mbps MB/s): $doit_key, $bytes bytes transmitted in $durshort seconds" >>$runlog
     fi
+    echo >>$runlog
 }
 resume_cmp() {
     if cmp "$1" "$2" >&5 ; then
@@ -445,6 +452,12 @@ compat_traits() {
     can_escctl=""
     s_16bit_crc_opt=""
     r_can_16bit_crc=""
+    TEST_SZ=""
+    TEST_SB=""
+    TEST_SX=""
+    TEST_RZ=""
+    TEST_RB=""
+    TEST_RX=""
 
     case "$other" in 
     self)
@@ -708,490 +721,36 @@ ycompat() {
         fi
     done
 }
-
-
-echo "mode=$mode"
-if test "$mode" = all -o "$mode" = xerrors -o "$mode" = "errors"; then
-    xerrors
-fi
-if test "$mode" = all -o "$mode" = yerrors -o "$mode" = "errors"; then
-    yerrors
-fi
-if test "$mode" = all -o "$mode" = zerrors -o "$mode" = "errors"; then
-    zerrors
-fi
-if test "$mode" = all -o "$mode" = xcompat -o "$mode" = "compat"; then
-    xcompat
-fi
-if test "$mode" = all -o "$mode" = ycompat -o "$mode" = "compat"; then
-    ycompat
-fi
-
-
-
-if test -s "$testdir/failures.log" ; then
-    echo "Some tests failed. See $testdir/failures.log"
-    exit 1
-fi
-echo "All primary tests passed.\n";
-
-if test "$mode" = all -o "$mode" = abuse ; then
-    if test -z "$ONLY" ; then
-	echo "going to tests misuse. Errors are ok, hangs are not!"
-
-	echo "both sides sending:"
-	$SZ -q $z_test_files <$testdir/pipe | \
-		($SZ -q $z_test_files >>$testdir/pipe )
-
-	echo "both sides receiving:"
-	$RZ -q <$testdir/pipe | \
-		( $RZ -q >>$testdir/pipe )
+zcompat() {
+    available="self"
+    if test -x ~/bin/lrzsz-0.12.21rc/lrz -a -x ~/bin/lrzsz-0.12.21rc/lsz ; then
+        available="$available lrzsz-0.12.21rc"
     fi
-fi
-echo "All tests passed.\n";
-exit 0
-
-available="self"
-if test -x ~/bin/lrzsz-0.12.21rc/lrz -a -x ~/bin/lrzsz-0.12.21rc/lsz ; then
-    available="$available lrzsz-0.12.21rc"
-fi
-if test -x ~/bin/crzsz/crz -a -x ~/bin/crzsz/csz ; then
-    available="$available crzsz"
-fi
-if test -x ~/bin/zmtx -a -x ~/bin/zmrx ; then
-    available="$available zmtx-zmrx"
-fi
-if test -x ~/bin/sexyz ; then
-    available="$available sexyz"
-fi
-for other in $available; do
-    s_framelen_opt=""
-    s_4k_opt=""
-    s_8k_opt=""
-    s_turno_opt=""
-    r_error_opt=""
-    r_ymodem_opt=""
-    s_ymodem_opt=""
-    r_xmodem_opt=""
-    s_xmodem_opt=""
-    r_xmodem_crc_opt=""
-    r_can_xmodem_1k=""
-    s_1k_opt=""
-    r_ascii_opt="" 
-    s_ascii_opt="" 
-    r_binary_opt="" 
-    r_resume_opt="" 
-    s_resume_opt="" 
-    s_append_opt="" 
-    s_rename_opt="" 
-    r_rename_opt="" 
-    r_can_rename=""
-    s_can_rename=""
-    s_can_resume=""
-    r_can_4k=""
-    r_can_8k=""
-    can_escctl=""
-    s_16bit_crc_opt=""
-    r_can_16bit_crc=""
-
-    case "$other" in 
-    self)
-        TEST_SZ="$SZ -q"
-        TEST_SB="$SZ -q -g"
-        TEST_SX="$SZ -q -X"
-        TEST_RZ="$RZ -q"
-        TEST_RB="$RZ -q -g"
-        TEST_RX="$RZ -q -X"
-        s_framelen_opt=-l
-        r_error_opt="-F" # lrzsz lrz option to create errors, short form
-        r_ymodem_opt="-g" 
-        s_ymodem_opt="-g" 
-        r_xmodem_opt="-X" 
-        s_xmodem_opt="-X" 
-        r_xmodem_crc_opt="-c"
-        r_can_xmodem_1k="yes"
-        s_1k_opt="-k"
-        r_ascii_opt="-a" 
-        s_ascii_opt="-a" 
-        r_binary_opt="-b" 
-        r_resume_opt="-r" 
-        s_resume_opt="-r" 
-        s_append_opt="-+" 
-        s_rename_opt="-E" 
-        r_rename_opt="-E" 
-        r_can_rename=yes
-        s_can_rename=yes
-        s_can_resume=yes
-        r_can_4k="yes"
-        r_can_8k="yes"
-        otherrz="lrz"
-        othersz="lsz"
-        can_escctl="yes"
-        s_16bit_crc_opt="-o"
-        r_can_16bit_crc="yes"
-        ;;
-    lrzsz-0.12.21rc)
-        TEST_SZ=~/bin/lrzsz-0.12.21rc/lsz" -q"
-        TEST_SX=~/bin/lrzsz-0.12.21rc/lsz" -q --xmodem"
-        TEST_SB=~/bin/lrzsz-0.12.21rc/lsz" -q --ymodem"
-        TEST_RZ=~/bin/lrzsz-0.12.21rc/lrz" -q "
-        TEST_RX=~/bin/lrzsz-0.12.21rc/lrz" -q --xmodem"
-        TEST_RB=~/bin/lrzsz-0.12.21rc/lrz" -q --ymodem"
-        s_framelen_opt=-l
-        s_4k_opt="-4"
-        s_8k_opt="-8"
-        s_turno_opt="-T"
-        r_error_opt="--errors" #lrzsz lrz option to create errors
-        r_ymodem_opt="--ymodem"
-        s_ymodem_opt="--ymodem"
-        r_xmodem_opt="--xmodem"
-        s_xmodem_opt="--xmodem"
-        r_xmodem_crc_opt="-c"
-        r_can_xmodem_1k="yes"
-        s_1k_opt="-k"
-        r_ascii_opt="-a" 
-        s_ascii_opt="-a" 
-        r_binary_opt="-b" 
-        r_resume_opt="-r" 
-        s_resume_opt="-r" 
-        s_append_opt="-+" 
-        s_rename_opt="-E" 
-        r_rename_opt="-E" 
-        r_can_rename=yes
-        s_can_rename=yes
-        s_can_resume=yes
-        r_can_4k="yes"
-        r_can_8k="yes"
-        can_escctl="yes"
-        otherrz="lrz(0.12.21rc)"
-        othersz="lsz(0.12.21rc)"
-        s_16bit_crc_opt="-o"
-        r_can_16bit_crc="yes"
-        ;;
-
-    sexyz)
-        TEST_SZ=~/bin/sexyz" sz"
-        TEST_RZ=~/bin/sexyz" rz"
-        TEST_SX=~/bin/sexyz" sx"
-        TEST_RX=~/bin/sexyz" rx"
-        TEST_SB=~/bin/sexyz" sy"
-        TEST_RB=~/bin/sexyz" ry"
-        otherrz="sexyz"
-        othersz="sexyz"
-        s_1k_opt="-k"
-        r_can_4k="yes"
-        r_can_8k="yes"
-        s_4k_opt="-4"
-        s_8k_opt="-8"
-        ;;
-        
-    crzsz)
-        TEST_SZ=~/bin/crzsz/csz # no -q option
-        TEST_SB=~/bin/crzsz/csb # no -q option
-        TEST_SX=~/bin/crzsz/csx # no -q option
-        TEST_RZ=~/bin/crzsz/crz
-        TEST_RB=~/bin/crzsz/crb
-        TEST_RX=~/bin/crzsz/crx
-        otherrz="crz"
-        othersz="csz"
-        s_can_resume=yes
-        can_escctl="yes"
-        s_16bit_crc_opt="-o"
-        r_can_16bit_crc="yes"
-        s_1k_opt="-k"
-        ;;
-    zmtx-zmrx)
-        TEST_SZ=~/bin/zmtx # no -q option
-        TEST_RZ=~/bin/zmrx" -q"
-        otherrz="zmrx"
-        othersz="zmtx"
-        r_can_4k="yes"
-        r_can_8k="yes"
-        r_4k_opt="-q"
-        #s_can_resume=  : ZCRC is not implemented.
-        #can_escapectl= : ZESCCTL is not implemented
-        ;;
-    esac
-
-
-    # start with the xmodem tests
-    if test "$mode" = all -o "$mode" = x ; then
-        if test -n "$r_xmodem_opt" ; then
-            bn=$(basename $all_256_file)
-            test -n "$r_binary_opt" && \
-                doit "xmodem-lsz-$otherrz-small-binary" "lsz sending to $otherrz" "$SZ -q -X" "$TEST_RX $r_binary_opt $bn" cmp "$all_256_file" 
-            bn=$(basename $binary_16k)
-            test -n "$r_binary_opt" && \
-                doit "xmodem-lsz-$otherrz-16k-binary" "lsz sending to $otherrz" "$SZ -q -X" "$TEST_RX $r_binary_opt $bn" cmp "$binary_16k" 
-            test -n "$r_binary_opt" && test -n "$r_xmodem_crc_opt" && \
-                doit "xmodem-lsz-$otherrz-16k-binary-crc" "lsz sending to $otherrz" "$SZ -q -X" "$TEST_RX $r_xmodem_crc_opt $r_binary_opt $bn" cmp "$binary_16k" 
-
-            bn=$(basename $large_binary_file)
-            test -n "$r_binary_opt" && test -n "$r_can_xmodem_1k" && \
-                doit "xmodem-lsz-$otherrz-large-binary-1k" "lsz sending to $otherrz" "$SZ -q -X -k" "$TEST_RX $r_binary_opt $bn" cmp "$large_binary_file" 
-            test -n "$r_binary_opt" && test -n "$r_can_xmodem_1k" && test -n "$r_xmodem_crc_opt" && \
-                doit "xmodem-lsz-$otherrz-large-binary-1k-crc" "lsz sending to $otherrz" "$SZ -q -X -k" "$TEST_RX $r_xmodem_crc_opt $r_binary_opt $bn" cmp "$large_binary_file" 
-            bn=$(basename $megabyte_binary)
-            test -n "$r_binary_opt" && test -n "$r_can_xmodem_1k" && test -n "$r_xmodem_crc_opt" && \
-                doit "xmodem-lsz-$otherrz-megabyte-binary-1k-crc" "lsz sending to $otherrz" "$SZ -q -X -k" "$TEST_RX $r_xmodem_crc_opt $r_binary_opt $bn" cmp "$megabyte_binary" 
-
-            bn=$(basename $nocontrols_file)
-            test -n "$r_ascii_opt" && \
-                doit "xmodem-lsz-$otherrz-small-ascii" "lsz sending to $otherrz" "$SZ -q -X" "$TEST_RX $r_ascii_opt $bn" cmp "$nocontrols_file" 
-            bn=$(basename $po_file)
-            test -n "$r_ascii_opt" && \
-                doit "xmodem-lsz-$otherrz-medium-ascii" "lsz sending to $otherrz" "$SZ -q -X" "$TEST_RX  $r_ascii_opt $bn" cmp "$po_file" 
-            test -n "$r_ascii_opt" && test -n "$r_xmodem_crc_opt" && \
-                doit "xmodem-lsz-$otherrz-medium-ascii-crc" "lsz sending to $otherrz" "$SZ -q -X" "$TEST_RX $r_xmodem_crc_opt $r_ascii_opt $bn" cmp "$po_file" 
-            test -n "$r_ascii_opt" && test -n "$r_can_xmodem_1k" && \
-                doit "xmodem-lsz-$otherrz-medium-ascii-1k" "lsz sending to $otherrz" "$SZ -k -q -X" "$TEST_RX $r_ascii_opt $bn" cmp "$po_file" 
-            test -n "$r_ascii_opt" && test -n "$r_xmodem_crc_opt" && test -n "$r_can_xmodem_1k" && \
-                doit "xmodem-lsz-$otherrz-medium-ascii-1k-crc" "lsz sending to $otherrz" "$SZ -q -k -X" "$TEST_RX $r_xmodem_crc_opt $r_ascii_opt $bn" cmp "$po_file" 
-
-            # sender -a option: \n => \r\n. because, well, featuritis?
-            # problem: rz -a removes the \r again. rz -b adds ^Zs. so we use a padded comparison file.
-            if test -n "$r_binary_opt"; then
-                bn=$(basename $po_file)
-                doit "xmodem-lsz-$otherrz-medium-crlf" "lsz sending to $otherrz" "$SZ -a -q -X" "$TEST_RX $r_binary_opt $bn" "$po_file_crlf_padded_128" "$po_file" 
-            fi
-
-        fi
-
-
-        if test "$other" != "self" -a -n "$TEST_SX"; then
-            bn=$(basename $all_256_file)
-            doit "xmodem-$othersz-lrz-small-binary" "XMODEM: small binary transfer: $othersz sending to lrz" "$TEST_SX -b" "$RZ -q -X -b $bn" cmp "$all_256_file" 
-
-            bn=$(basename $binary_16k)
-            doit "xmodem-$othersz-lrz-16k-binary" "XMODEM: 16k binary transfer: $otherrz sending to lrz" "$TEST_SX" "$RZ -q -X -b  $bn" cmp "$binary_16k" 
-            doit "xmodem-$othersz-lrz-16k-binary-crc" "XMODEM/CRC: 16k binary transfer: $otherrz sending to lrz" "$TEST_SX" "$RZ -q -X -b -c  $bn" cmp "$binary_16k" 
-
-            bn=$(basename $large_binary_file)
-            test -n "$s_1k_opt" && \
-                doit "xmodem-$othersz-lrz-large-binary-1k" "XMODEM/1k: large binary transfer: $otherrz sending to lrz" "$TEST_SX $s_1k_opt" "$RZ -q -X -b $bn" cmp "$large_binary_file" 
-            test -n "$s_1k_opt" && \
-                doit "xmodem-$othersz-lrz-large-binary-1k-crc" "XMODEM/1k/CRC: large binary transfer: $otherrz sending to lrz" "$TEST_SX $s_1k_opt" "$RZ -q -X -b -c $bn" cmp "$large_binary_file" 
-            bn=$(basename $megabyte_binary)
-            test -n "$s_1k_opt" && \
-                doit "xmodem-$othersz-lrz-megabyte-binary-1k-crc" "XMODEM/1k/CRC: megabyte binary transfer: $otherrz sending to lrz" "$TEST_SX $s_1k_opt" "$RZ -q -X -b -c $bn" cmp "$megabyte_binary" 
-
-            bn=$(basename $nocontrols_file)
-            doit "xmodem-$othersz-lrz-small-ascii" "XMODEM: small ascii transfer: $otherrz sending to lrz" "$TEST_SX" "$RZ -q -X -a $bn" cmp "$nocontrols_file" 
-            bn=$(basename $po_file)
-            doit "xmodem-$othersz-lrz-medium-ascii" "XMODEM: medium ascii transfer: $otherrz sending to lrz" "$TEST_SX" "$RZ -q -X -a $bn" cmp "$po_file" 
-            doit "xmodem-$othersz-lrz-medium-ascii-crc" "XMODEM/CRC: medium ascii transfer: $otherrz sending to lrz" "$TEST_SX" "$RZ -q -X -c -a $bn" cmp "$po_file" 
-
-            bn=$(basename $po_file)
-            test -n "$s_1k_opt" && \
-                doit "xmodem-$othersz-lrz-medium-ascii-1k" "XMODEM/1k: medium ascii transfer: $otherrz sending to lrz" "$TEST_SX $s_1k_opt" "$RZ -q -X -a $bn" cmp "$po_file" 
-            test -n "$s_1k_opt" && \
-                doit "xmodem-$othersz-lrz-medium-ascii-1k-crc" "XMODEM/1k/CRC: medium ascii transfer: $otherrz sending to lrz" "$TEST_SX $s_1k_opt" "$RZ -q -X -c -a $bn" cmp "$po_file" 
-
-            bn=$(basename $po_file)
-            test -n "$s_ascii_opt" && \
-                doit "xmodem-$othersz-lrz-medium-crlf" "XMODEM CR/LF conversion: medium ascii transfer: $otherrz sending to lrz" "$TEST_SX $s_ascii_opt" "$RZ -q -X -b $bn" "$po_file_crlf_padded_128" "$po_file" 
-        fi
+    if test -x ~/bin/crzsz/crz -a -x ~/bin/crzsz/csz ; then
+        available="$available crzsz"
     fi
-    if test "$mode" = all -o "$mode" = y ; then
-            test -n "$r_ymodem_opt" && doit "ymodem-lsz-$otherrz-basic" "YMODEM: lsz sending to $other ($TEST_RZ)" "$SZ -q -g" "$TEST_RZ $r_ymodem_opt" cmp "$y_test_files" 
-            if test "$other" != "self" ; then
-                test -n "$s_ymodem_opt" && doit "ymodem-$othersz-lrz-basic" "YMODEM: $othersz sending to lrz" "$TEST_SZ $s_ymodem_opt" "$RZ -q -g" cmp "$y_test_files" 
-            fi
+    if test -x ~/bin/zmtx -a -x ~/bin/zmrx ; then
+        available="$available zmtx-zmrx"
     fi
-    # zmodem management options.
-    # this is deliberatly limited to lrzsz alone.
-    # - zmtx only implements newer, clobber and protect.
-    # - crzsz implements most or all, but crz doesn't have options for them (csz has).
-    # i decided against testing against other zmodems here, because
-    # a) interoperability shouldn't be a problem (all these are just header flags)
-    # b) i would need three flags (in the already long list above) per management option:
-    # -- "senders XXX option."
-    # -- "receivers XXX option."
-    # -- "receiver can handle XXX, if the sender initializes it."
-    #    multiply that by CRC, NEW, NEWL, APND, CLOB, DIFF, PROT, CHNG…
-    # c) i'd bet there are logical differences in the implementations.
-    # notes:
-    # - ZMDIFF isn't implemented anywhere.
-    # - ZMCRC has to be tested as part of the resume handling, too.
-    if test "$mode" = all -o "$mode" = z ; then
-        if test "$other" = "self" ; then
-            # first check the defaults
-            # - lrz does create a not existing target.
-            # - lrz does NOT overwrite an existing file without a ZMCLOB
-            key="zmodem-lsz-$otherrz-MGMT-default-nonexisting"
-            doit "$key" "lsz sending to $otherrz does create file" "$SZ -q" "$TEST_RZ" "$testdir/$key/all256.bin" $all_256_file
-
-            # check the opposite: a file of the same name and the same size is not overwritten
-            key="zmodem-lsz-$otherrz-MGMT-default-existing"
-            mkdir "$testdir/$key"
-            cp $all_256_file $testdir/$key/16k.bin # this one is smaller
-            touch -d 2001-02-03T04:05:06.07 $testdir/16k.bin # this one is old.
-            cp $testdir/$key/16k.bin $testdir/$key/cmp
-            doit "$key" "lsz sending to $otherrz does not overwrite existing file" "$SZ -q" "$TEST_RZ" "$testdir/$key/cmp" $binary_16k
-
-            #
-            # test ZMNEW (5), ZMNEWL (1)
-            # ZMNEWL is only partially tested (size), as it falls through to ZMNEW.
-            #
-            key="zmodem-lsz-$otherrz-MGMT-ZMNEW-fail-s"
-            mkdir "$testdir/$key"
-            cp $all_256_file $testdir/$key/test.bin
-            cp $binary_16k $testdir/test.bin
-            touch -d 2001-02-03T04:05:06.07 $testdir/test.bin # this one is old.
-            doit "$key" "lsz sending to $otherrz fails (sender initialized)" "$SZ -q -n" "$TEST_RZ" $all_256_file "$testdir/test.bin" 
-
-            key="zmodem-lsz-$otherrz-MGMT-ZMNEW-success-s"
-            mkdir "$testdir/$key"
-            cp $all_256_file $testdir/$key/test.bin
-            touch -d 2001-02-03T04:05:06.07 $testdir/$key/test.bin # this one is old.
-            cp $binary_16k $testdir/test.bin
-            doit "$key" "lsz sending to $otherrz succeeds (sender initialized)" "$SZ -q -n" "$TEST_RZ" $binary_16k "$testdir/test.bin" 
-
-            key="zmodem-lsz-$otherrz-MGMT-ZMNEWL-succes-s"
-            mkdir "$testdir/$key"
-            cp $all_256_file $testdir/$key/test.bin
-            cp $binary_16k $testdir/test.bin
-            touch -d 2001-02-03T04:05:06.07 $testdir/test.bin # this one is old.
-            doit "$key" "lsz sending to $otherrz succeeds (sender initialized)" "$SZ -q -N" "$TEST_RZ" $binary_16k "$testdir/test.bin" 
-
-            key="zmodem-lsz-$otherrz-MGMT-ZMNEW-fail-r"
-            mkdir "$testdir/$key"
-            cp $all_256_file $testdir/$key/test.bin
-            cp $binary_16k $testdir/test.bin
-            touch -d 2001-02-03T04:05:06.07 $testdir/test.bin # this one is old.
-            doit "$key" "lsz sending to $otherrz fails (receiver initialized)" "$SZ -q" "$TEST_RZ -n" $all_256_file "$testdir/test.bin" 
-
-            key="zmodem-lsz-$otherrz-MGMT-ZMNEW-success-r"
-            mkdir "$testdir/$key"
-            cp $all_256_file $testdir/$key/test.bin
-            touch -d 2001-02-03T04:05:06.07 $testdir/$key/test.bin # this one is old.
-            cp $binary_16k $testdir/test.bin
-            doit "$key" "lsz sending to $otherrz succeeds (receiver initialized)" "$SZ -q" "$TEST_RZ -n" $binary_16k "$testdir/test.bin" 
-
-            key="zmodem-lsz-$otherrz-MGMT-ZMNEWL-success-r"
-            mkdir "$testdir/$key"
-            cp $all_256_file $testdir/$key/test.bin
-            cp $binary_16k $testdir/test.bin
-            touch -d 2001-02-03T04:05:06.07 $testdir/test.bin # this one is old, but longer
-            doit "$key" "lsz sending to $otherrz fails (receiver initialized)" "$SZ -q" "$TEST_RZ -N" $binary_16k "$testdir/test.bin" 
-
-            #
-            # ZMCRC (2)
-            #
-
-            # first we check that lrz without -H somewhere does keep the modified file.
-            key="zmodem-lsz-$otherrz-MGMT-noZMCRC-s"
-            mkdir "$testdir/$key"
-            cp $all_256_file $testdir/$key/
-            printf '\x41' | dd of=$testdir/$key/all256.bin bs=1 seek=32 conv=notrunc 2>&5
-            cp $testdir/$key/all256.bin $testdir/$key/cmp
-            doit "$key" "lsz sending to $otherrz does not overwrite (sender initialized)" "$SZ -q" "$TEST_RZ" "$testdir/$key/cmp" $all_256_file
-
-            key="zmodem-lsz-$otherrz-MGMT-ZMCRC-s"
-            mkdir "$testdir/$key"
-            cp $all_256_file $testdir/$key/
-            printf '\x41' | dd of=$testdir/$key/all256.bin bs=1 seek=32 conv=notrunc 2>&5
-            doit "$key" "lsz sending to $otherrz overwrites (sender initialized)" "$SZ -qH" "$TEST_RZ" cmp $all_256_file
-
-            key="zmodem-lsz-$otherrz-MGMT-ZMCRC-r"
-            mkdir "$testdir/$key"
-            cp $all_256_file $testdir/$key/
-            printf '\x41' | dd of=$testdir/$key/all256.bin bs=1 seek=32 conv=notrunc 2>&5
-            doit "$key" "lsz sending to $otherrz overwrites (receiver initialized)" "$SZ -q" "$TEST_RZ -H" cmp $all_256_file
-
-            #
-            # ZMAPND (3)
-            # receiver appends to the target, if it exists
-            # the doc does not specify if the target shall be created if it doesn't exists,
-            # but in practice it is (the 1988s code changed the fopen mode from "w" to "a", and omen also does this).
-            #
-            key="zmodem-lsz-$otherrz-MGMT-ZMAPND-s"
-            mkdir $testdir/$key 2>/dev/null|| true
-            cp $srcdir/src/Makefile.in $testdir/$key/lsz.c
-            cat $srcdir/src/Makefile.in $srcdir/src/lsz.c >>$testdir/$key/cmp
-            doit "$key" "ZMODEM/MGMT/ZMAPND: lsz sending to $other" "$SZ -q -+" "$TEST_RZ" "$testdir/$key/cmp" $srcdir/src/lsz.c 
-
-            key="zmodem-lsz-$otherrz-MGMT-ZMAPND-r"
-            mkdir $testdir/$key 2>/dev/null|| true
-            cp $srcdir/src/Makefile.in $testdir/$key/lsz.c
-            cat $srcdir/src/Makefile.in $srcdir/src/lsz.c >>$testdir/$key/cmp
-            doit "$key" "ZMODEM/MGMT/ZMAPND: $othersz sending to lrz" "$TEST_SZ" "$RZ -q -+" "$testdir/$key/cmp" $srcdir/src/lsz.c 
-
-            #
-            # ZMCLOB (4)
-            # we check in the ZMCRC test that the file would normally be skipped.
-            #
-            key="zmodem-lsz-$otherrz-MGMT-ZMCLOB-s"
-            mkdir "$testdir/$key"
-            printf '\x41' | dd of=$testdir/$key/all256.bin bs=1 seek=32 conv=notrunc 2>&5
-            doit "$key" "lsz -y sending to $otherrz (sender initialized)" "$SZ -q -y" "$TEST_RZ" "$all_256_file" $all_256_file
-
-            key="zmodem-lsz-$otherrz-MGMT-ZMCLOB-r"
-            mkdir "$testdir/$key"
-            printf '\x41' | dd of=$testdir/$key/all256.bin bs=1 seek=32 conv=notrunc 2>&5
-            doit "$key" "lsz sending to $otherrz -y (receiver initialized)" "$SZ -q" "$TEST_RZ -y" "$all_256_file" $all_256_file
-
-            #
-            # ZMDIFF (6)
-            #   Transfer file if destination file absent.  Otherwise, transfer file 
-            #   overwriting destination if files have different lengths or dates. 
-            # This is not implemented anywhere, not even in crzsz
-            #
-
-            #
-            # ZMPROT (7)
-            #
-            key="zmodem-lsz-$otherrz-MGMT-ZMPROT-s"
-            mkdir "$testdir/$key"
-            touch $testdir/$key/all256.bin
-            touch $testdir/$key/null
-            doit "$key" "lsz sending to $otherrz (sender initialized)" "$SZ -q -p" "$TEST_RZ" "$testdir/$key/null" $all_256_file
-            key="zmodem-lsz-$otherrz-MGMT-ZMPROT-r"
-            mkdir "$testdir/$key"
-            touch $testdir/$key/all256.bin
-            touch $testdir/$key/null
-            doit "$key" "lsz sending to $otherrz (receiver initialized)" "$SZ -q" "$TEST_RZ -p" "$testdir/$key/null" $all_256_file
-
-            #
-            # ZMCHNG (8)
-            #
-            key="zmodem-lsz-$otherrz-MGMT-ZMCHNG-s"
-            mkdir "$testdir/$key"
-            cp $all_256_file $testdir/$key/
-            doit "$key" "lsz sending to $otherrz (sender initialized)" "$SZ -q -E" "$TEST_RZ" "$testdir/$key/all256.bin.0" $all_256_file
-            key="zmodem-lsz-$otherrz-MGMT-ZMCHNG-r"
-            mkdir "$testdir/$key"
-            cp $all_256_file $testdir/$key/
-            doit "$key" "lsz sending to $otherrz (received initialized)" "$SZ -q" "$TEST_RZ -E" "$testdir/$key/all256.bin.0" $all_256_file
-
-            # there also is this:
-            # define ZF1_ZMSKNOLOC   0x80 /* Skip file if not present at rx */ (alternatively written as ZF1ZMSKNOLOC)
-            # lrzsz sets this if lsz is given the -Y (overwrite or skip) option.
-            key="zmodem-lsz-$otherrz-MGMT-ZMSKNOLOC-nonexisting"
-            doit "$key" "lsz sending to $otherrz does not create file" "$SZ -q -Y" "$TEST_RZ" "missing" $all_256_file
-
-            key="zmodem-lsz-$otherrz-MGMT-ZMSKNOLOC-existing"
-            mkdir "$testdir/$key"
-            touch $testdir/$key/all256.bin
-            doit "$key" "lsz sending to $otherrz does not create file" "$SZ -q -Y" "$TEST_RZ" "$all_256_file" $all_256_file
-
-        fi
+    if test -x ~/bin/sexyz ; then
+        available="$available sexyz"
     fi
-    if test "$mode" = all -o "$mode" = z ; then
-        doit "zmodem-lsz-$otherrz-multiple" "lsz sending multiple files to $otherrz" "$SZ -q" "$TEST_RZ" cmp "$z_test_files" 
-        doit "zmodem-lsz-$otherrz-framelen-512" "lsz sending with framelen 512 to $otherrz" "$SZ -q -l 512" "$TEST_RZ" cmp "$z_test_files" 
-        doit "zmodem-lsz-$otherrz-framelen-128" "lsz sending with framelen 256 to $otherrz" "$SZ -q -l 128" "$TEST_RZ" cmp "$z_test_files" 
-        test -n "$r_can_4k" && doit "zmodem-lsz-$otherrz-4k" "lsz tries to send 4k blocks to $otherrz" "$SZ -q -4" "$TEST_RZ" cmp "$z_test_files" 
-        test -n "$r_can_4k" && doit "zmodem-lsz-$otherrz-4kstart" "lsz starts to send 4k blocks to $otherrz" "$SZ -q -5" "$TEST_RZ" cmp "$z_test_files" 
-        test -n "$r_can_8k" && doit "zmodem-lsz-$otherrz-8k" "lsz tries to send 8k blocks to $otherrz" "$SZ -q -8" "$TEST_RZ" cmp "$z8_test_files" 
-        test -n "$r_can_8k" && doit "zmodem-lsz-$otherrz-8kstart" "lsz starts to send 8k blocks to $otherrz" "$SZ -q -9" "$TEST_RZ" cmp "$z8_test_files" 
-        doit "zmodem-lsz-$otherrz-turbo" "lsz sending with turbo escaping to $otherrz" "$SZ -qT" "$TEST_RZ" cmp "$z_test_files" 
-        test -n "$r_can_8k" && doit "zmodem-lsz-$otherrz-8k-turbo" "lsz tries to send 4k block with turbo escaping to $otherrz" "$SZ -qT -8" "$TEST_RZ" cmp "$z8_test_files" 
-        test -n "$r_error_opt" && doit "zmodem-lsz-$otherrz-errors-7777" "lsz sending to $otherrz on a very faulty line" "$SZ -qT" "$TEST_RZ $r_error_opt 7777" cmp "$z_test_files" 
-        test -n "$r_error_opt" && doit "zmodem-lsz-$otherrz-errors-11111" "lsz sending to $otherrz on a faulty line" "$SZ -qT" "$TEST_RZ $r_error_opt 11111" cmp "$z_test_files" 
-        test -n "$r_error_opt" && doit "zmodem-lsz-$otherrz-errors-33333" "lsz sending to $otherrz on a less faulty line" "$SZ -qT" "$TEST_RZ $r_error_opt 33333" cmp "$z_test_files" 
-        test -n "$can_escctl" && doit "zmodem-lsz-$otherrz-escape-s" "lsz sending with escaped control chars to $otherrz (sender initiated)" "$SZ -q -e" "$TEST_RZ" cmp "$z_test_files" 
-        test -n "$r_can_16bit_crc" && doit "zmodem-lsz-$otherrz-crc16" "lsz sending with CRC16 to $otherrz" "$SZ -q -o" "$TEST_RZ" cmp "$z_test_files" 
+    for other in $available; do
+        compat_traits "$other"
+        # we also assume that all programs transfer binary by default. rzsz and descendants do, and to do something else would be stupid.
+        # we also do NO ascii tests. ASCII conversion should die, die, die. We will test it in lrzsz specific test, though
+        all_binaries="$all_256_file $binary_4k $binary_16k $binary_128k $binary_256k $megabyte_binary"
+        doit "zmodem-lsz-$otherrz-multiple" "lsz sending multiple files to $otherrz" "$SZ -q" "$TEST_RZ" cmp "$all_binaries" 
+        doit "zmodem-lsz-$otherrz-framelen-512" "lsz sending with framelen 512 to $otherrz" "$SZ -q -l 512" "$TEST_RZ" cmp "$all_binaries" 
+        doit "zmodem-lsz-$otherrz-framelen-128" "lsz sending with framelen 256 to $otherrz" "$SZ -q -l 128" "$TEST_RZ" cmp "$all_binaries" 
+        test -n "$r_can_4k" && doit "zmodem-lsz-$otherrz-4k" "lsz tries to send 4k blocks to $otherrz" "$SZ -q -4" "$TEST_RZ" cmp "$all_binaries" 
+        test -n "$r_can_4k" && doit "zmodem-lsz-$otherrz-4kstart" "lsz starts to send 4k blocks to $otherrz" "$SZ -q -5" "$TEST_RZ" cmp "$all_binaries" 
+        test -n "$r_can_8k" && doit "zmodem-lsz-$otherrz-8k" "lsz tries to send 8k blocks to $otherrz" "$SZ -q -8" "$TEST_RZ" cmp "$all_binaries" 
+        test -n "$r_can_8k" && doit "zmodem-lsz-$otherrz-8kstart" "lsz starts to send 8k blocks to $otherrz" "$SZ -q -9" "$TEST_RZ" cmp "$all_binaries" 
+        doit "zmodem-lsz-$otherrz-turbo" "lsz sending with turbo escaping to $otherrz" "$SZ -qT" "$TEST_RZ" cmp "$all_binaries" 
+        test -n "$r_can_8k" && doit "zmodem-lsz-$otherrz-8k-turbo" "lsz tries to send 4k block with turbo escaping to $otherrz" "$SZ -qT -8" "$TEST_RZ" cmp "$all_binaries" 
+        test -n "$can_escctl" && doit "zmodem-lsz-$otherrz-escape-s" "lsz sending with escaped control chars to $otherrz (sender initiated)" "$SZ -q -e" "$TEST_RZ" cmp "$all_binaries" 
+        test -n "$r_can_16bit_crc" && doit "zmodem-lsz-$otherrz-crc16" "lsz sending with CRC16 to $otherrz" "$SZ -q -o" "$TEST_RZ" cmp "$all_binaries" 
         if test -n "$s_resume_opt" ; then
             key="zmodem-lsz-$otherrz-RESUME-s"
             mkdir $testdir/$key 2>/dev/null|| true
@@ -1215,21 +774,17 @@ for other in $available; do
             doit "$key" "lsz sending to $other (resuming)" "$SZ -q" "$TEST_RZ $r_resume_opt" resume_cmp $srcdir/src/lsz.c 
             # could check against the receivers CRC options - but why should i check them?
         fi
-
         if test "$other" != "self" ; then
-            doit "zmodem-$othersz-lrz-multiple" "$othersz sending multiple files to lrz" "$TEST_SZ" "$RZ -q" cmp "$z_test_files" 
-            test "$s_opt_framelen" = 1 && doit "zmodem-$othersz-lrz-framelen-512" "$othersz sending with framelen 512 to lrz" "$TEST_SZ $s_opt_framelen 512" "$RZ -q" cmp "$z_test_files" 
-            test "$s_opt_framelen" = 1 && doit "zmodem-$othersz-lrz-framelen-128" "$othersz sending with framelen 512 to lrz" "$TEST_SZ $s_opt_framelen 128" "$RZ -q" cmp "$z_test_files" 
-            test -n "$s_4k_opt" && doit "zmodem-$othersz-lrz-4k" "$othersz tries to send 4k blocks to lrz" "$TEST_SZ $s_4k_opt" "$RZ -q" cmp "$z_test_files" 
-            test -n "$s_8k_opt" && doit "zmodem-$othersz-lrz-8k" "$othersz tries to send 8k blocks to lrz" "$TEST_SZ $s_8k_opt" "$RZ -q" cmp "$z_test_files" 
-            test -n "$s_turbo_opt" && doit "zmodem-$othersz-lrz-turbo" "$othersz sending with turbo escaping to lrz" "$TEST_SZ $s_turbo_opt" "$RZ -q" cmp "$z_test_files" 
+            doit "zmodem-$othersz-lrz-multiple" "$othersz sending multiple files to lrz" "$TEST_SZ" "$RZ -q" cmp "$all_binaries" 
+            test "$s_opt_framelen" = 1 && doit "zmodem-$othersz-lrz-framelen-512" "$othersz sending with framelen 512 to lrz" "$TEST_SZ $s_opt_framelen 512" "$RZ -q" cmp "$all_binaries" 
+            test "$s_opt_framelen" = 1 && doit "zmodem-$othersz-lrz-framelen-128" "$othersz sending with framelen 512 to lrz" "$TEST_SZ $s_opt_framelen 128" "$RZ -q" cmp "$all_binaries" 
+            test -n "$s_4k_opt" && doit "zmodem-$othersz-lrz-4k" "$othersz tries to send 4k blocks to lrz" "$TEST_SZ $s_4k_opt" "$RZ -q" cmp "$all_binaries" 
+            test -n "$s_8k_opt" && doit "zmodem-$othersz-lrz-8k" "$othersz tries to send 8k blocks to lrz" "$TEST_SZ $s_8k_opt" "$RZ -q" cmp "$all_binaries" 
+            test -n "$s_turbo_opt" && doit "zmodem-$othersz-lrz-turbo" "$othersz sending with turbo escaping to lrz" "$TEST_SZ $s_turbo_opt" "$RZ -q" cmp "$all_binaries" 
             test -n "$s_turbo_opt" && test -n "$s_8k_opt" && \
-                doit "zmodem-$othersz-lrz-8k-8k-turbo" "$othersz sending 8k blocks with turbo escaping to lrz" "$TEST_SZ $s_turbo_opt $s_8k_opt" "$RZ -q" cmp "$z8_test_files" 
-            doit "zmodem-$othersz-lrz-errors-7777" "$othersz sending to lrz on a very faulty line" "$TEST_SZ" "$RZ -q -F 7777" cmp "$z_test_files" 
-            doit "zmodem-$othersz-lrz-errors-11111" "$othersz sending to lrz on a faulty line" "$TEST_SZ" "$RZ -q -F 11111" cmp "$z_test_files" 
-            doit "zmodem-$othersz-lrz-errors-33333" "$othersz sending to lrz on a less faulty line" "$TEST_SZ" "$RZ -q -F 33333" cmp "$z_test_files" 
-            test -n "$can_escapectl" && doit "zmodem-$othersz-lrz-escape-r" "$othersz sending with escaped control characters to lrz (receiver initialized)" "$TEST_SZ" "$RZ -q -e" cmp "$z_test_files" 
-            test -n "$s_16bit_crc_opt" && doit "zmodem-$othersz-lrz-crc16" "$othersz sending with CRC16 to lrz" "$TEST_SZ $s_16bit_crc_opt" "$RZ -q -e" cmp "$z_test_files" 
+                doit "zmodem-$othersz-lrz-8k-8k-turbo" "$othersz sending 8k blocks with turbo escaping to lrz" "$TEST_SZ $s_turbo_opt $s_8k_opt" "$RZ -q" cmp "$all_binaries" 
+            test -n "$can_escapectl" && doit "zmodem-$othersz-lrz-escape-r" "$othersz sending with escaped control characters to lrz (receiver initialized)" "$TEST_SZ" "$RZ -q -e" cmp "$all_binaries" 
+            test -n "$s_16bit_crc_opt" && doit "zmodem-$othersz-lrz-crc16" "$othersz sending with CRC16 to lrz" "$TEST_SZ $s_16bit_crc_opt" "$RZ -q -e" cmp "$all_binaries" 
 
             key=zmodem-$othersz-lrz-resume-r
             mkdir $testdir/$key 2>/dev/null|| true
@@ -1255,11 +810,214 @@ for other in $available; do
                 doit "$key" "$othersz sending with resume to lrz" "$TEST_SZ $s_resume_opt" "$RZ -q" resume_cmp $srcdir/src/lsz.c 
             fi
         fi
-    fi
-done
+
+    done
+}
+zmanage() {
+
+    # this is deliberatly limited to lrzsz alone.
+    # - zmtx only implements newer, clobber and protect.
+    # - crzsz implements most or all, but crz doesn't have options for them (csz has).
+    # i decided against testing against other zmodems here, because
+    # a) interoperability shouldn't be a problem (all these are just header flags)
+    # b) i would need three flags (in the already long list above) per management option:
+    # -- "senders XXX option."
+    # -- "receivers XXX option."
+    # -- "receiver can handle XXX, if the sender initializes it."
+    #    multiply that by CRC, NEW, NEWL, APND, CLOB, DIFF, PROT, CHNG…
+    # c) i'd bet there are logical differences in the implementations.
+    # notes:
+    # - ZMDIFF isn't implemented anywhere.
+    # - ZMCRC has to be tested as part of the resume handling, too.
+
+    # first check the defaults
+    # - lrz does create a not existing target.
+    # - lrz does NOT overwrite an existing file without a ZMCLOB
+    key="zmodem-lsz-lrz-MGMT-default-nonexisting"
+    doit "$key" "lsz sending to lrz does create file" "$SZ -q" "$RZ -q" "$testdir/$key/all256.bin" $all_256_file
+
+    # check the opposite: a file of the same name and the same size is not overwritten
+    key="zmodem-lsz-lrz-MGMT-default-existing"
+    mkdir "$testdir/$key"
+    cp $all_256_file $testdir/$key/16k.bin # this one is smaller
+    touch -d 2001-02-03T04:05:06.07 $testdir/16k.bin # this one is old.
+    cp $testdir/$key/16k.bin $testdir/$key/cmp
+    doit "$key" "lsz sending to lrz does not overwrite existing file" "$SZ -q" "$RZ -q" "$testdir/$key/cmp" $binary_16k
+    #
+    # test ZMNEW (5), ZMNEWL (1)
+    # ZMNEWL is only partially tested (size), as it falls through to ZMNEW.
+    #
+    key="zmodem-lsz-lrz-MGMT-ZMNEW-fail-s"
+    mkdir "$testdir/$key"
+    cp $all_256_file $testdir/$key/test.bin
+    cp $binary_16k $testdir/test.bin
+    touch -d 2001-02-03T04:05:06.07 $testdir/test.bin # this one is old.
+    doit "$key" "lsz sending to lrz fails (sender initialized)" "$SZ -q -n" "$RZ -q" $all_256_file "$testdir/test.bin" 
+
+    key="zmodem-lsz-lrz-MGMT-ZMNEW-success-s"
+    mkdir "$testdir/$key"
+    cp $all_256_file $testdir/$key/test.bin
+    touch -d 2001-02-03T04:05:06.07 $testdir/$key/test.bin # this one is old.
+    cp $binary_16k $testdir/test.bin
+    doit "$key" "lsz sending to lrz succeeds (sender initialized)" "$SZ -q -n" "$RZ -q" $binary_16k "$testdir/test.bin" 
+
+    key="zmodem-lsz-lrz-MGMT-ZMNEWL-succes-s"
+    mkdir "$testdir/$key"
+    cp $all_256_file $testdir/$key/test.bin
+    cp $binary_16k $testdir/test.bin
+    touch -d 2001-02-03T04:05:06.07 $testdir/test.bin # this one is old.
+    doit "$key" "lsz sending to lrz succeeds (sender initialized)" "$SZ -q -N" "$RZ -q" $binary_16k "$testdir/test.bin" 
+
+    key="zmodem-lsz-lrz-MGMT-ZMNEW-fail-r"
+    mkdir "$testdir/$key"
+    cp $all_256_file $testdir/$key/test.bin
+    cp $binary_16k $testdir/test.bin
+    touch -d 2001-02-03T04:05:06.07 $testdir/test.bin # this one is old.
+    doit "$key" "lsz sending to lrz fails (receiver initialized)" "$SZ -q" "$RZ -q -n" $all_256_file "$testdir/test.bin" 
+
+    key="zmodem-lsz-lrz-MGMT-ZMNEW-success-r"
+    mkdir "$testdir/$key"
+    cp $all_256_file $testdir/$key/test.bin
+    touch -d 2001-02-03T04:05:06.07 $testdir/$key/test.bin # this one is old.
+    cp $binary_16k $testdir/test.bin
+    doit "$key" "lsz sending to lrz succeeds (receiver initialized)" "$SZ -q" "$RZ -q -n" $binary_16k "$testdir/test.bin" 
+
+    key="zmodem-lsz-lrz-MGMT-ZMNEWL-success-r"
+    mkdir "$testdir/$key"
+    cp $all_256_file $testdir/$key/test.bin
+    cp $binary_16k $testdir/test.bin
+    touch -d 2001-02-03T04:05:06.07 $testdir/test.bin # this one is old, but longer
+    doit "$key" "lsz sending to lrz fails (receiver initialized)" "$SZ -q" "$RZ -q -N" $binary_16k "$testdir/test.bin" 
+
+    #
+    # ZMCRC (2)
+    #
+
+    # first we check that lrz without -H somewhere does keep the modified file.
+    key="zmodem-lsz-lrz-MGMT-noZMCRC-s"
+    mkdir "$testdir/$key"
+    cp $all_256_file $testdir/$key/
+    printf '\x41' | dd of=$testdir/$key/all256.bin bs=1 seek=32 conv=notrunc 2>&5
+    cp $testdir/$key/all256.bin $testdir/$key/cmp
+    doit "$key" "lsz sending to lrz does not overwrite (sender initialized)" "$SZ -q" "$RZ -q" "$testdir/$key/cmp" $all_256_file
+
+    key="zmodem-lsz-lrz-MGMT-ZMCRC-s"
+    mkdir "$testdir/$key"
+    cp $all_256_file $testdir/$key/
+    printf '\x41' | dd of=$testdir/$key/all256.bin bs=1 seek=32 conv=notrunc 2>&5
+    doit "$key" "lsz sending to lrz overwrites (sender initialized)" "$SZ -qH" "$RZ -q" cmp $all_256_file
+
+    key="zmodem-lsz-lrz-MGMT-ZMCRC-r"
+    mkdir "$testdir/$key"
+    cp $all_256_file $testdir/$key/
+    printf '\x41' | dd of=$testdir/$key/all256.bin bs=1 seek=32 conv=notrunc 2>&5
+    doit "$key" "lsz sending to lrz overwrites (receiver initialized)" "$SZ -q" "$RZ -q -H" cmp $all_256_file
+
+    #
+    # ZMAPND (3)
+    # receiver appends to the target, if it exists
+    # the doc does not specify if the target shall be created if it doesn't exists,
+    # but in practice it is (the 1988s code changed the fopen mode from "w" to "a", and omen also does this).
+    #
+    key="zmodem-lsz-lrz-MGMT-ZMAPND-s"
+    mkdir $testdir/$key 2>/dev/null|| true
+    cp $srcdir/src/Makefile.in $testdir/$key/lsz.c
+    cat $srcdir/src/Makefile.in $srcdir/src/lsz.c >>$testdir/$key/cmp
+    doit "$key" "ZMODEM/MGMT/ZMAPND: lsz sending to $other" "$SZ -q -+" "$RZ -q" "$testdir/$key/cmp" $srcdir/src/lsz.c 
+
+    key="zmodem-lsz-lrz-MGMT-ZMAPND-r"
+    mkdir $testdir/$key 2>/dev/null|| true
+    cp $srcdir/src/Makefile.in $testdir/$key/lsz.c
+    cat $srcdir/src/Makefile.in $srcdir/src/lsz.c >>$testdir/$key/cmp
+    doit "$key" "ZMODEM/MGMT/ZMAPND: $othersz sending to lrz" "$SZ" "$RZ -q -+" "$testdir/$key/cmp" $srcdir/src/lsz.c 
+
+    #
+    # ZMCLOB (4)
+    # we check in the ZMCRC test that the file would normally be skipped.
+    #
+    key="zmodem-lsz-lrz-MGMT-ZMCLOB-s"
+    mkdir "$testdir/$key"
+    printf '\x41' | dd of=$testdir/$key/all256.bin bs=1 seek=32 conv=notrunc 2>&5
+    doit "$key" "lsz -y sending to lrz (sender initialized)" "$SZ -q -y" "$RZ -q" "$all_256_file" $all_256_file
+
+    key="zmodem-lsz-lrz-MGMT-ZMCLOB-r"
+    mkdir "$testdir/$key"
+    printf '\x41' | dd of=$testdir/$key/all256.bin bs=1 seek=32 conv=notrunc 2>&5
+    doit "$key" "lsz sending to lrz -y (receiver initialized)" "$SZ -q" "$RZ -q -y" "$all_256_file" $all_256_file
+
+    #
+    # ZMDIFF (6)
+    #   Transfer file if destination file absent.  Otherwise, transfer file 
+    #   overwriting destination if files have different lengths or dates. 
+    # This is not implemented anywhere, not even in crzsz
+    #
+
+    #
+    # ZMPROT (7)
+    #
+    key="zmodem-lsz-lrz-MGMT-ZMPROT-s"
+    mkdir "$testdir/$key"
+    touch $testdir/$key/all256.bin
+    touch $testdir/$key/null
+    doit "$key" "lsz sending to lrz (sender initialized)" "$SZ -q -p" "$RZ -q" "$testdir/$key/null" $all_256_file
+    key="zmodem-lsz-lrz-MGMT-ZMPROT-r"
+    mkdir "$testdir/$key"
+    touch $testdir/$key/all256.bin
+    touch $testdir/$key/null
+    doit "$key" "lsz sending to lrz (receiver initialized)" "$SZ -q" "$RZ -q -p" "$testdir/$key/null" $all_256_file
+
+    #
+    # ZMCHNG (8)
+    #
+    key="zmodem-lsz-lrz-MGMT-ZMCHNG-s"
+    mkdir "$testdir/$key"
+    cp $all_256_file $testdir/$key/
+    doit "$key" "lsz sending to lrz (sender initialized)" "$SZ -q -E" "$RZ -q" "$testdir/$key/all256.bin.0" $all_256_file
+    key="zmodem-lsz-lrz-MGMT-ZMCHNG-r"
+    mkdir "$testdir/$key"
+    cp $all_256_file $testdir/$key/
+    doit "$key" "lsz sending to lrz (received initialized)" "$SZ -q" "$RZ -q -E" "$testdir/$key/all256.bin.0" $all_256_file
+
+    # there also is this:
+    # define ZF1_ZMSKNOLOC   0x80 /* Skip file if not present at rx */ (alternatively written as ZF1ZMSKNOLOC)
+    # lrzsz sets this if lsz is given the -Y (overwrite or skip) option.
+    key="zmodem-lsz-lrz-MGMT-ZMSKNOLOC-nonexisting"
+    doit "$key" "lsz sending to lrz does not create file if does not exist" "$SZ -q -Y" "$RZ -q" "missing" $all_256_file
+
+    key="zmodem-lsz-lrz-MGMT-ZMSKNOLOC-existing"
+    mkdir "$testdir/$key"
+    touch $testdir/$key/all256.bin
+    doit "$key" "lsz sending to lrz does update file if it does exist" "$SZ -q -Y" "$RZ -q" "$all_256_file" $all_256_file
+}
+
+
+echo "mode=$mode"
+if test "$mode" = all -o "$mode" = xerrors -o "$mode" = "errors" -o "$mode" = "x" ; then
+    xerrors
+fi
+if test "$mode" = all -o "$mode" = yerrors -o "$mode" = "errors" -o "$mode" = "y" ; then
+    yerrors
+fi
+if test "$mode" = all -o "$mode" = zerrors -o "$mode" = "errors" -o "$mode" = "z" ; then
+    zerrors
+fi
+if test "$mode" = all -o "$mode" = xcompat -o "$mode" = "compat" -o "$mode" = "x" ; then
+    xcompat
+fi
+if test "$mode" = all -o "$mode" = ycompat -o "$mode" = "compat" -o "$mode" = "y" ; then
+    ycompat
+fi
+if test "$mode" = all -o "$mode" = zcompat -o "$mode" = "compat" -o "$mode" = "z" ; then
+    zcompat
+fi
+if test "$mode" = all -o "$mode" = zmanage -o "$mode" = "z" ; then
+    zmanage
+fi
+
+
 
 if test -s "$testdir/failures.log" ; then
-    echo "Some tests failed. See $testdir/failures.log"
+    echo "Some tests failed. See $testdir/failures.log and $testdir/run.log"
     exit 1
 fi
 echo "All primary tests passed.\n";
@@ -1279,4 +1037,3 @@ if test "$mode" = all -o "$mode" = abuse ; then
 fi
 echo "All tests passed.\n";
 exit 0
-
