@@ -877,26 +877,17 @@ zrbhdr32(char *hdr)
 		return c;
 	Rxtype = c;
 	crc = 0xFFFFFFFFL; crc = UPDC32(c, crc);
-#ifdef DEBUGZ
-	VPRINTF(3,("zrbhdr32 c=%X  crc=%lX", c, crc)i);
-#endif
 
 	for (n=4; --n >= 0; ++hdr) {
 		if ((c = zdlread()) & ~0377)
 			return c;
 		crc = UPDC32(c, crc);
 		*hdr = c;
-#ifdef DEBUGZ
-		VPRINTF(3,("zrbhdr32 c=%X  crc=%lX", c, crc));
-#endif
 	}
 	for (n=4; --n >= 0;) {
 		if ((c = zdlread()) & ~0377)
 			return c;
 		crc = UPDC32(c, crc);
-#ifdef DEBUGZ
-		VPRINTF(3,("zrbhdr32 c=%X  crc=%lX", c, crc));
-#endif
 	}
 	if (crc != 0xDEBB20E3) {
 		zperr(badcrc);
