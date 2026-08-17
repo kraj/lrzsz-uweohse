@@ -855,11 +855,25 @@ wcs(const char *oname, const char *remotename)
 
 	if (Restricted) {
 		/* restrict pathnames to current tree */
-		if ( strstr(oname, "../") || oname[0] == '/') {
-			canit(STDOUT_FILENO);
-			vchar('\r');
-			error(1,0,
-				_("security violation: not allowed to upload from %s"),oname);
+		/* deny absolute paths */
+		if (oname[0] == '/')
+			goto violation;
+		/* walk path components */
+		{
+			const char *cp;
+			for (cp = oname; *cp; ) {
+				const char *slash = strchr(cp, '/');
+				size_t len = slash ? (size_t)(slash - cp) : strlen(cp);
+				if (len > 0) {
+					if (Restricted > 1 && cp[0] == '.')
+						goto violation;
+					if (len == 2 && strncmp(cp, "..", 2) == 0)
+						goto violation;
+				}
+				if (!slash)
+					break;
+				cp = slash + 1;
+			}
 		}
 	}
 
@@ -1007,6 +1021,13 @@ wcs(const char *oname, const char *remotename)
 #endif
 	}
 	return 0;
+
+violation:
+	canit(STDOUT_FILENO);
+	vchar('\r');
+	error(1,0,
+		_("security violation: not allowed to upload from %s"),oname);
+	exit(1);
 }
 
 /*
