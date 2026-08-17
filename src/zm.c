@@ -92,7 +92,7 @@ static inline int zgethex (void);
 static int zrbhdr (char *hdr);
 static int zrbhdr32 (char *hdr);
 static int zrhhdr (char *hdr);
-static char zsendline_tab[256];
+static unsigned char zsendline_tab[256];
 static int zrdat32 (char *buf, int length, size_t *);
 static void zsbh32 (char *hdr, int type);
 static inline void zsendline_s (const char *s, size_t count);
