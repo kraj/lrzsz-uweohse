@@ -197,14 +197,20 @@ stats_start_one()
 void
 stats_journal_open(const char *path)
 {
+    int fd;
     if (journal_fp) {
         fclose(journal_fp);
         journal_fp = NULL;
     }
-    journal_fp = fopen(path, "a");
+    fd = open(path, O_WRONLY|O_CREAT|O_APPEND, 0600);
+    if (fd < 0) {
+        lrzsz_warning(errno,_("%s: cannot open journal file '%s'"), lrzsz_progname, path);
+        return;
+    }
+    journal_fp = fdopen(fd, "a");
     if (!journal_fp) {
-        fprintf(stderr, _("%s: cannot open journal file '%s': %s\n"),
-                lrzsz_progname, path, strerror(errno));
+        lrzsz_warning(errno,_("%s: cannot open journal file '%s'"), lrzsz_progname, path);
+        close(fd);
         return;
     }
     setvbuf(journal_fp, NULL, _IOLBF, 0);
