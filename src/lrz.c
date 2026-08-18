@@ -313,13 +313,9 @@ main(int argc, char *argv[])
 		case 'a': Rxascii=TRUE;  break;
 		case 'b': Rxbinary=TRUE; break;
 		case 'B': 
-			if (strcmp(optarg,"auto")==0) 
-				buffersize=-1;
-			else {
-				buffersize=strtol(optarg,NULL,10);
-				if (buffersize != -1 && buffersize < 0)
-					usage(2,_("buffer size out of range"));
-			}
+			if (strcmp(optarg,"auto")==0)
+				fatal_error(1,0,_("the auto buffersize option has been removed; see the manual"));
+                        buffersize = lrzsz_strtoul( _("-B / --bufsize"), optarg, "km", 0, 0);
 			break;
 		case 'c': Crcflg=TRUE; break;
 		case 'D': Nflag = TRUE; break;
@@ -417,25 +413,25 @@ main(int argc, char *argv[])
 #  ifndef ENABLE_SYSLOG_FORCE
 			if (optarg && (!strcmp(optarg,"off") || !strcmp(optarg,"no"))) {
 				if (under_rsh)
-					fatal_error(0,0, _("cannot turnoff syslog"));
+					lrzsz_warning(0, _("cannot turnoff syslog"));
 				else
 					enable_syslog=FALSE;
 			}
 			else
 				enable_syslog=TRUE;
 #  else
-			fatal_error(0,0, _("cannot turnoff syslog"));
+			lrzsz_warning(0, _("cannot turnoff syslog"));
 #  endif
 #endif
 			break;
                 case 4:
-                        startup_delay = (unsigned int) lrzsz_strtoul( "-w / --windowsize", optarg, NULL, 0, 0);
+                        startup_delay = (unsigned int) lrzsz_strtoul( "--delay-startup", optarg, NULL, 0, 0);
 			break;
 		case 5:
 #if defined(F_GETFD) && defined(F_SETFD) && defined(O_SYNC)
 			o_sync=1;
 #else
-			fatal_error(0,0, _("O_SYNC not supported by the kernel"));
+			lrzsz_warning(0, _("O_SYNC not supported by the kernel"));
 #endif
 			break;
 		default:
@@ -537,7 +533,7 @@ usage(int exitcode, const char *what)
 "  -+, --append                append to existing files\n"
 "  -a, --ascii                 ASCII transfer (change CR/LF to LF)\n"
 "  -b, --binary                binary transfer\n"
-"  -B, --bufsize N             buffer N bytes (N==auto: buffer whole file)\n"
+"  -B, --bufsize N             buffer N bytes before writing to disk\n"
 "  -c, --with-crc              Use 16 bit CRC (X)\n"
 "  -D, --null                  write all received data to /dev/null\n"
 "      --delay-startup N       sleep N seconds before doing anything\n"
@@ -687,9 +683,7 @@ wcreceive(int argc, char **argp)
 		if (Pathname)
 			free(Pathname);
 		errno=0;
-		Pathname=strdup(*argp);
-		if (!Pathname)
-			fatal_error(1,0,_("out of memory"));
+		Pathname=xstrdup(*argp);
 
                 checkpath(Pathname);
                 stats_set_filename(Pathname);
@@ -1133,10 +1127,7 @@ procheader(char *name, struct zm_fileinfo *zi)
             name=p;
         }
     }
-    name_static=malloc(strlen(name)+1);
-    if (!name_static)
-        fatal_error(1,0,_("out of memory"));
-    strcpy(name_static,name);
+    name_static=xstrdup(name);
     zi->fname=name_static;
 
     if (Verbose>2) {
@@ -1266,10 +1257,7 @@ procheader(char *name, struct zm_fileinfo *zi)
                 return ERROR;
             }
             free(name_static);
-            name_static=malloc(strlen(tmpname)+1);
-            if (!name_static)
-                fatal_error(1,0,_("out of memory"));
-            strcpy(name_static,tmpname);
+            name_static=xstrdup(tmpname);
             zi->fname=name_static;
         }
     }
@@ -1293,9 +1281,7 @@ procheader(char *name, struct zm_fileinfo *zi)
     if (Pathname)
         free(Pathname);
 
-    Pathname=strdup(name_static);
-    if (!Pathname)
-        fatal_error(1,0,_("out of memory"));
+    Pathname=xstrdup(name_static);
     if (Verbose) {
         /* overwrite the "waiting to receive" line */
         vstring("\r                                                                     \r");
@@ -1389,27 +1375,11 @@ buffer_it:
 		}
 #endif
 
-		if (buffersize==-1 && s) {
-			if (zi->bytes_total>last_length) {
-				free(s);
-				s=NULL;
-				last_length=0;
-			}
-		}
 		if (!s && buffersize) {
-			last_length=32768;
-			if (buffersize==-1) {
-				if (zi->bytes_total>0)
-					last_length=zi->bytes_total;
-			} else 
-				last_length=buffersize;
+			last_length=buffersize;
 			/* buffer `4096' bytes pages */
 			last_length=(last_length+4095)&0xfffff000;
-			s=malloc(last_length);
-			if (!s) {
-				zpfatal(_("out of memory"));
-				exit(1);
-			}
+			s=xmalloc(last_length);
 		}
 		if (s) {
                     setvbuf(fout,s,_IOFBF,last_length);
