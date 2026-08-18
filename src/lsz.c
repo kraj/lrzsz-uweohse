@@ -765,7 +765,7 @@ wcs(const char *oname, const char *remotename)
 	int c;
 #endif
 	struct stat f;
-	char *name;
+	static char *name=NULL;
 	struct zm_fileinfo zi;
 #ifdef HAVE_MMAP
 	int dont_mmap_this=0;
@@ -779,6 +779,8 @@ wcs(const char *oname, const char *remotename)
 		shortname=oname;
 #endif
 
+	free(name);
+	name=NULL;
 
 	if (Restricted) {
 		/* restrict pathnames to current tree */
@@ -806,11 +808,12 @@ wcs(const char *oname, const char *remotename)
 
 	if (0==strcmp(oname,"-")) {
 		char *p=getenv("ONAME");
-		name=alloca(PATH_MAX+1);
 		if (p) {
-			strcpy(name, p);
+			name=xstrdup(p);
 		} else {
-			sprintf(name, "s%lu.lsz", (unsigned long) getpid());
+			char tmp[64];
+			snprintf(tmp, sizeof tmp, "s%lu.lsz", (unsigned long) getpid());
+			name=xstrdup(tmp);
 		}
 		input_f=stdin;
 #ifdef HAVE_MMAP
@@ -822,8 +825,7 @@ wcs(const char *oname, const char *remotename)
 		++errcnt;
 		return OK;	/* pass over it, there may be others */
 	} else {
-		name=alloca(PATH_MAX+1);
-		strcpy(name, oname);
+		name=xstrdup(oname);
 	}
 #ifdef HAVE_MMAP
 	if (!use_mmap || dont_mmap_this)
