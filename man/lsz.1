@@ -215,17 +215,6 @@ Send COMMAND to the receiver for execution, return with COMMAND\'s exit status.
 .B "-C N, --command-tries N"
 Retry to send command N times (default: 11).
 .TP
-.B "-d, --dot-to-slash"
-Change all instances of "." to "/" in the transmitted pathname.
-Thus, C.omenB0000 (which is unacceptable to MSDOS or CP/M)
-is transmitted as C/omenB0000.
-If the resultant filename has more than 8 characters in the stem,
-a "." is inserted to allow a total of eleven.
-
-This option enables the 
-.B "--full-path"
-option.
-.TP
 .B "--delay-startup N"
 Wait
 .B N
@@ -266,10 +255,6 @@ name already exists.
 Send Full pathname.
 Normally directory prefixes are stripped from the transmitted
 filename.
-
-This is also turned on with to 
-.B "--dot-to-slash"
-option.
 .TP
 .B "-h, --help"
 give help.
@@ -551,3 +536,11 @@ environment variable and the associated public directory feature
 usually
 .IR /var/spool/uucppublic )
 have been removed.
+.TP
+.B "-d, --dot-to-slash"
+Converted dots to slashes in pathnames and truncated filenames to
+8.3 format for MS-DOS / CP-M compatibility.
+Removed because these systems are obsolete.
+Use
+.B -f / --full-path
+to send full pathnames.

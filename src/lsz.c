@@ -144,7 +144,6 @@ int Quiet=0;		/* overrides logic that would otherwise set verbose */
 int Ascii=0;		/* Add CR's for brain damaged programs */
 int Fullname=0;		/* transmit full pathname */
 int Unlinkafter=0;	/* Unlink file after it is sent */
-int Dottoslash=0;	/* Change foo.bar.baz to foo/bar/baz */
 int firstsec;
 int errcnt=0;		/* number of files unreadable */
 size_t blklen=128;		/* length of transmitted records */
@@ -434,9 +433,8 @@ main(int argc, char **argv)
 			Cmdstr = optarg;
 			break;
 		case 'd':
-			++Dottoslash;
-                        Fullname=TRUE;
-                        break;
+			fatal_error(1,0,_("this option has been removed; see the manual"));
+			break;
 		case 'f': Fullname=TRUE; break;
 		case 'e': Zctlesc = 1; break;
 		case 'E': Lzmanag = ZF1_ZMCHNG; break;
@@ -970,10 +968,7 @@ static int
 wctxpn(struct zm_fileinfo *zi)
 {
 	register char *p, *q;
-	char *name2;
 	struct stat f;
-
-	name2=alloca(PATH_MAX+1);
 
 	if (protocol==ZM_XMODEM) {
 		if (Verbose && *zi->fname && fstat(fileno(input_f), &f)!= -1) {
@@ -994,34 +989,34 @@ wctxpn(struct zm_fileinfo *zi)
 			return ERROR;
 		}
 
-	q = (char *) 0;
-	if (Dottoslash) {		/* change . to . */
-		for (p=zi->fname; *p; ++p) {
-			if (*p == '/')
-				q = p;
-			else if (*p == '.')
-				*(q=p) = '/';
+	/* ZMODEM spec: file information subpacket must not exceed 1024 bytes.
+	 * YMODEM block 0 is 128 bytes. Both carry the same filename + metadata.
+	 * Reserve room for the metadata suffix (max ~64 bytes) and null. */
+	{
+		size_t maxlen = zmodem_requested ? (1024 - 64) : (128 - 64);
+		const char *base = zi->fname;
+		if (!Fullname) {
+			const char *slash = strrchr(zi->fname, '/');
+			if (slash)
+				base = slash + 1;
 		}
-		if (q && strlen(++q) > 8) {	/* If name>8 chars */
-			q += 8;			/*   make it .ext */
-			strcpy(name2, q);	/* save excess of name */
-			*q = '.';
-			strcpy(++q, name2);	/* add it back */
+		if (strlen(base) >= maxlen) {
+			lrzsz_warning(0, _("filename too long for %s subpacket: %s"),
+				      protname(), zi->fname);
+			fclose(input_f);
+			return OK;
 		}
-	}
-
-	for (p=zi->fname, q=txbuf ; *p; )
-		if ((*q++ = *p++) == '/' && !Fullname)
-			q = txbuf;
-	*q++ = 0;
-	p=q;
-	while (q < (txbuf + MAX_BLOCK))
+		for (p=zi->fname, q=txbuf ; *p; )
+			if ((*q++ = *p++) == '/' && !Fullname)
+				q = txbuf;
 		*q++ = 0;
+		p=q;
+	}
 	/* note that we may lose some information here in case mode_t is wider than an
 	 * int. But i believe sending %lo instead of %o _could_ break compatability
 	 */
 	if (!Ascii && (input_f!=stdin) && *zi->fname && fstat(fileno(input_f), &f)!= -1)
-		sprintf(p, "%lu %llo %o 0 %d %ld",
+		snprintf(p, (size_t)(txbuf + MAX_BLOCK - p), "%lu %llo %o 0 %d %ld",
               (long) f.st_size,
               (long long) f.st_mtime,
               (unsigned int)((no_unixmode) ? 0 : f.st_mode),
@@ -1326,7 +1321,7 @@ usage(int exitcode, const char *what)
 "  -B, --bufsize N             buffer N bytes (N==auto: buffer whole file)\n"
 "  -c, --command COMMAND       execute remote command COMMAND (Z)\n"
 "  -C, --command-tries N       try N times to execute a command (Z)\n"
-"  -d, --dot-to-slash          change '.' to '/' in pathnames (Y/Z)\n"
+"  -d, --dot-to-slash          (removed; use -f for full pathnames)\n"
 "      --delay-startup N       sleep N seconds before doing anything\n"
 "  -e, --escape                escape all control characters (Z)\n"
 "  -E, --rename                force receiver to rename files it already has\n"
