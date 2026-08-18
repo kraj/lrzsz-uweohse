@@ -1,0 +1,150 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+#include "zglobal.h"
+
+#ifndef _
+# define _(String) String
+#endif
+
+const char * lrzsz_progname;
+
+void
+lrzsz_set_progname (const char * str, const char *who)
+{
+    const char *known[]={"lrz","lsz","lrb","lsb","lrx","lsx"};
+    const char * p = strrchr(str,'/');
+    char *tmp;
+    size_t len;
+    if (!str) {
+        lrzsz_progname=xstrdup(who);
+        return;
+    }
+    if (p && p[1])
+        p=p+1;
+    else if (!p)
+        p=str;
+    for (unsigned int i=0;i< sizeof(known) / sizeof (const char *);i++) {
+        if (0==strcmp(known[i],p)) {
+            lrzsz_progname=known[i];
+            return;
+        }
+    }
+    /* asprintf is C11, over our baseline. Well. */
+    len=strlen(p)+strlen(who)+4; /* 4: space ( ) null */
+    tmp=malloc (len);
+    if (!tmp) {
+        fatal_error(1,0,"out of memory");
+    }
+    (void) snprintf(tmp,len,"%s (%s)",p, who);
+    lrzsz_progname = tmp;
+    return;
+}
+
+/* Print the program name and error message MESSAGE, which is a printf-style
+ * format string with optional args.
+ * If ERRNUM is nonzero, print its corresponding system error message.
+ */
+LRZSZ_FORMAT_PRINTF(2,0)
+static void
+lrzsz_vwarning (int errnum, const char *format, va_list ap)
+{
+    fflush(stdout);
+
+    /* Print program name (or fallback) and colon-space prefix */
+    fprintf(stderr, "%s: ", lrzsz_progname && *lrzsz_progname? lrzsz_progname : "lrzsz");
+
+    /* Format the error message with optional arguments */
+    vfprintf(stderr, format, ap);
+
+    /* Add system error if errnum is nonzero */
+    if (errnum)
+        fprintf(stderr, ": %s", strerror(errnum));
+
+    /* Print newline and flush */
+    putc ('\n', stderr);
+    fflush(stderr);
+}
+
+void
+lrzsz_warning (int errnum, const char *format, ...)
+{
+    va_list args;
+    va_start(args, format);
+    lrzsz_vwarning(errnum, format, args);
+    va_end(args);
+}
+
+/* like lrzsz_warning(), but exit with status.  */
+LRZSZ_NORETURN void
+fatal_error (int status, int errnum, const char *message, ...)
+{
+    va_list args;
+    va_start(args, message);
+    lrzsz_vwarning(errnum, message, args);
+    va_end(args);
+    exit(status);
+}
+
+unsigned long
+lrzsz_strtoul(const char *name, const char *value, const char *valid_suffixes, unsigned long int min, unsigned long int max)
+{
+  char *p;
+  unsigned long int tmp;
+  unsigned int factor;
+
+  errno = 0;
+  tmp = strtoul (value, &p, 10);
+  if (errno != 0)
+    fatal_error(2,0, _("%s `%s' is larger than maximum unsigned long int"), name,value);
+  if (value[0] == '-')
+    fatal_error(2,0, _("%s `%s' is negative"), name,value);
+  if (p == value)
+    fatal_error(2,0, _("%s `%s' is invalid"), name,value);
+  if (*p) {
+      unsigned char c;
+      if (!valid_suffixes || p[1] || !strchr (valid_suffixes, *p)) {
+        fatal_error (2,0, _("%s `%s' is followed by an invalid suffix"), name,value);
+      }
+      c=*p;
+      switch (c) {
+        case 'c': factor=1; break;
+        case 'k': factor=1024; break;
+        case 'm': factor=1024*1024; break;
+        case 'g': factor=1024*1024*1024; break;
+        default:
+        fatal_error (2,0, _("%s `%s' is followed by an invalid suffix"), name,value);
+      }
+      if (tmp > ULONG_MAX / (unsigned long) factor) {
+        fatal_error(2,0, _("%s `%s' is larger than maximum unsigned long int"), name,value);
+      }
+      tmp *= factor;
+  }
+  if (tmp < (unsigned long int) min) {
+    fatal_error(2,0, _("%s `%s' is smaller than the allowed minimum of `%lu'"), name,value, min);
+  }
+  if (max && tmp > (unsigned long int) max) {
+    fatal_error(2,0, _("%s `%s' is larger than the allowed maximum of `%lu'"), name,value, max);
+  }
+
+  return tmp;
+}
+
+char *
+xstrdup(const char *s)
+{
+    char *tmp = strdup(s);
+    if (!tmp)
+        fatal_error(1,errno,"strdup");
+    return tmp;
+}
+
+void *
+xmalloc(size_t size)
+{
+    char *tmp = malloc(size);
+    if (!tmp)
+        fatal_error(1,errno,"malloc");
+    return tmp;
+}
