@@ -542,14 +542,14 @@ main(int argc, char **argv)
 			if (optarg && (!strcmp(optarg,"off") || !strcmp(optarg,"no")))
 			{
 				if (under_rsh)
-					fatal_error(0,0, _("cannot turnoff syslog"));
+					lrzsz_warning(0, _("cannot turnoff syslog"));
 				else
 					enable_syslog=FALSE;
 			}
 			else
 				enable_syslog=TRUE;
 #  else
-			fatal_error(0,0, _("cannot turnoff syslog"));
+			lrzsz_warning(0, _("cannot turnoff syslog"));
 #  endif
 #endif
 			break;
@@ -869,7 +869,7 @@ wcs(const char *oname, const char *remotename)
 	c = f.st_mode & S_IFMT;
 	if (c == S_IFDIR || c == S_IFBLK) {
 #endif
-		fatal_error(0,0, _("is not a file: %s"),name);
+		lrzsz_warning(0, _("is not a file: %s"),name);
 		fclose(input_f);
 		return OK;
 	}
