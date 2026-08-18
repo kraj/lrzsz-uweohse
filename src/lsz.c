@@ -1605,8 +1605,8 @@ again:
 				/* mmap on files of 0 length can give 0 as result .. under linux 2.2.9 at least */
 				if (fstat (fileno (input_f), &st) == 0 && st.st_size!=0) {
 					mm_size = st.st_size;
-					mm_addr = mmap (0, mm_size, PROT_READ,
-									MAP_SHARED, fileno (input_f), 0);
+				mm_addr = mmap (0, mm_size, PROT_READ,
+								MAP_PRIVATE, fileno (input_f), 0);
 					if ((caddr_t) mm_addr == (caddr_t) - 1)
 						mm_addr = NULL;
 					else {
@@ -1702,7 +1702,7 @@ zsendfdata (struct zm_fileinfo *zi)
 		if (fstat (fileno (input_f), &st) == 0 && st.st_size!=0) {
 			mm_size = st.st_size;
 			mm_addr = mmap (0, mm_size, PROT_READ,
-							MAP_SHARED, fileno (input_f), 0);
+							MAP_PRIVATE, fileno (input_f), 0);
 			if ((caddr_t) mm_addr == (caddr_t) - 1)
 				mm_addr = NULL;
 			else {
