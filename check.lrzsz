@@ -93,44 +93,49 @@ runlog=$testdir/run.log
 LRZSZ_JOURNAL=$(pwd)/$testdir/journal.log
 export LRZSZ_JOURNAL
 
-megabyte_binary=$(find /usr/bin/ /usr/lib -size +1100000c -a -size -5000000c |xargs ls -S1 | tail -n1)
-dd if="$megabyte_binary" of="$testdir/megabyte_binary" bs=1024 count=1024 2>&5
-megabyte_binary="$testdir/megabyte_binary"
+binary_1m=$(find /usr/bin/ /usr/lib -size +1100000c -a -size -5000000c |xargs ls -S1 | tail -n1)
+dd if="$binary_1m" of="$testdir/binary_1m" bs=1024 count=1024 2>&5
+binary_1m="$testdir/binary_1m"
+
+binary_8m=$testdir/8m.bin
+for i in $(seq 0 7) ; do
+    cat $binary_1m >>$binary_8m
+done
 
 # special files to test x/y binary transfers
 all_256_file=$testdir/all256.bin
 for i in $(seq 0 255); do printf "\\$(printf '%03o' "$i")"; done > $all_256_file
 
 binary_256k=$testdir/256k.bin
-dd if="$megabyte_binary" of="$binary_256k" bs=1024 count=256 2>&5
+dd if="$binary_1m" of="$binary_256k" bs=1024 count=256 2>&5
 dd if="$all_256_file" of="$binary_256k" bs=1 seek=8192 conv=notrunc 2>&5
 
 binary_128k=$testdir/128k.bin
-dd if="$megabyte_binary" of="$binary_128k" bs=1024 count=128 2>&5
+dd if="$binary_1m" of="$binary_128k" bs=1024 count=128 2>&5
 dd if="$all_256_file" of="$binary_128k" bs=1 seek=8192 conv=notrunc 2>&5
 
 binary_64k=$testdir/64k.bin
-dd if="$megabyte_binary" of="$binary_64k" bs=1024 count=64 2>&5
+dd if="$binary_1m" of="$binary_64k" bs=1024 count=64 2>&5
 dd if="$all_256_file" of="$binary_64k" bs=1 seek=8192 conv=notrunc 2>&5
 
 binary_32k=$testdir/32k.bin
-dd if="$megabyte_binary" of="$binary_32k" bs=1024 count=32 2>&5
+dd if="$binary_1m" of="$binary_32k" bs=1024 count=32 2>&5
 dd if="$all_256_file" of="$binary_32k" bs=1 seek=8192 conv=notrunc 2>&5
 
 binary_16k=$testdir/16k.bin
-dd if="$megabyte_binary" of="$binary_16k" bs=1024 count=16 2>&5
+dd if="$binary_1m" of="$binary_16k" bs=1024 count=16 2>&5
 dd if="$all_256_file" of="$binary_16k" bs=1 seek=8192 conv=notrunc 2>&5
 
 binary_8k=$testdir/8k.bin
-dd if="$megabyte_binary" of="$binary_8k" bs=1024 count=8 2>&5
+dd if="$binary_1m" of="$binary_8k" bs=1024 count=8 2>&5
 dd if="$all_256_file" of="$binary_8k" bs=1 seek=1024 conv=notrunc 2>&5
 
 binary_4k=$testdir/4k.bin
-dd if="$megabyte_binary" of="$binary_4k" bs=1024 count=4 2>&5
+dd if="$binary_1m" of="$binary_4k" bs=1024 count=4 2>&5
 dd if="$all_256_file" of="$binary_4k" bs=1 seek=1024 conv=notrunc 2>&5
 
 binary_2k=$testdir/2k.bin
-dd if="$megabyte_binary" of="$binary_2k" bs=1024 count=2 2>&5
+dd if="$binary_1m" of="$binary_2k" bs=1024 count=2 2>&5
 dd if="$all_256_file" of="$binary_2k" bs=1 seek=1024 conv=notrunc 2>&5
 
 large_binary_file=$testdir/large.bin
@@ -218,13 +223,14 @@ doit() {
                     rm -f $testdir/$doit_key/$doit_bn
             else
                     echo "filecheck-fail: $doit_i" >>$runlog
-                    echo "status:" >>$runlog
+                    echo "stat original:" >>$runlog
                     if test -f $cmp ; then
-                        stat $cmp >>$runlog
+                        stat $cmp | awk '{print "        " $0}' >>$runlog 
                     else
-                        stat $doit_i >>$runlog
+                        stat $doit_i | awk '{print "        " $0}' >>$runlog
                     fi
-                    stat $testdir/$doit_key/$doit_bn >>$runlog
+                    echo "stat received:" >>$runlog
+                    stat $testdir/$doit_key/$doit_bn | awk '{print "        " $0}' >>$runlog
                     failed=1
             fi
     done
@@ -458,9 +464,19 @@ compat_traits() {
     TEST_RZ=""
     TEST_RB=""
     TEST_RX=""
+    BENCH_SZ_1k=""
+    BENCH_SZ_2k=""
+    BENCH_SZ_4k=""
+    BENCH_SZ_8k=""
+    BENCH_RZ=""
 
     case "$other" in 
     self)
+        BENCH_SZ_1k="$SZ -q"
+        BENCH_SZ_2k=""
+        BENCH_SZ_4k="$SZ -q -4"
+        BENCH_SZ_8k="$SZ -q -8"
+        BENCH_RZ="$RZ -q"
         TEST_SZ="$SZ -q"
         TEST_SB="$SZ -q -g"
         TEST_SX="$SZ -q -X"
@@ -502,6 +518,11 @@ compat_traits() {
         TEST_RZ=~/bin/lrzsz-0.12.21rc/lrz" -q "
         TEST_RX=~/bin/lrzsz-0.12.21rc/lrz" -q --xmodem"
         TEST_RB=~/bin/lrzsz-0.12.21rc/lrz" -q --ymodem"
+        BENCH_SZ_1k="$TEST_SZ"
+        BENCH_SZ_2k=""
+        BENCH_SZ_4k="$TEST_SZ -4"
+        BENCH_SZ_8k="$TEST_SZ -8"
+        BENCH_RZ="$TEST_RZ"
         s_framelen_opt=-l
         s_4k_opt="-4"
         s_8k_opt="-8"
@@ -549,6 +570,11 @@ compat_traits() {
         s_4k_opt="-4"
         s_8k_opt="-8"
         r_binary_opt=" "  # always binary
+        BENCH_SZ_1k="$TEST_SZ"
+        BENCH_SZ_2k="$TEST_SZ -2"
+        BENCH_SZ_4k="$TEST_SZ -4"
+        BENCH_SZ_8k="$TEST_SZ -8"
+        BENCH_RZ="$TEST_RZ"
         ;;
         
     crzsz)
@@ -565,10 +591,14 @@ compat_traits() {
         s_16bit_crc_opt="-o"
         r_can_16bit_crc="yes"
         s_1k_opt="-k"
+        BENCH_SZ_1k="$TEST_SZ"
+        BENCH_RZ="$TEST_RZ"
         ;;
     zmtx-zmrx)
         TEST_SZ=~/bin/zmtx # no -q option
         TEST_RZ=~/bin/zmrx" -q"
+        BENCH_SZ_1k="$TEST_SZ"
+        BENCH_RZ="$TEST_RZ"
         otherrz="zmrx"
         othersz="zmtx"
         r_can_4k="yes"
@@ -610,9 +640,9 @@ xcompat() {
                 doit "xmodem-lsz-$otherrz-large-binary-1k" "lsz sending to $otherrz" "$SZ -q -X -k" "$TEST_RX $r_binary_opt $bn" cmp "$large_binary_file" 
             test -n "$r_binary_opt" && test -n "$r_can_xmodem_1k" && test -n "$r_xmodem_crc_opt" && \
                 doit "xmodem-lsz-$otherrz-large-binary-1k-crc" "lsz sending to $otherrz" "$SZ -q -X -k" "$TEST_RX $r_xmodem_crc_opt $r_binary_opt $bn" cmp "$large_binary_file" 
-            bn=$(basename $megabyte_binary)
+            bn=$(basename $binary_1m)
             test -n "$r_binary_opt" && test -n "$r_can_xmodem_1k" && test -n "$r_xmodem_crc_opt" && \
-                doit "xmodem-lsz-$otherrz-megabyte-binary-1k-crc" "lsz sending to $otherrz" "$SZ -q -X -k" "$TEST_RX $r_xmodem_crc_opt $r_binary_opt $bn" cmp "$megabyte_binary" 
+                doit "xmodem-lsz-$otherrz-megabyte-binary-1k-crc" "lsz sending to $otherrz" "$SZ -q -X -k" "$TEST_RX $r_xmodem_crc_opt $r_binary_opt $bn" cmp "$binary_1m" 
 
             bn=$(basename $nocontrols_file)
             test -n "$r_ascii_opt" && \
@@ -649,9 +679,9 @@ xcompat() {
                 doit "xmodem-$othersz-lrz-large-binary-1k" "XMODEM/1k: large binary transfer: $otherrz sending to lrz" "$TEST_SX $s_1k_opt" "$RZ -q -X -b $bn" cmp "$large_binary_file" 
             test -n "$s_1k_opt" && \
                 doit "xmodem-$othersz-lrz-large-binary-1k-crc" "XMODEM/1k/CRC: large binary transfer: $otherrz sending to lrz" "$TEST_SX $s_1k_opt" "$RZ -q -X -b -c $bn" cmp "$large_binary_file" 
-            bn=$(basename $megabyte_binary)
+            bn=$(basename $binary_1m)
             test -n "$s_1k_opt" && \
-                doit "xmodem-$othersz-lrz-megabyte-binary-1k-crc" "XMODEM/1k/CRC: megabyte binary transfer: $otherrz sending to lrz" "$TEST_SX $s_1k_opt" "$RZ -q -X -b -c $bn" cmp "$megabyte_binary" 
+                doit "xmodem-$othersz-lrz-megabyte-binary-1k-crc" "XMODEM/1k/CRC: megabyte binary transfer: $otherrz sending to lrz" "$TEST_SX $s_1k_opt" "$RZ -q -X -b -c $bn" cmp "$binary_1m" 
 
             bn=$(basename $nocontrols_file)
             doit "xmodem-$othersz-lrz-small-ascii" "XMODEM: small ascii transfer: $otherrz sending to lrz" "$TEST_SX" "$RZ -q -X -a $bn" cmp "$nocontrols_file" 
@@ -690,7 +720,7 @@ ycompat() {
         # we here assume the Y is implemented like X. Which is quite reasonable.
         # we also assume that all programs transfer binary by default. rzsz and descendants do, and to do something else would be stupid.
         # we also do NO ascii tests.
-        all_binaries="$all_256_file $binary_16k $binary_128k $binary_256k $megabyte_binary"
+        all_binaries="$all_256_file $binary_16k $binary_128k $binary_256k $binary_1m"
         if test -n "$TEST_RB" ; then
             doit "ymodem-lsz-$otherrz-small-binary" "lsz sending to $otherrz" "$SZ -q -g" "$TEST_RB" cmp "$all_256_file" 
             doit "ymodem-lsz-$otherrz-16k-binary" "lsz sending to $otherrz" "$SZ -q -g" "$TEST_RB" cmp "$binary_16k" 
@@ -739,7 +769,7 @@ zcompat() {
         compat_traits "$other"
         # we also assume that all programs transfer binary by default. rzsz and descendants do, and to do something else would be stupid.
         # we also do NO ascii tests. ASCII conversion should die, die, die. We will test it in lrzsz specific test, though
-        all_binaries="$all_256_file $binary_4k $binary_16k $binary_128k $binary_256k $megabyte_binary"
+        all_binaries="$all_256_file $binary_4k $binary_16k $binary_128k $binary_256k $binary_1m"
         doit "zmodem-lsz-$otherrz-multiple" "lsz sending multiple files to $otherrz" "$SZ -q" "$TEST_RZ" cmp "$all_binaries" 
         doit "zmodem-lsz-$otherrz-framelen-512" "lsz sending with framelen 512 to $otherrz" "$SZ -q -l 512" "$TEST_RZ" cmp "$all_binaries" 
         doit "zmodem-lsz-$otherrz-framelen-128" "lsz sending with framelen 256 to $otherrz" "$SZ -q -l 128" "$TEST_RZ" cmp "$all_binaries" 
@@ -811,6 +841,66 @@ zcompat() {
             fi
         fi
 
+    done
+}
+zspeed() {
+    available="self"
+    if test -x ~/bin/lrzsz-0.12.21rc/lrz -a -x ~/bin/lrzsz-0.12.21rc/lsz ; then
+        available="$available lrzsz-0.12.21rc"
+    fi
+    if test -x ~/bin/crzsz/crz -a -x ~/bin/crzsz/csz ; then
+        available="$available crzsz"
+    fi
+    if test -x ~/bin/zmtx -a -x ~/bin/zmrx ; then
+        available="$available zmtx-zmrx"
+    fi
+    if test -x ~/bin/sexyz ; then
+        available="$available sexyz"
+    fi
+    available="self self self"
+    for sender in $available ; do
+        compat_traits "$sender"
+        _SZ_1k="$BENCH_SZ_1k";
+        _SZ_2k="$BENCH_SZ_2k";
+        _SZ_4k="$BENCH_SZ_4k";
+        _SZ_8k="$BENCH_SZ_8k";
+        if test -z "$_SZ_1k" ; then
+            continue
+        fi
+        for receiver in $available ; do
+            compat_traits "$receiver"
+            _RZ="$BENCH_RZ";
+            if test -z "$_RZ" ; then
+                continue
+            fi
+            #for speed in unlimited 38400 115200 1m; do
+            for speed in unlimited; do
+                if test "$speed" = "unlimited" ; then
+                    FAULT=""
+                else
+                    FAULT="$SIMU -s 1 -r $speed"
+                fi
+                case "$speed" in
+                115200) all_binaries="$all_256_file $binary_4k $binary_8k $binary_16k" ;;
+                38400) all_binaries="$all_256_file $binary_4k $binary_8k" ;;
+                *) all_binaries="$all_256_file $binary_4k $binary_16k $binary_128k $binary_256k $binary_1m $binary_8m" ;;
+                esac
+
+                key="zmodem-$sender-$receiver-speed-$speed-1k-4096"
+                doit "$key" "$sender sending multiple files to $receiver" "$_SZ_1k" "$_RZ -B4096" cmp "$all_binaries" 
+                key="zmodem-$sender-$receiver-speed-$speed-1k-32768"
+                doit "$key" "$sender sending multiple files to $receiver" "$_SZ_1k" "$_RZ -B32768" cmp "$all_binaries" 
+                key="zmodem-$sender-$receiver-speed-$speed-1k-131072"
+                doit "$key" "$sender sending multiple files to $receiver" "$_SZ_1k" "$_RZ -B131072" cmp "$all_binaries" 
+                key="zmodem-$sender-$receiver-speed-$speed-1k-262144"
+                doit "$key" "$sender sending multiple files to $receiver" "$_SZ_1k" "$_RZ -B262144" cmp "$all_binaries" 
+                key="zmodem-$sender-$receiver-speed-$speed-1k-1048576"
+                doit "$key" "$sender sending multiple files to $receiver" "$_SZ_1k" "$_RZ -B1048576" cmp "$all_binaries" 
+                key="zmodem-$sender-$receiver-speed-$speed-1k-4194304"
+                doit "$key" "$sender sending multiple files to $receiver" "$_SZ_1k" "$_RZ -B4194304" cmp "$all_binaries" 
+            done
+            
+        done
     done
 }
 zmanage() {
@@ -1012,6 +1102,9 @@ if test "$mode" = all -o "$mode" = zcompat -o "$mode" = "compat" -o "$mode" = "z
 fi
 if test "$mode" = all -o "$mode" = zmanage -o "$mode" = "z" ; then
     zmanage
+fi
+if test "$mode" = all -o "$mode" = zspeed  -o "$mode" = "speed"  -o "$mode" = "z" ; then
+    zspeed
 fi
 
 

@@ -41,6 +41,14 @@ not perfectly trustworthy senders.
   to the receiving attacker if that turned off crc32.
   Impact: low to medium.
 
+* Overlong pathnames (> 960 + X bytes, with X depending on 
+  metadata) might have caused a buffer overflow in the sending 
+  programs (Y- and ZMODEM), which could have leaked information
+  to the receiver.
+
+  Note: this stems from the original public domain rzsz
+  suite (80s).
+
 * autotools updated.
 
 * the TCP mode was removed (no authentication, no encryption).
@@ -80,7 +88,7 @@ not perfectly trustworthy senders.
   Note: that this was possible stems from the original public 
   domain rzsz suite (80s).
 
-* when the -B / --bufsize "auto" option was used, an attacker
+* when the lrz -B / --bufsize "auto" option was used, an attacker
   could have wasted up to 2 GB of memory while keeping the
   connection option. This was a possible remotely triggered denial
   of service attack (in a rare configuration).
@@ -92,6 +100,9 @@ not perfectly trustworthy senders.
   suite still in use implemented it, and the function to set
   the receivers time needed root rights - which, given the 
   facts listed above, lrz should not have.
+
+* the `-d / --dot-to-slash` option (DOS 8.3 filename transformation)
+  was removed.
 
 * a number of possible security problems have been fixed:
   - double fclose in lrz.
