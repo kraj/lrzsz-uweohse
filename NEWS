@@ -77,11 +77,16 @@ not perfectly trustworthy senders.
   leading directories, too (`dir/.subdir/filename` was allowed
   before).
 
-  Note: that will was possible stems from the original public 
+  Note: that this was possible stems from the original public 
   domain rzsz suite (80s).
 
+* when the -B / --bufsize "auto" option was used, an attacker
+  could have wasted up to 2 GB of memory while keeping the
+  connection option. This was a possible remotely triggered denial
+  of service attack (in a rare configuration).
+
 * the lrz file CRC check could have run into an endless loop.
-  This was a possible denial of service attack.
+  This was a possible remotely triggered denial of service attack.
 
 * the timesync protocol support was removed. No other zmodem
   suite still in use implemented it, and the function to set

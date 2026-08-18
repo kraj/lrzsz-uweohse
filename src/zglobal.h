@@ -166,20 +166,6 @@ extern int enable_syslog;
 # define PATH_MAX _POSIX_PATH_MAX
 #endif
 
-#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 202000L
-#  define LRZSZ_NORETURN [[noreturn]]
-#elif defined(__GNUC__) || defined(__clang__)
-#  define LRZSZ_NORETURN __attribute__((__noreturn__))
-#else
-#  define LRZSZ_NORETURN
-#endif
-
-#if defined(__GNUC__) || defined(__clang__)
-#  define LRZSZ_FORMAT_PRINTF(fmtidx, argidx) __attribute__((format(printf, fmtidx, argidx)))
-#else
-#  define LRZSZ_FORMAT_PRINTF(fmt, arg)
-#endif
-
 #include "stats.h"
 #include "util.h"
 
