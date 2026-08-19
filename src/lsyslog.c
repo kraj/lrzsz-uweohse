@@ -48,7 +48,7 @@ lsyslog(int prio, const char *format, ...)
                     username=strdup(pwd->pw_name);
             }
             if (!username) {
-                    sprintf(uid_string,"#%lu",(unsigned long) uid);
+		    snprintf(uid_string,sizeof(uid_string),"#%lu",(unsigned long) uid);
                     username = uid_string;
             }
     }
