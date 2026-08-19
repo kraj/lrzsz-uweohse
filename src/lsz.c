@@ -1834,7 +1834,12 @@ zsendfdata (struct zm_fileinfo *zi)
 			int minleft = 0;
 			int secleft = 0;
 			time_t now;
-			last_bps = (zi->bytes_sent / timing (0,&now));
+			{
+				double d = timing(0, &now);
+				if (d == 0)
+					d = 0.5;
+				last_bps = (zi->bytes_sent / d);
+			}
 			if (last_bps > 0) {
 				minleft = (zi->bytes_total - zi->bytes_sent) / last_bps / 60;
 				secleft = ((zi->bytes_total - zi->bytes_sent) / last_bps) % 60;
