@@ -304,8 +304,8 @@ show_version(void)
 int
 main(int argc, char *argv[])
 {
-	register char *cp;
-	register int npats;
+	char *cp;
+	int npats;
 	char **patts=NULL; /* keep compiler quiet */
 	int exitcode=0;
 	int c;
@@ -824,7 +824,7 @@ fubar:
 static int 
 wcrxpn(struct zm_fileinfo *zi, char *rpn)
 {
-    register int c;
+    int c;
     size_t Blklen=0;		/* record length of received packets */
 
     READLINE_PF(1);
@@ -863,8 +863,8 @@ et_tu:
 static int 
 wcrx(struct zm_fileinfo *zi)
 {
-    register int sectnum, sectcurr;
-    register char sendchar;
+    int sectnum, sectcurr;
+    char sendchar;
     size_t Blklen;
 
     Firstsec=TRUE;sectnum=0; 
@@ -930,9 +930,9 @@ wcrx(struct zm_fileinfo *zi)
 static int
 wcgetsec(size_t *Blklen, char *rxbuf, unsigned int maxtime)
 {
-    register int checksum, wcj, firstch;
-    register unsigned short oldcrc;
-    register char *p;
+    int checksum, wcj, firstch;
+    unsigned short oldcrc;
+    char *p;
     int sectcurr;
 
     for (Lastrx=errors=0; errors<RETRYMAX; errors++) {
@@ -1468,7 +1468,7 @@ buffer_it:
 static int
 make_dirs(char *pathname)
 {
-	register char *p;		/* Points into path */
+	char *p;		/* Points into path */
 	int madeone = 0;		/* Did we do anything yet? */
 	int save_errno = errno;		/* Remember caller's errno */
 
@@ -1515,7 +1515,7 @@ make_dirs(char *pathname)
 static int 
 putsec(struct zm_fileinfo *zi, char *buf, size_t n)
 {
-	register char *p;
+	char *p;
 
 	if (n == 0)
 		return OK;
@@ -1659,7 +1659,7 @@ violation:
 static int
 tryz(void)
 {
-	register int c, n;
+	int c, n;
 	int zrqinits_received=0;
 	size_t bytes_in_block=0;
 
@@ -1783,7 +1783,7 @@ again:
 static int
 rzfiles(struct zm_fileinfo *zi)
 {
-	register int c;
+	int c;
 
 	for (;;) {
 		timing(1,NULL);
@@ -1872,7 +1872,7 @@ oosb_free(void)
 static int
 rzfile(struct zm_fileinfo *zi)
 {
-	register int c, n;
+	int c, n;
 	long last_rxbytes=0;
 	unsigned long last_bps=0;
 	long not_printed=0;

@@ -106,7 +106,7 @@ extern int zmodem_requested;
 static inline int
 noxrd7(void)
 {
-	register int c;
+	int c;
 
 	for (;;) {
 		if ((c = READLINE_PF(Rxtimeout)) < 0)
@@ -130,7 +130,7 @@ noxrd7(void)
 static inline int
 zgeth1(void)
 {
-	register int c, n;
+	int c, n;
 
 	if ((c = noxrd7()) < 0)
 		return c;
@@ -154,7 +154,7 @@ zgeth1(void)
 static inline int
 zgethex(void)
 {
-	register int c;
+	int c;
 
 	c = zgeth1();
 	VPRINTF(9,("zgethex: %02X", c));
@@ -322,8 +322,8 @@ zsendline_s(const char *s, size_t count)
 void 
 zsbhdr(int type, char *hdr)
 {
-	register int n;
-	register unsigned short crc;
+	int n;
+	unsigned short crc;
 
 	VPRINTF(3,("zsbhdr: %s %lx", frametype_to_string(type), rclhdr(hdr)));
 	if (type == ZDATA)
@@ -355,8 +355,8 @@ zsbhdr(int type, char *hdr)
 static void
 zsbh32(char *hdr, int type)
 {
-	register int n;
-	register unsigned long crc;
+	int n;
+	unsigned long crc;
 
 	xsendline(ZBIN32);  zsendline(type);
 	crc = 0xFFFFFFFFL; crc = UPDC32(type, crc);
@@ -376,8 +376,8 @@ zsbh32(char *hdr, int type)
 void 
 zshhdr(int type, char *hdr)
 {
-	register int n;
-	register unsigned short crc;
+	int n;
+	unsigned short crc;
 	unsigned char s[30];
 	size_t len;
 
@@ -427,7 +427,7 @@ static const char *Zendnames[] = { "ZCRCE", "ZCRCG", "ZCRCQ", "ZCRCW"};
 void 
 zsdata(const char *buf, size_t length, int frameend)
 {
-	register unsigned short crc;
+	unsigned short crc;
 
 	VPRINTF(3,("zsdata: %lu %s", (unsigned long) length, 
 		Zendnames[(frameend-ZCRCE)&3]));
@@ -543,10 +543,10 @@ printout_blocksizes(void)
 int
 zrdata(char *buf, int length, size_t *bytes_received)
 {
-	register int c;
-	register unsigned short crc;
-	register char *end;
-	register int d;
+	int c;
+	unsigned short crc;
+	char *end;
+	int d;
 
 	*bytes_received=0;
 	if (Rxframeind == ZBIN32)
@@ -611,10 +611,10 @@ crcfoo:
 static int
 zrdat32(char *buf, int length, size_t *bytes_received)
 {
-	register int c;
-	register unsigned long crc;
-	register char *end;
-	register int d;
+	int c;
+	unsigned long crc;
+	char *end;
+	int d;
 
 	crc = 0xFFFFFFFFL;  end = buf + length;
 	while (buf <= end) {
@@ -688,7 +688,7 @@ crcfoo:
 int
 zgethdr(char *hdr, int eflag, size_t *Rxpos)
 {
-	register int c, cancount;
+	int c, cancount;
 	unsigned int max_garbage; /* Max bytes before start of frame */
 	size_t rxpos=0; /* keep gcc happy */
 	int garbage_count = 0;
@@ -845,8 +845,8 @@ fifi:
 static int 
 zrbhdr(char *hdr)
 {
-	register int c, n;
-	register unsigned short crc;
+	int c, n;
+	unsigned short crc;
 
 	if ((c = zdlread()) & ~0377)
 		return c;
@@ -878,8 +878,8 @@ zrbhdr(char *hdr)
 static int
 zrbhdr32(char *hdr)
 {
-	register int c, n;
-	register unsigned long crc;
+	int c, n;
+	unsigned long crc;
 
 	if ((c = zdlread()) & ~0377)
 		return c;
@@ -911,9 +911,9 @@ zrbhdr32(char *hdr)
 static int 
 zrhhdr(char *hdr)
 {
-	register int c;
-	register unsigned short crc;
-	register int n;
+	int c;
+	unsigned short crc;
+	int n;
 
 	if ((c = zgethex()) < 0)
 		return c;

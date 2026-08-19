@@ -965,7 +965,7 @@ violation:
 static int
 wctxpn(struct zm_fileinfo *zi)
 {
-	register char *p, *q;
+	char *p, *q;
 	struct stat f;
 
 	if (protocol==ZM_XMODEM) {
@@ -1096,8 +1096,8 @@ getnak(void)
 static int
 wctx(struct zm_fileinfo *zi)
 {
-	register size_t thisblklen;
-	register int sectnum, attempts, firstch;
+	size_t thisblklen;
+	int sectnum, attempts, firstch;
 
 	firstsec=TRUE;  thisblklen = blklen;
 	vfile("wctx:file length=%ld", (long) zi->bytes_total);
