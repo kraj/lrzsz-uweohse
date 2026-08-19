@@ -91,6 +91,8 @@ exec 5>$testdir/error.log
 
 runlog=$testdir/run.log
 LRZSZ_JOURNAL=$(pwd)/$testdir/journal.log
+TRACEFILE_SZ=$(pwd)/$testdir/trace-sz.txt
+TRACEFILE_RZ=$(pwd)/$testdir/trace-rz.txt
 export LRZSZ_JOURNAL
 
 binary_1m=$(find /usr/bin/ /usr/lib -size +1100000c -a -size -5000000c |xargs ls -S1 | tail -n1)
@@ -203,10 +205,19 @@ doit() {
     if test -n "$NOSNIF" ; then
         MYSNIF=""
     fi
+    
+    TRACE_SZ=""
+    TRACE_RZ=""
+    if test -n "$STRACE" ; then
+        TRACE_SZ="strace -vs 1280 -Ttt -fo $TRACEFILE_SZ"
+        TRACE_RZ="strace -vs 1280 -Ttt -fo $TRACEFILE_RZ"
+    fi
+
     echo "$doit_key - $title" >>$runlog
     echo "pid: $$" >>$runlog
     echo "cmd: ($sz $files ) <$testdir/pipe | (cd $testdir/$doit_key ; exec $FAULT $MYSNIF $rz >>../pipe )" >>$runlog
-    (echo "pid-sender: " $(getpid) >>$runlog ; exec $sz $files ) <$testdir/pipe | (echo "pid-receiver: $(getpid)" >>$runlog ; cd $testdir/$doit_key ; exec $FAULT $MYSNIF $rz >>../pipe )
+        (echo "pid-sender: " $(getpid) >>$runlog ; exec $TRACE_SZ $sz $files ) <$testdir/pipe | 
+        (echo "pid-receiver: $(getpid)" >>$runlog ; cd $testdir/$doit_key ; exec $FAULT $MYSNIF $TRACE_RZ $rz >>../pipe )
     end=$(date +%s.%N)
     echo "cmp: $cmp" >>$runlog
     for doit_i in $files ; do 
@@ -511,7 +522,7 @@ compat_traits() {
         s_16bit_crc_opt="-o"
         r_can_16bit_crc="yes"
         ;;
-    lrzsz-0.12.21rc)
+    lrzsz_old)
         TEST_SZ=~/bin/lrzsz-0.12.21rc/lsz" -q"
         TEST_SX=~/bin/lrzsz-0.12.21rc/lsz" -q --xmodem"
         TEST_SB=~/bin/lrzsz-0.12.21rc/lsz" -q --ymodem"
@@ -556,8 +567,8 @@ compat_traits() {
         ;;
 
     sexyz)
-        TEST_SZ=~/bin/sexyz" sz"
-        TEST_RZ=~/bin/sexyz" rz"
+        TEST_SZ=~/bin/sexyz" -s sz"
+        TEST_RZ=~/bin/sexyz" -s rz"
         TEST_SX=~/bin/sexyz" sx"
         TEST_RX=~/bin/sexyz" rx"
         TEST_SB=~/bin/sexyz" sy"
@@ -594,7 +605,7 @@ compat_traits() {
         BENCH_SZ_1k="$TEST_SZ"
         BENCH_RZ="$TEST_RZ"
         ;;
-    zmtx-zmrx)
+    zmtxzmrx)
         TEST_SZ=~/bin/zmtx # no -q option
         TEST_RZ=~/bin/zmrx" -q"
         BENCH_SZ_1k="$TEST_SZ"
@@ -609,16 +620,17 @@ compat_traits() {
         ;;
     esac
 }
+
 xcompat() {
     available="self"
     if test -x ~/bin/lrzsz-0.12.21rc/lrz -a -x ~/bin/lrzsz-0.12.21rc/lsz ; then
-        available="$available lrzsz-0.12.21rc"
+        available="$available lrzsz_old"
     fi
     if test -x ~/bin/crzsz/crz -a -x ~/bin/crzsz/csz ; then
         available="$available crzsz"
     fi
     if test -x ~/bin/zmtx -a -x ~/bin/zmrx ; then
-        available="$available zmtx-zmrx"
+        available="$available zmtxzmrx"
     fi
     if test -x ~/bin/sexyz ; then
         available="$available sexyz"
@@ -704,13 +716,13 @@ xcompat() {
 ycompat() {
     available="self"
     if test -x ~/bin/lrzsz-0.12.21rc/lrz -a -x ~/bin/lrzsz-0.12.21rc/lsz ; then
-        available="$available lrzsz-0.12.21rc"
+        available="$available lrzsz_old"
     fi
     if test -x ~/bin/crzsz/crz -a -x ~/bin/crzsz/csz ; then
         available="$available crzsz"
     fi
     if test -x ~/bin/zmtx -a -x ~/bin/zmrx ; then
-        available="$available zmtx-zmrx"
+        available="$available zmtxzmrx"
     fi
     if test -x ~/bin/sexyz ; then
         available="$available sexyz"
@@ -754,13 +766,13 @@ ycompat() {
 zcompat() {
     available="self"
     if test -x ~/bin/lrzsz-0.12.21rc/lrz -a -x ~/bin/lrzsz-0.12.21rc/lsz ; then
-        available="$available lrzsz-0.12.21rc"
+        available="$available lrzsz_old"
     fi
     if test -x ~/bin/crzsz/crz -a -x ~/bin/crzsz/csz ; then
         available="$available crzsz"
     fi
     if test -x ~/bin/zmtx -a -x ~/bin/zmrx ; then
-        available="$available zmtx-zmrx"
+        available="$available zmtxzmrx"
     fi
     if test -x ~/bin/sexyz ; then
         available="$available sexyz"
@@ -843,63 +855,230 @@ zcompat() {
 
     done
 }
-zspeed() {
+zbuffer() {
+    compat_traits "self"
+    _SZ_1k="$BENCH_SZ_1k";
+    _RZ="$BENCH_RZ";
+    sender="lsz"
+    receiver="lrz"
+    for i in $(seq 1 7); do
+            for speed in unlimited; do
+                FAULT=""
+                all_binaries="$all_256_file $binary_4k $binary_16k $binary_128k $binary_256k $binary_1m $binary_8m"
+
+                key="zmodem-$sender-$receiver-buffer-4096"
+                doit "$key" "$sender sending multiple files to $receiver" "$_SZ_1k" "$_RZ -B4096" cmp "$all_binaries" 
+                key="zmodem-$sender-$receiver-buffer-8192"
+                doit "$key" "$sender sending multiple files to $receiver" "$_SZ_1k" "$_RZ -B8192" cmp "$all_binaries" 
+                key="zmodem-$sender-$receiver-buffer-16384"
+                doit "$key" "$sender sending multiple files to $receiver" "$_SZ_1k" "$_RZ -B16384" cmp "$all_binaries" 
+                key="zmodem-$sender-$receiver-buffer-32768"
+                doit "$key" "$sender sending multiple files to $receiver" "$_SZ_1k" "$_RZ -B32768" cmp "$all_binaries" 
+                key="zmodem-$sender-$receiver-buffer-65536"
+                doit "$key" "$sender sending multiple files to $receiver" "$_SZ_1k" "$_RZ -B65536" cmp "$all_binaries" 
+                key="zmodem-$sender-$receiver-buffer-131072"
+                doit "$key" "$sender sending multiple files to $receiver" "$_SZ_1k" "$_RZ -B131072" cmp "$all_binaries" 
+                key="zmodem-$sender-$receiver-buffer-262144"
+                doit "$key" "$sender sending multiple files to $receiver" "$_SZ_1k" "$_RZ -B262144" cmp "$all_binaries" 
+            done
+            
+    done
+}
+# for the benchmarking.
+config() {
+    case "$1" in
+    self|lrzsz)
+        shift
+        _cmd=
+        _opt=
+        for _i in $* ; do
+            case "$_i" in
+            sx) _cmd=$SZ" -q -X" ;;
+            sy) _cmd=$SZ" -q -g" ;;
+            sz) _cmd=$SZ" -q" ;;
+            rx) _cmd=$RZ" -q -X" ;;
+            ry) _cmd=$RZ" -q -g" ;;
+            rz) _cmd=$RZ" -q" ;;
+            crc) _opt="$_opt -c" ;;
+            crc16) _opt="$_opt -o" ;;
+            1k) _opt="$_opt -k" ;;
+            4k) _opt="$_opt -4" ;;
+            8k) _opt="$_opt -8" ;;
+            turbo) _opt="$_opt -T" ;;
+            r_can_2k) ;;
+            r_can_4k) ;;
+            r_can_8k) ;;
+            *) echo "" ; return ;;
+            esac
+        done
+        echo $_cmd $_opt
+        return
+        ;;
+    lrzsz_old)
+        shift
+        _cmd=
+        _opt=
+        for _i in $* ; do
+            case "$_i" in
+            sx) _cmd=~/bin/lrzsz-0.12.21rc/lsz" -q --xmodem" ;;
+            ry) _cmd=~/bin/lrzsz-0.12.21rc/lsz" -q --ymodem" ;;
+            sz) _cmd=~/bin/lrzsz-0.12.21rc/lsz" -q" ;;
+            rx) _cmd=~/bin/lrzsz-0.12.21rc/lrz" -q --xmodem" ;;
+            ry) _cmd=~/bin/lrzsz-0.12.21rc/lrz" -q --ymodem" ;;
+            rz) _cmd=~/bin/lrzsz-0.12.21rc/lrz" -q" ;;
+            crc) _opt="$_opt -c" ;;
+            crc16) _opt="$_opt -o" ;;
+            1k) _opt="$_opt -k" ;;
+            4k) _opt="$_opt -4" ;;
+            8k) _opt="$_opt -8" ;;
+            turbo) _opt="$_opt -T" ;;
+            r_can_2k) ;;
+            r_can_4k) ;;
+            r_can_8k) ;;
+            *) echo "" ; return ;;
+            esac
+        done
+        echo $_cmd $_opt
+        return
+        ;;
+    crzsz)
+        shift
+        _cmd=
+        _opt=
+        for _i in $* ; do
+            case "$_i" in
+            sx) _cmd=~/bin/crzsz/csx ;;
+            sy) _cmd=~/bin/crzsz/csb ;;
+            sz) _cmd=~/bin/crzsz/csz ;;
+            rx) _cmd=~/bin/crzsz/crx ;;
+            ry) _cmd=~/bin/crzsz/crb ;;
+            rz) _cmd=~/bin/crzsz/crz ;;
+            r_can_2k) ;;
+            crc16) _opt="$_opt -o" ;;
+            1k) _opt="$_opt -k" ;;
+            *) echo "" ; return ;;
+            esac
+        done
+        echo $_cmd $_opt
+        return;
+        ;;
+    zmtxzmrx)
+        shift
+        _cmd=
+        for _i in $* ; do
+            case "$_i" in
+            r_can_2k) ;;
+            r_can_4k) ;;
+            r_can_8k) ;;
+            sz) _cmd=~/bin/zmtx ;;
+            rz) _cmd=~/bin/zmrx" -q" ;;
+            *) echo "" ; return ;;
+            esac
+        done
+        echo $_cmd
+        return;
+        ;;
+    sexyz)
+        shift
+        _cmd=~/bin/sexyz
+        _post=~/bin/sexyz
+        for _i in $* ; do
+            case "$_i" in
+            r_can_2k) ;;
+            r_can_4k) ;;
+            r_can_8k) ;;
+            8k) _cmd="$_cmd -8" ;;
+            4k) _cmd="$_cmd -4" ;;
+            2k) _cmd="$_cmd -2" ;;
+            1k) _cmd="$_cmd -k" ;;
+            crc) _cmd="$_cmd -c" ;;
+            crc16) _cmd="$_cmd -o" ;;
+            segmented) _cmd="$_cmd -s" ;;
+            sz) _post="sz" ;;
+            rz) _post="rz" ;;
+            sy) _post="sy" ;;
+            ry) _post="ry" ;;
+            sx) _post="sx" ;;
+            rx) _post="rx" ;;
+            *) echo "" ; return ;;
+            esac
+        done
+        echo $_cmd $_post
+        return
+        ;;
+    esac
+}
+zbenchmark() {
     available="self"
     if test -x ~/bin/lrzsz-0.12.21rc/lrz -a -x ~/bin/lrzsz-0.12.21rc/lsz ; then
-        available="$available lrzsz-0.12.21rc"
+        available="$available lrzsz_old"
     fi
     if test -x ~/bin/crzsz/crz -a -x ~/bin/crzsz/csz ; then
         available="$available crzsz"
     fi
     if test -x ~/bin/zmtx -a -x ~/bin/zmrx ; then
-        available="$available zmtx-zmrx"
+        available="$available zmtxzmrx"
     fi
     if test -x ~/bin/sexyz ; then
         available="$available sexyz"
     fi
-    available="self self self"
+    if false ; then
+        for sender in $available ; do
+            echo "sender $sender sz  =" $(config $sender sz)
+            echo "receiver $sender rz  =" $(config $sender rz)
+            echo "sender $sender sz 4k =" $(config $sender sz 4k)
+            echo "receiver $sender rz r_can_4k =" $(config $sender rz r_can_4k)
+        done
+        return
+    fi
     for sender in $available ; do
-        compat_traits "$sender"
-        _SZ_1k="$BENCH_SZ_1k";
-        _SZ_2k="$BENCH_SZ_2k";
-        _SZ_4k="$BENCH_SZ_4k";
-        _SZ_8k="$BENCH_SZ_8k";
-        if test -z "$_SZ_1k" ; then
-            continue
-        fi
         for receiver in $available ; do
-            compat_traits "$receiver"
-            _RZ="$BENCH_RZ";
-            if test -z "$_RZ" ; then
-                continue
-            fi
-            #for speed in unlimited 38400 115200 1m; do
-            for speed in unlimited; do
-                if test "$speed" = "unlimited" ; then
-                    FAULT=""
-                else
-                    FAULT="$SIMU -s 1 -r $speed"
+            # blacklist of known problem combos
+            case "$sender-$receiver" in
+            zmtxzmrx-crzsz)
+                # crzsz for some reason falls back to XMODEM.
+                continue;
+                ;;
+            sexyz-zmtxzmrx)
+                # sexyz stumbles (a) over the ZACK zmrx sends for ZFILE, and (b) over the wrong ZACK position in other ZACKs.
+                continue;
+                ;;
+            esac
+            for kparm in "" 2k 4k 8k ; do
+                TEST_S=$(config $sender sz $kparm)
+                if test -z "$TEST_S" ; then continue ; fi
+                t=""
+                if test -n "$kparm" ; then
+                    t="r_can_$kparm"
                 fi
-                case "$speed" in
-                115200) all_binaries="$all_256_file $binary_4k $binary_8k $binary_16k" ;;
-                38400) all_binaries="$all_256_file $binary_4k $binary_8k" ;;
-                *) all_binaries="$all_256_file $binary_4k $binary_16k $binary_128k $binary_256k $binary_1m $binary_8m" ;;
-                esac
+                TEST_R=$(config $receiver rz $t)
+                if test -z "$TEST_R" ; then continue ; fi
+                #for speed in unlimited 8m 1m 115200; do
+                for speed in 5ms 4ms 3ms 2ms 1ms; do
+                    case $speed in
+                    unlimited) FAULT="" ;;
+                    *ms) FAULT="$SIMU -s 1 -d $speed" ;;
+                    *) FAULT="$SIMU -s 1 -r $speed" ;;
+                    esac
 
-                key="zmodem-$sender-$receiver-speed-$speed-1k-4096"
-                doit "$key" "$sender sending multiple files to $receiver" "$_SZ_1k" "$_RZ -B4096" cmp "$all_binaries" 
-                key="zmodem-$sender-$receiver-speed-$speed-1k-32768"
-                doit "$key" "$sender sending multiple files to $receiver" "$_SZ_1k" "$_RZ -B32768" cmp "$all_binaries" 
-                key="zmodem-$sender-$receiver-speed-$speed-1k-131072"
-                doit "$key" "$sender sending multiple files to $receiver" "$_SZ_1k" "$_RZ -B131072" cmp "$all_binaries" 
-                key="zmodem-$sender-$receiver-speed-$speed-1k-262144"
-                doit "$key" "$sender sending multiple files to $receiver" "$_SZ_1k" "$_RZ -B262144" cmp "$all_binaries" 
-                key="zmodem-$sender-$receiver-speed-$speed-1k-1048576"
-                doit "$key" "$sender sending multiple files to $receiver" "$_SZ_1k" "$_RZ -B1048576" cmp "$all_binaries" 
-                key="zmodem-$sender-$receiver-speed-$speed-1k-4194304"
-                doit "$key" "$sender sending multiple files to $receiver" "$_SZ_1k" "$_RZ -B4194304" cmp "$all_binaries" 
+                    case "$speed" in
+                    38400|5ms|0ms) all_binaries="$all_256_file $binary_8k $binary_64k" ;;
+                    115200) all_binaries="$all_256_file $binary_2k $binary_16k $binary_128k" ;;
+                    1m) all_binaries="$all_256_file $binary_4k $binary_16k $binary_128k $binary_256k" ;;
+                    8m) all_binaries="$binary_1m" ;;
+                    #8m) all_binaries="$all_256_file $binary_4k $binary_16k $binary_128k $binary_256k $binary_1m" ;;
+                    *) all_binaries="$all_256_file $binary_4k $binary_16k $binary_128k $binary_256k $binary_1m $binary_8m" ;;
+                    esac
+
+                    t="1k"
+                    if test -n "$kparm" ; then
+                        t="$kparm"
+                    fi
+                    key="zmodem-$sender-$receiver-benchmark-$speed-$t"
+                    doit "$key" "$sender sending multiple files to $receiver" "$TEST_S" "$TEST_R" cmp "$all_binaries" 
+                done
             done
-            
+
         done
     done
 }
@@ -1103,8 +1282,14 @@ fi
 if test "$mode" = all -o "$mode" = zmanage -o "$mode" = "z" ; then
     zmanage
 fi
-if test "$mode" = all -o "$mode" = zspeed  -o "$mode" = "speed"  -o "$mode" = "z" ; then
-    zspeed
+# not part of the normal self test, this is just too slow
+if test "$mode" = zbenchmark  -o "$mode" = "benchmark" ; then
+    zbenchmark
+fi
+if test "$mode" = zbuffer ; then
+    # benchmark if the setvbuf default of 32768 is ok.
+    # very special stuff, not a regular self check.
+    zbuffer
 fi
 
 
