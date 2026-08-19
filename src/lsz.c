@@ -1984,8 +1984,6 @@ calc_blklen(long total_sent)
 	if (calcs_done++ < 5) {
 		if (error_count && start_blklen >1024)
 			return last_blklen=1024;
-		else
-			last_blklen/=2;
 		return last_blklen=start_blklen;
 	}
 
