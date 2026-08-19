@@ -1,3 +1,6 @@
+#ifndef LRZSZ_STATS_H
+#define LRZSZ_STATS_H
+
 struct lrzsz_stat {
     unsigned int n_files;
     char *filename;
@@ -38,3 +41,5 @@ void stats_log(struct lrzsz_stat *st, bool forone);
 void stats_set_filename(const char *);
 void stats_journal_open(const char *path);
 void stats_journal_close(void);
+
+#endif

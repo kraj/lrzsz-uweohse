@@ -1,3 +1,6 @@
+#ifndef LRZSZ_ZMODEM_H
+#define LRZSZ_ZMODEM_H
+
 /* zmodem.h - ZMODEM protocol constants
 
   Copyright (C) until 1998 Chuck Forsberg (OMEN Technology Inc)
@@ -139,3 +142,4 @@ extern char Attn[ZATTNLEN+1];	/* Attention string rx sends to tx on err */
 #endif
 
 /* End of ZMODEM.H */
+#endif
