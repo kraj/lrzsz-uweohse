@@ -1320,6 +1320,12 @@ procheader(char *name, struct zm_fileinfo *zi)
                 stat_for_file.policy_rejects+=1;
                 return ERROR;
             }
+            if (errno != ENOENT) {
+                stat_for_file.local_errors+=1;
+                if (Verbose)
+                    vstringf(_("cannot check %s: %s\n"),tmpname,strerror(errno));
+                return ERROR;
+            }
             free(name_static);
             name_static=xstrdup(tmpname);
             zi->fname=name_static;
