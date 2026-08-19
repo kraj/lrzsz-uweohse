@@ -105,6 +105,56 @@ static size_t getfree (void);
 static int install_signal_handler (int sig);
 static FILE *safe_open (const char *path, const char *mode);
 
+static int
+path_within_cwd(const char *path)
+{
+    char *dir;
+    char *slash;
+    char *real_dir;
+    static char *cwd = NULL;
+    size_t cwd_len;
+
+    if (!cwd) {
+        cwd = realpath(".", NULL);
+        if (!cwd)
+            return 1; /* can't verify — allow */
+    }
+    cwd_len = strlen(cwd);
+
+    dir = strdup(path);
+    if (!dir)
+        return 1; /* OOM — allow, caller handles open failure */
+
+    slash = strrchr(dir, '/');
+    if (slash == dir) {
+        /* parent is root: "/foo" — absolute path, checkpath already rejects */
+        free(dir);
+        return 0;
+    }
+    if (slash) {
+        *slash = '\0'; /* dir is now the parent directory */
+    } else {
+        /* no slash — parent is "." */
+        free(dir);
+        return 1; /* same directory as CWD, no symlink traversal possible */
+    }
+
+    real_dir = realpath(dir[0] ? dir : ".", NULL);
+    free(dir);
+    if (!real_dir)
+        return 0; /* parent doesn't exist or is unreadable — reject */
+
+    /* Check that real_dir is CWD itself or a subdirectory of CWD */
+    if (strncmp(real_dir, cwd, cwd_len) != 0 ||
+        (real_dir[cwd_len] != '\0' && real_dir[cwd_len] != '/')) {
+        free(real_dir);
+        return 0; /* parent resolved outside CWD — reject */
+    }
+
+    free(real_dir);
+    return 1;
+}
+
 static long buffersize=32768;
 static unsigned long min_bps=0;
 static long min_bps_time=120;
@@ -1062,11 +1112,15 @@ do_crc_check(FILE *f, size_t remote_bytes, size_t check_bytes)
 }
 
 /*
- * Open a file for writing without following symlinks in the final
- * path component.  Maps fopen-style mode strings to open() flags.
- * Returns a FILE* on success, NULL on error (errno set).
+ * Open a file w/o following symlinks.
+ * - O_NOFOLLOW prevents the final path component from being a symlink;
+ * - path_within_cwd() checks that the intermediate directory components 
+ *   do not redirect outside CWD via symlinks.
+ * Maps fopen-style mode strings to open() flags.
+ *
+ * @return FILE *|NULL
  */
-    static FILE *
+static FILE *
 safe_open(const char *path, const char *mode)
 {
     int flags = 0;
@@ -1086,7 +1140,7 @@ safe_open(const char *path, const char *mode)
                 flags |= O_WRONLY | O_CREAT | O_APPEND;
                 break;
             case '+':
-                flags &= ~(O_RDONLY | O_WRONLY | O_APPEND);
+                flags &= ~(O_RDONLY | O_WRONLY);
                 flags |= O_RDWR;
                 break;
             default:
@@ -1094,6 +1148,11 @@ safe_open(const char *path, const char *mode)
         }
     }
     flags |= O_NOFOLLOW;
+
+    if (!path_within_cwd(path)) {
+        errno = EACCES;
+        return NULL;
+    }
 
     fd = open(path, flags, 0666);
     if (fd < 0)
