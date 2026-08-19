@@ -233,7 +233,7 @@ void readline_setup (int fd, size_t readnum, size_t buffer_size);
 extern int Fromcu;
 extern int Twostop;
 extern int iofd;
-extern unsigned Baudrate;
+extern unsigned int Baudrate;
 
 LRZSZ_FORMAT_PRINTF(1,2) void zperr (const char *fmt, ...);
 LRZSZ_FORMAT_PRINTF(1,2) void zpfatal (const char *fmt, ...);
