@@ -45,11 +45,7 @@ char *alloca ();
 # endif
 #endif
 
-#ifdef __STDC__
 #include <stdarg.h>
-#else
-#include <varargs.h>
-#endif
 
 #  include <sys/time.h>
 #  include <time.h>
