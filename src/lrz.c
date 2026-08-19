@@ -121,9 +121,7 @@ path_within_cwd(const char *path)
     }
     cwd_len = strlen(cwd);
 
-    dir = strdup(path);
-    if (!dir)
-        return 1; /* OOM — allow, caller handles open failure */
+    dir = xstrdup(path); /* even if we handled that gracefully something would fail later */
 
     slash = strrchr(dir, '/');
     if (slash == dir) {
@@ -1359,12 +1357,7 @@ procheader(char *name, struct zm_fileinfo *zi)
         {
                 /* cast because we might not have a prototyp for strdup :-/ */
                 free(name_static);
-                name_static=(char *) strdup("/dev/null");
-                if (!name_static)
-                {
-                        fprintf(stderr,"%s: %s\n", lrzsz_progname, _("out of memory"));
-                        exit(1);
-                }
+                name_static=xstrdup("/dev/null");
         }
 
         if (Thisbinary && zconv==ZCRESUM) {
