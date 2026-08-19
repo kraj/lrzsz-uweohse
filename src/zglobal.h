@@ -77,20 +77,11 @@ char *alloca ();
 
 #include <sys/stat.h>
 
-/* we need to decide whether readcheck is possible */
 #ifdef HAVE_FCNTL_H
 #  include <fcntl.h>
 #endif
 #ifdef HAVE_SYS_IOCTL_H
 #  include <sys/ioctl.h>
-#endif
-#ifdef HAVE_RDCHK
-#  define READCHECK
-#else
-#  ifdef FIONREAD
-#    define READCHECK_FIONREAD
-#    define READCHECK
-#  endif
 #endif
 
 #ifdef HAVE_TERMIOS_H

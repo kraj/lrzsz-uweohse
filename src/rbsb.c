@@ -144,21 +144,6 @@ from_cu(void)
 
 int Twostop;		/* Use two stop bits */
 
-
-#ifdef READCHECK_FIONREAD
-/*
- *  Return non 0 if something to read from io descriptor f
- */
-int 
-rdchk(int fd)
-{
-	long lf;
-
-	ioctl(fd, FIONREAD, &lf);
-	return ((int) lf);
-}
-#endif
-
 struct termios oldtty, tty;
 
 /*
@@ -192,13 +177,8 @@ io_mode(int fd, int n)
 		if (Twostop)
 			tty.c_cflag |= CSTOPB;	/* Set two stop bits */
 
-#ifdef READCHECK
 		tty.c_lflag = protocol==ZM_ZMODEM ? 0 : ISIG;
 		tty.c_cc[VINTR] = protocol==ZM_ZMODEM ? -1 : 030;	/* Interrupt char */
-#else
-		tty.c_lflag = 0;
-		tty.c_cc[VINTR] = protocol==ZM_ZMODEM ? 03 : 030;	/* Interrupt char */
-#endif
 #ifdef _POSIX_VDISABLE
 		if (((int) _POSIX_VDISABLE)!=(-1)) {
 			tty.c_cc[VQUIT] = _POSIX_VDISABLE;		/* Quit char */

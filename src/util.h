@@ -31,4 +31,6 @@ unsigned long lrzsz_strtoul(const char *name, const char *value, const char *val
 char * xstrdup(const char *s);
 void * xmalloc(size_t size);
 
+int fd_readable(int fd);
+
 #endif

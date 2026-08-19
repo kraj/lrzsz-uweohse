@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <sys/select.h>
 #include "zglobal.h"
 
 #ifndef _
@@ -147,4 +148,17 @@ xmalloc(size_t size)
     if (!tmp)
         fatal_error(1,errno,"malloc");
     return tmp;
+}
+
+int
+fd_readable(int fd)
+{
+    fd_set fds;
+    struct timeval tv;
+
+    FD_ZERO(&fds);
+    FD_SET(fd, &fds);
+    tv.tv_sec = 0;
+    tv.tv_usec = 0;
+    return select(fd + 1, &fds, NULL, NULL, &tv);
 }

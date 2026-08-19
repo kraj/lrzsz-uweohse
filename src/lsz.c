@@ -123,11 +123,8 @@ int use_mmap=1;
  *  when an error is detected.  A pause (0336) may be needed before the
  *  ^C (03) or after it.
  */
-#ifdef READCHECK
 char Myattn[] = { 0 };
-#else
-char Myattn[] = { 03, 0336, 0 };
-#endif
+/* alternative: char Myattn[] = { 03, 0336, 0 }; when READCHECK was not defined (but it always was under linux). */
 
 FILE *input_f;
 
@@ -151,7 +148,8 @@ int Optiong;		/* Let it rip no wait for sector ACK's */
 int Totsecs;		/* total number of sectors this file */
 int Filcnt=0;		/* count of number of files opened */
 int Lfseen=0;
-unsigned Rxbuflen = 16384;	/* Receiver's max buffer length */
+#define DEFAULT_RXBUFLEN (16*1024)
+unsigned Rxbuflen = DEFAULT_RXBUFLEN;	/* Receiver's max buffer length */
 unsigned Tframlen = 0;	/* Override for tx frame length */
 unsigned blkopt=0;		/* Override value for zmodem blklen */
 int Rxflags = 0;
@@ -380,7 +378,7 @@ main(int argc, char **argv)
 #define getopt_long(argc,argv,str,longopts,longind) getopt(argc,argv,str)
 #endif
 	while ((c = getopt_long (argc, argv,
-		"2+4589abB:C:c:dfeEghHi:J:kL:l:m:M:NnOopRrqsSt:TUuvVw:XYyZ",
+		"2+4589aA:bB:C:c:dfeEghHi:J:kL:l:m:M:NnOopRrqsSt:TUuvVw:XYyZ",
 		long_options, (int *) 0))!=EOF)
 	{
 		switch (c)
@@ -1347,6 +1345,7 @@ usage(int exitcode, const char *what)
 "  -R, --restricted            restricted, more secure mode\n"
 "  -q, --quiet                 quiet (no progress reports)\n"
 "  -s, --stop-at {HH:MM|+N}    stop transmission at HH:MM or in N seconds\n"
+/* -S was timesync */
 "  -u, --unlink                unlink file after transmission\n"
 "  -U, --unrestrict            turn off restricted mode (if allowed to)\n"
 "  -v, --verbose               be verbose, provide debugging information\n"
@@ -1420,45 +1419,43 @@ getzrxinit(void)
 			vfile("Rxbuflen=%d Tframlen=%d", Rxbuflen, Tframlen);
 			if ( play_with_sigint)
 				signal(SIGINT, SIG_IGN);
+
 			io_mode(io_mode_fd,2);	/* Set cbreak, XON/XOFF, etc. */
-#ifndef READCHECK
-			/* Use MAX_BLOCK byte frames if no sample/interrupt */
-			if (Rxbuflen < 32 || Rxbuflen > MAX_BLOCK) {
-				Rxbuflen = MAX_BLOCK;
-				vfile("Rxbuflen=%d", Rxbuflen);
-			}
-#endif
+
 			/* Override to force shorter frame length */
 			if (Tframlen && Rxbuflen > Tframlen)
 				Rxbuflen = Tframlen;
 			if ( !Rxbuflen)
-				Rxbuflen = 1024;
+				Rxbuflen = DEFAULT_RXBUFLEN;
 			vfile("Rxbuflen=%d", Rxbuflen);
 
+#if 0
 			/* If using a pipe for testing set lower buf len */
 			fstat(0, &f);
-#if defined(S_ISCHR)
 			if (! (S_ISCHR(f.st_mode))) {
-#else
-			if ((f.st_mode & S_IFMT) != S_IFCHR) {
-#endif
-				Rxbuflen = MAX_BLOCK;
+				Rxbuflen = 8192;
 			}
+#endif
 			/*
 			 * If input is not a regular file, force ACK's to
 			 *  prevent running beyond the buffer limits
 			 */
 			if ( !command_mode) {
 				fstat(fileno(input_f), &f);
-#if defined(S_ISREG)
 				if (!(S_ISREG(f.st_mode))) {
-#else
-				if ((f.st_mode & S_IFMT) != S_IFREG) {
-#endif
 					Canseek = -1;
 					/* return ERROR; */
 				}
 			}
+
+                        /* for segmented streaming: */                        
+                        if (start_blklen > Rxbuflen && Rxbuflen) {
+                            start_blklen = Rxbuflen;
+                        }
+                        if (max_blklen > Rxbuflen && Rxbuflen) {
+                            max_blklen = Rxbuflen;
+                        }
+
 			/* Set initial subpacket length */
 			if (blklen < 1024) {	/* Command line override? */
 				if (Baudrate > 300)
@@ -1691,6 +1688,7 @@ zsendfdata (struct zm_fileinfo *zi)
 	static long not_printed = 0;
 	static long total_sent = 0;
 	static time_t low_bps=0;
+        int newcnt;
 
 #ifdef HAVE_MMAP
 	if (use_mmap && !mm_addr)
@@ -1755,16 +1753,15 @@ zsendfdata (struct zm_fileinfo *zi)
 		case ZRINIT:
 			return OK;
 		}
-#ifdef READCHECK
-		/*
-		 * If the reverse channel can be tested for data,
-		 *  this logic may be used to detect error packets
-		 *  sent by the receiver, in place of setjmp/longjmp
-		 *  rdchk(fdes) returns non 0 if a character is available
-		 */
-		while (rdchk (io_mode_fd)) {
-			switch (READLINE_PF (1))
-			{
+
+                /* we got something, just not what we want. */
+		while (fd_readable (io_mode_fd)) {
+                        c=READLINE_PF(1);
+                        if (TIMEOUT == c) {
+                            goto gotack; /* does error handling */
+                        }
+                
+			switch (c) {
 			case CAN:
 			case ZPAD:
 				c = getinsync (zi, 1);
@@ -1776,9 +1773,9 @@ zsendfdata (struct zm_fileinfo *zi)
                                 ;
 			}
 		}
-#endif
 	}
 
+        newcnt = Rxbuflen;
 	Txwcnt = 0;
 	stohdr (zi->bytes_sent);
 	zsbhdr (ZDATA, Txhdr);
@@ -1815,6 +1812,12 @@ zsendfdata (struct zm_fileinfo *zi)
 			if (Verbose>3)
 				vstringf("e=ZCRCW/bytcnt == Lastsync == %ld",
 					(unsigned long) Lastsync);
+                /* segmented streaming. note: newcnt is reset to Rxbuflen in the goto jungle. */
+                } else if (Rxbuflen && (newcnt -= n) <= 0) {
+                        e = ZCRCW;
+                        if (Verbose>3)
+                                vstringf("e=ZCRCW/Rxbuflen(newcnt=%ld,n=%ld, Rxbuflen=%ld)",
+                                        (unsigned long) newcnt,(unsigned long) n, (unsigned long) Rxbuflen);
 		} else if (Txwindow && (Txwcnt += n) >= Txwspac) {
 			Txwcnt = 0;
 			e = ZCRCQ;
@@ -1880,17 +1883,14 @@ zsendfdata (struct zm_fileinfo *zi)
 		bytcnt = zi->bytes_sent += n;
 		if (e == ZCRCW)
 			goto waitack;
-#ifdef READCHECK
-		/*
-		 * If the reverse channel can be tested for data,
-		 *  this logic may be used to detect error packets
-		 *  sent by the receiver, in place of setjmp/longjmp
-		 *  rdchk(fdes) returns non 0 if a character is available
-		 */
+
 		fflush (stdout);
-		while (rdchk (io_mode_fd)) {
-			switch (READLINE_PF (1))
-			{
+		while (fd_readable (io_mode_fd)) {
+                        c=READLINE_PF(1);
+                        if (TIMEOUT == c) {
+                            goto gotack; /* does error handling */
+                        }
+			switch (c) {
 			case CAN:
 			case ZPAD:
 				c = getinsync (zi, 1);
@@ -1907,7 +1907,7 @@ zsendfdata (struct zm_fileinfo *zi)
 				++junkcount;
 			}
 		}
-#endif	/* READCHECK */
+
 		if (Txwindow) {
 			size_t tcount = 0;
 			while ((tcount = zi->bytes_sent - Lrxpos) >= Txwindow) {
