@@ -227,9 +227,8 @@ io_mode(int fd, int n)
 	case 0:
 		if(!did0)
 			return ERROR;
-		tcdrain (fd); /* wait until everything is sent */
+		tcsetattr (fd,TCSANOW,&oldtty);
 		tcflush (fd,TCIOFLUSH); /* flush input queue */
-		tcsetattr (fd,TCSADRAIN,&oldtty);
 		tcflow (fd,TCOON); /* restart output */
 
 		return OK;
