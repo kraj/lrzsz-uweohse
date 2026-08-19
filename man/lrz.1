@@ -152,6 +152,19 @@ Convert files to
 conventions by stripping carriage returns and all characters
 beginning with the first Control Z (CP/M end of file).
 .TP
+.B "-A, --segmentsize NNNN"
+Tell the sender to turn on `Segmented Streaming' with a buffer / window
+of NNNN bytes. If the sender supports it, it will ask for an ZACK packet
+every NNNN bytes. This somewhat limits throughput on perfect lines, and
+can vastly improve performance on faulty lines.
+
+NNNN can range from 0 to 65535 (this is a protocol limitation). '0', the
+default, tells the sender that the receiver does not wish to use 
+segmentation. Note that `lsz', the sending program of this package, does
+then use its own default of 16kb.
+
+Support for segmented streaming is not universal.
+.TP
 .B "-b, --binary"
 Binary
 (tell it like it is)

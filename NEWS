@@ -104,6 +104,18 @@ not perfectly trustworthy senders.
 * the `-d / --dot-to-slash` option (DOS 8.3 filename transformation)
   was removed.
 
+* lrz has a new option -A --segmentsize NNN. This turns on 
+  `Segmented Streaming' if the sender supports it. This ZMODEM
+  feature was originally intended to allow transfers to machines
+  unable to do overlapping serial and disk I/O. Today it is useful
+  to limit the damage caused by line errors when the sender streams
+  without asking for an ACK.
+  lsz, the original public domain zmodem sz and crzsz csz always 
+  enforced segmented streaming - which is why lrzsz and other zmodem
+  implementations stemming from the same source usually behave much 
+  better on faulty lines than other implementations optimized for 
+  the perfect world.
+
 * a number of possible security problems have been fixed:
   - double fclose in lrz.
   - a write before a buffer in lrz (80s).

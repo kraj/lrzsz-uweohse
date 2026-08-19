@@ -58,6 +58,7 @@ int errors;
 int Restricted=1;	/* restricted; no /.. or ../ in filenames */
 int Readnum = MAX_BLOCK;	/* Number of bytes to ask for in read() from modem */
 int skip_if_not_found;
+unsigned int Segmentsize = 0;
 
 char *Pathname;
 
@@ -202,6 +203,7 @@ static struct option const long_options[] =
 {
 	{"append", no_argument, NULL, '+'},
 	{"ascii", no_argument, NULL, 'a'},
+	{"segmentsize", no_argument, NULL, 'A'},
 	{"binary", no_argument, NULL, 'b'},
 	{"bufsize", required_argument, NULL, 'B'},
 	{"allow-commands", no_argument, NULL, 'C'},
@@ -302,7 +304,7 @@ main(int argc, char *argv[])
 #define getopt_long(argc,argv,str,longopts,longind) getopt(argc,argv,str)
 #endif
 	while ((c = getopt_long (argc, argv, 
-		"a+bB:cCDeEghHJ:m:M:nNOprRqs:St:uUvVw:XZy",
+		"A:a+bB:cCDeEghHJ:m:M:nNOprRqs:St:uUvVw:XZy",
 		long_options, (int *) 0)) != EOF)
 	{
 		switch (c)
@@ -311,6 +313,9 @@ main(int argc, char *argv[])
 			break;
 		case '+': Lzmanag = ZF1_ZMAPND; break;
 		case 'a': Rxascii=TRUE;  break;
+                case 'A':
+                        Segmentsize = (unsigned int) lrzsz_strtoul( "-A / --segmentsize-tries", optarg, NULL, 0, 65536);
+                        break;
 		case 'b': Rxbinary=TRUE; break;
 		case 'B': 
 			if (strcmp(optarg,"auto")==0)
@@ -532,6 +537,7 @@ usage(int exitcode, const char *what)
 	fputs(_(
 "  -+, --append                append to existing files\n"
 "  -a, --ascii                 ASCII transfer (change CR/LF to LF)\n"
+"  -A, --segmentsize           ask for an ACK every ... bytes\n"
 "  -b, --binary                binary transfer\n"
 "  -B, --bufsize N             buffer N bytes before writing to disk\n"
 "  -c, --with-crc              Use 16 bit CRC (X)\n"
@@ -553,6 +559,7 @@ usage(int exitcode, const char *what)
 "  -r, --resume                try to resume interrupted file transfer (Z)\n"
 "  -R, --restricted            restricted, more secure mode\n"
 "  -s, --stop-at {HH:MM|+N}    stop transmission at HH:MM or in N seconds\n"
+/* -S was timesync */
 "      --syslog[=off]          turn syslog on or off, if possible\n"
 "  -t, --timeout N             set timeout to N tenths of a second\n"
 "  -u, --keep-uppercase        keep upper case filenames\n"
@@ -1603,8 +1610,13 @@ tryz(void)
 
 	for (n=zmodem_requested?15:5; 
 		 (--n + zrqinits_received) >=0 && zrqinits_received<10; ) {
-		/* Set buffer length (0) and capability flags */
-		stohdr(0L);
+		/* Set buffer length and capability flags */
+                stohdr(0L);
+                if (tryzhdrtype==ZRINIT) {
+                    /* special short number */
+		    Txhdr[ZP0] = Segmentsize & 0xff;
+		    Txhdr[ZP1] = (Segmentsize / 256) & 0xff;
+                }
 #ifdef CANBREAK
 		Txhdr[ZF0] = CANFC32|CANFDX|CANOVIO|CANBRK;
 #else
