@@ -14,6 +14,18 @@ static FILE *journal_fp = NULL;
 #define OUT(X,Y) if (st->X) fprintf(out, " %s=%lu",Y,(unsigned long) (st->X))
 #define OUTLL(X,Y) if (st->X) fprintf(out, " %s=%llu",Y,(unsigned long long) (st->X))
 
+static void
+fprintf_sanitized(FILE *out, const char *s)
+{
+    for (; *s; s++) {
+        unsigned char c = (unsigned char)*s;
+        if (c >= 0x20 && c < 0x7f)
+            fputc(c, out);
+        else
+            fprintf(out, "\\x%02x", c);
+    }
+}
+
 void
 stats_set_filename(const char *fn)
 {
@@ -56,7 +68,8 @@ write_stats_line(FILE *out, struct lrzsz_stat *st, bool forone)
     fprintf(out," dir=%s", dir);
     fprintf(out," proto=%c", protocol == ZM_XMODEM ? 'x' : protocol == ZM_YMODEM ? 'y' : 'z');
     if (forone) {
-        fprintf(out," filename=%s",st->filename ? st->filename : "unknown"); // unknown: coding error or out of memory.
+        fprintf(out," filename=");
+        fprintf_sanitized(out, st->filename ? st->filename : "unknown"); // unknown: coding error or out of memory.
         if (st->files_ok) {
             fprintf(out," status=ok");
         } else if (st->files_err) {
