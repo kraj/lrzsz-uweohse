@@ -240,7 +240,7 @@ print_dir(int dir)
 /* --- Flag decoding */
 
 static void
-print_zrinit_flags(unsigned char f0)
+print_zrinit_flags(unsigned char f0, const unsigned char *hdr)
 {
     int first = 1;
     fprintf(stderr, "flags=");
@@ -257,6 +257,27 @@ print_zrinit_flags(unsigned char f0)
 #undef PF
     if (first)
         fprintf(stderr, "0x%02x", f0);
+    {
+        /* 
+            9.5  Segmented Streaming
+
+            If the receiver cannot overlap serial and disk I/O, it uses the
+            ZRINIT frame to specify a buffer length which the sender will not
+            overflow.
+
+            11.2 ZRINIT
+            ZP0 and ZP1 contain the size of the receiver's buffer in bytes, or 0
+            if nonstop I/O is allowed.
+          
+        */
+        unsigned int buflen = ((unsigned int)(unsigned char)hdr[ZP0]) |
+           ((unsigned int)(unsigned char)hdr[ZP1] << 8);
+        fprintf(stderr, " Rxbuflen=%d %x", buflen, buflen);
+        fprintf(stderr, " ZP[0-3]=[%x", (unsigned int) (unsigned char) hdr[ZP0]);
+        fprintf(stderr, " ,%x", (unsigned int) (unsigned char) hdr[ZP1]);
+        fprintf(stderr, " ,%x", (unsigned int) (unsigned char) hdr[ZP2]);
+        fprintf(stderr, " ,%x]", (unsigned int) (unsigned char) hdr[ZP3]);
+    }
 }
 
 static void
@@ -323,7 +344,7 @@ print_header_fields(int type, const unsigned char *hdr)
 {
     switch (type) {
     case ZRINIT:
-        print_zrinit_flags(hdr[ZF0]);
+        print_zrinit_flags(hdr[ZF0], hdr);
         break;
     case ZSINIT:
         print_zsinit_flags(hdr[ZF0]);
