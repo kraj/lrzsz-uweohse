@@ -1939,6 +1939,8 @@ zsendfdata (struct zm_fileinfo *zi)
 
 		if (Txwindow) {
 			size_t tcount = 0;
+			int stuck_acks = 0;
+			size_t prev_lrxpos = Lrxpos;
 			while (zi->bytes_sent >= Lrxpos &&
 			       (tcount = zi->bytes_sent - Lrxpos) >= Txwindow) {
 				vfile ("%ld (%ld,%ld) window >= %u", tcount,
@@ -1950,6 +1952,17 @@ zsendfdata (struct zm_fileinfo *zi)
 				if (c != ZACK) {
 					ZSDATA (txbuf, 0, ZCRCE);
 					goto gotack;
+				}
+				if (Lrxpos == prev_lrxpos) {
+					if (++stuck_acks > RETRYMAX) {
+						lrzsz_warning(0, _("receiver not advancing after %d ACKs"), stuck_acks);
+						ZSDATA (txbuf, 0, ZCRCE);
+						c = ERROR;
+						goto gotack;
+					}
+				} else {
+					stuck_acks = 0;
+					prev_lrxpos = Lrxpos;
 				}
 			}
 			vfile ("window = %ld", tcount);
