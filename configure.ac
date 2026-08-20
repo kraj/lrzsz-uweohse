@@ -8,6 +8,11 @@ AC_USE_SYSTEM_EXTENSIONS
 dnl Enable 64-bit file offsets on 32-bit platforms
 AC_DEFINE([_FILE_OFFSET_BITS], [64], [Define to 64 to enable 64-bit file offsets on 32-bit platforms.])
 
+dnl Policy: about 20 years. Rounded to the nearest _POSIX_C_SOURCE. Not below 15 years.
+supported_c_stds="c23 c17 c11 c99"
+AC_SUBST(MIN_POSIX_C_STD, "200809L")
+AC_SUBST(SUPPORTED_C_STDS, "$supported_c_stds")
+
 
 AC_PREREQ([2.72])
 
@@ -66,7 +71,7 @@ AC_ARG_ENABLE(syslog,
 	  ])
 have_std=
 AC_ARG_ENABLE([std],
-              [  --enable-std=STD Use a specific C std (c23, c17, c11, c99)],
+              [  --enable-std=STD Use a specific C std ($supported_c_stds)],
               [have_std=$enableval],
               [have_std="no"])
 AC_ARG_ENABLE([asan],
@@ -103,7 +108,7 @@ AC_C_CONST
 AC_C_INLINE
 AX_COMPILER_FLAGS_CFLAGS()
 
-for i in c23 c17 c11 c99 ; do
+for i in $supported_c_stds ; do
     if test "$have_std" = "no" ; then AX_CHECK_COMPILE_FLAG(-std=$i, [have_std=$i]) fi
 done
 if test "$have_std" != "no" ; then
