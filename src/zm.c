@@ -169,8 +169,10 @@ static inline int
 zdlread(void)
 {
 	int c;
+	if ((c = READLINE_PF(Rxtimeout)) < 0)
+		return c;
 	/* Quick check for non control characters */
-	if ((c = READLINE_PF(Rxtimeout)) & 0140)
+	if (c & 0140)
 		return c;
 	return zdlread2(c);
 }
@@ -182,7 +184,9 @@ zdlread2(int c)
 
 again:
 	/* Quick check for non control characters */
-	if ((c = READLINE_PF(Rxtimeout)) & 0140)
+	if ((c = READLINE_PF(Rxtimeout)) < 0)
+		return c;
+	if (c & 0140)
 		return c;
 jump_over:
 	switch (c) {
