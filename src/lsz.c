@@ -1939,7 +1939,8 @@ zsendfdata (struct zm_fileinfo *zi)
 
 		if (Txwindow) {
 			size_t tcount = 0;
-			while ((tcount = zi->bytes_sent - Lrxpos) >= Txwindow) {
+			while (zi->bytes_sent >= Lrxpos &&
+			       (tcount = zi->bytes_sent - Lrxpos) >= Txwindow) {
 				vfile ("%ld (%ld,%ld) window >= %u", tcount,
 					(long) zi->bytes_sent, (long) Lrxpos,
 					Txwindow);
