@@ -9,6 +9,22 @@ ACLOCAL_AMFLAGS = -I m4
 QUICKCHECKS=xmodem-lsz-lrz-16k-binary xmodem-lsz-lrz-large-binary-1k-crc zmodem-lsz-lrz-MGMT-default-nonexisting zmodem-lsz-lrz-MGMT-ZMCRC-r \
 	zmodem-lsz-lrz-multiple zmodem-lsz-lrz-4k zmodem-lsz-lrz-8k-turbo
 
+# Note: the inofficial target is to compile on systems of up to 20 years of age.
+# We support one C standard older than that.
+#
+SUPPORTED_C_STANDARDS=@SUPPORTED_C_STDS@
+SUPPORTED_COMPILERS=gcc clang
+buildcheck: 
+	for cc in $(SUPPORTED_COMPILERS) ; do \
+		for std in $(SUPPORTED_C_STANDARDS) ; do \
+			echo "running clean/configure/vcheck with --enable-std=$$std"; \
+			make -s V=0 clean >/dev/null ; \
+			./configure CC="$$cc" -q --enable-std=$$std || exit 1 ; \
+			make -s V=0 -j 4 || exit 1 ; \
+			QUIET=1 make -s V=0 vcheck || exit 1 ; \
+		done \
+	done
+
 oldcheck-local:
 	QUIET=-q $(srcdir)/check.lrzsz $(srcdir) `pwd`
 
