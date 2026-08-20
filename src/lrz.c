@@ -1927,6 +1927,12 @@ rzfile(struct zm_fileinfo *zi)
 					   shortname, protname()));
 					return ERROR;
 				}
+                                /* this is a data block with subframes. if the sender streams
+                                 * fast, this is a mass of data, which can easily overflow 
+                                 * the garbage max or the cancel max.
+                                 * so we read and forget it.
+                                 */
+				zrdata(secbuf, MAX_BLOCK, &bytes_in_block);
 				zmputs(Attn);  continue;
 			}
 moredata:
