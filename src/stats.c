@@ -144,7 +144,7 @@ stats_log(struct lrzsz_stat *st, bool forone)
     } while(0)
 
 void
-stats_account_one()
+stats_account_one(void)
 {
 #define debug_stats 0
 #if debug_stats
@@ -194,7 +194,7 @@ stats_account_one()
 }
 
 void
-stats_start_one()
+stats_start_one(void)
 {
     struct timespec start;
     int ret;
