@@ -17,13 +17,24 @@ SUPPORTED_COMPILERS=gcc clang
 buildcheck: 
 	for cc in $(SUPPORTED_COMPILERS) ; do \
 		for std in $(SUPPORTED_C_STANDARDS) ; do \
-			echo "running clean/configure/vcheck with --enable-std=$$std"; \
+			echo "running clean/configure/make with CC=$$cc --enable-std=$$std"; \
+			make -s V=0 clean >/dev/null ; \
+			./configure CC="$$cc" -q --enable-std=$$std || exit 1 ; \
+			make -s V=0 -j 4 || exit 1 ; \
+		done \
+	done ; \
+        make -s V=0 clean >/dev/null
+buildcheck+: 
+	for cc in $(SUPPORTED_COMPILERS) ; do \
+		for std in $(SUPPORTED_C_STANDARDS) ; do \
+			echo "running clean/configure/make/vcheck with CC=$$cc --enable-std=$$std"; \
 			make -s V=0 clean >/dev/null ; \
 			./configure CC="$$cc" -q --enable-std=$$std || exit 1 ; \
 			make -s V=0 -j 4 || exit 1 ; \
 			QUIET=1 make -s V=0 vcheck || exit 1 ; \
 		done \
-	done
+	done ; \
+        make -s V=0 clean >/dev/null ;
 
 oldcheck-local:
 	QUIET=-q $(srcdir)/check.lrzsz $(srcdir) `pwd`
