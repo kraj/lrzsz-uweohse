@@ -11,7 +11,9 @@
 #  define LRZSZ_NORETURN
 #endif
 
-#if defined(__GNUC__) || defined(__clang__)
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 202000L
+#  define LRZSZ_FORMAT_PRINTF(fmtidx, argidx) [[gnu::format(printf, fmtidx, argidx)]]
+#elif defined(__GNUC__) || defined(__clang__)
 #  define LRZSZ_FORMAT_PRINTF(fmtidx, argidx) __attribute__((format(printf, fmtidx, argidx)))
 #else
 #  define LRZSZ_FORMAT_PRINTF(fmt, arg)
@@ -23,8 +25,8 @@ void lrzsz_set_progname (const char * str, const char *who);
 LRZSZ_FORMAT_PRINTF(2,3)
 void lrzsz_warning(int errnum, const char *format, ...);
 
-LRZSZ_NORETURN void fatal_error (int status, int errnum, const char *message, ...)
-LRZSZ_FORMAT_PRINTF(3,4);
+LRZSZ_NORETURN LRZSZ_FORMAT_PRINTF(3,4)
+void fatal_error (int status, int errnum, const char *message, ...);
 
 unsigned long lrzsz_strtoul(const char *name, const char *value, const char *valid_suffixes, unsigned long int min, unsigned long int max);
 
