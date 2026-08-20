@@ -5,6 +5,9 @@ AM_INIT_AUTOMAKE(foreign)
 AC_CONFIG_HEADERS(config.h)
 AC_USE_SYSTEM_EXTENSIONS
 
+dnl Enable 64-bit file offsets on 32-bit platforms
+AC_DEFINE([_FILE_OFFSET_BITS], [64], [Define to 64 to enable 64-bit file offsets on 32-bit platforms.])
+
 
 AC_PREREQ([2.72])
 
@@ -168,7 +171,7 @@ AC_FUNC_MMAP
 AC_FUNC_ALLOCA
 AC_CHECK_TYPES([struct utimbuf], [], [], [[#include <utime.h>]])
 
-AC_CHECK_FUNCS(gettimeofday sigaction nogetopt_long)
+AC_CHECK_FUNCS(gettimeofday sigaction nogetopt_long fseeko)
 AC_REPLACE_FUNCS(stpcpy vasprintf)
 
 dnl O_NOFOLLOW is POSIX.1-2008; this is to providea fallback for ancient systems.

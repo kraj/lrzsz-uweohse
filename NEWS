@@ -104,6 +104,17 @@ not perfectly trustworthy senders.
 * the `-d / --dot-to-slash` option (DOS 8.3 filename transformation)
   was removed.
 
+* on 32bit systems the programs are now able to transfer files with 
+  sizes in the range 2GB to just under 4GB (64bit systems did not
+  have that limit).
+
+  Note: that lrzsz was limited to 31 bit file sizes stems from the 
+  original public domain rzsz suite (80s). The same limit existed
+  in later published omen technology sources, and at least one 
+  independent implementation.
+
+  Expect interoperability problems when transfering large files.
+
 * lrz has a new option -A --segmentsize NNN. This turns on 
   `Segmented Streaming' if the sender supports it. This ZMODEM
   feature was originally intended to allow transfers to machines

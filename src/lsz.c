@@ -1637,7 +1637,7 @@ again:
 					crc = UPDC32(gotchar, crc);
 				crc = ~crc;
 				clearerr(input_f);	/* Clear EOF */
-				fseek(input_f, 0L, 0);
+				fseeko(input_f, 0, 0);
 			}
 			stohdr(crc);
 			zsbhdr(ZCRC, Txhdr);
@@ -1666,10 +1666,10 @@ again:
 #ifdef HAVE_MMAP
 			if (!mm_addr)
 #endif
-			if (rxpos && fseek(input_f, (long) rxpos, 0)) {
+			if (rxpos && fseeko(input_f, (off_t) rxpos, 0)) {
 				int er=errno;
-				vfile("fseek failed: %s", strerror(er));
-				DO_SYSLOG((LOG_INFO, "%s/%s: fseek failed: %s",
+				vfile("fseeko failed: %s", strerror(er));
+				DO_SYSLOG((LOG_INFO, "%s/%s: fseeko failed: %s",
 						   shortname, protname(), strerror(er)));
 				return ERROR;
 			}
@@ -2116,7 +2116,7 @@ getinsync(struct zm_fileinfo *zi, int flag)
 #ifdef HAVE_MMAP
 			if (!mm_addr)
 #endif
-			if (fseek(input_f, (long) rxpos, 0))
+			if (fseeko(input_f, (off_t) rxpos, 0))
 				return ERROR;
 			zi->eof_seen = 0;
 			bytcnt = Lrxpos = zi->bytes_sent = rxpos;

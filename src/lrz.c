@@ -1066,7 +1066,7 @@ do_crc_check(FILE *f, size_t remote_bytes, size_t check_bytes)
         crc = UPDC32(c, crc);
     crc = ~crc;
     clearerr(f);  /* Clear EOF */
-    fseek(f, 0L, 0);
+    fseeko(f, 0, 0);
 
     while (t1<3) {
         stohdr(check_bytes);
@@ -1389,7 +1389,7 @@ procheader(char *name, struct zm_fileinfo *zi)
                         /* retransfer whole blocks */
                         zi->bytes_skipped = st.st_size & ~(1023);
                         if (can_resume) {
-                                if (fseek(fout, (long) zi->bytes_skipped, SEEK_SET)) {
+                                if (fseeko(fout, (off_t) zi->bytes_skipped, SEEK_SET)) {
                                         stat_for_file.local_errors+=1;
                                         fclose(fout);
                                         fout=NULL;
