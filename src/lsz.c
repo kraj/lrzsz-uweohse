@@ -34,6 +34,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include <getopt.h>
+#include <stdint.h>
 
 #ifndef R_OK
 #  define R_OK 4
@@ -1640,8 +1641,11 @@ again:
 					struct stat st;
 					if (0==fstat(fileno(input_f),&st)) {
 						rxpos=st.st_size;
-					} else
-						rxpos=-1;
+					} else {
+						int er=errno;
+						lrzsz_warning(0, _("fstat failed: %s"), strerror(er));
+						rxpos=SIZE_MAX;
+					}
 				}
 				while (rxpos-- && ((gotchar = getc(input_f)) != EOF))
 					crc = UPDC32(gotchar, crc);
