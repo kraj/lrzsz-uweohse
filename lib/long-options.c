@@ -55,6 +55,7 @@ void parse_long_options (int argc, char **argv,
 	{
 	case 'h':
 	  (*usage) (0);
+	  exit (0);
 
 	case 'v':
 	  (*version) ();
