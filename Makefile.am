@@ -15,17 +15,17 @@ QUICKCHECKS=xmodem-lsz-lrz-16k-binary xmodem-lsz-lrz-large-binary-1k-crc zmodem-
 SUPPORTED_C_STANDARDS=@SUPPORTED_C_STDS@
 SUPPORTED_COMPILERS=gcc clang
 buildcheck: 
-	for cc in $(SUPPORTED_COMPILERS) ; do \
+	for cc in $(SUPPORTED_COMPILERS) ; do if type -p "$$cc" >/dev/null ; then \
 		for std in $(SUPPORTED_C_STANDARDS) ; do \
 			echo "running clean/configure/make with CC=$$cc --enable-std=$$std"; \
 			make -s V=0 clean >/dev/null ; \
 			./configure CC="$$cc" -q --enable-std=$$std || exit 1 ; \
 			make -s V=0 -j 4 || exit 1 ; \
 		done \
-	done ; \
+	fi ; done ; \
         make -s V=0 clean >/dev/null
 buildcheck+: 
-	for cc in $(SUPPORTED_COMPILERS) ; do \
+	for cc in $(SUPPORTED_COMPILERS) ; do if type -p "$$cc" >/dev/null ; then \
 		for std in $(SUPPORTED_C_STANDARDS) ; do \
 			echo "running clean/configure/make/vcheck with CC=$$cc --enable-std=$$std"; \
 			make -s V=0 clean >/dev/null ; \
@@ -33,8 +33,12 @@ buildcheck+:
 			make -s V=0 -j 4 || exit 1 ; \
 			QUIET=1 make -s V=0 vcheck || exit 1 ; \
 		done \
-	done ; \
+	fi ; done ; \
         make -s V=0 clean >/dev/null ;
+
+buildcheck-openbsd: dist $(PR).tar.gz
+	scp ./remote-build-check.sh $(PR).tar.gz uwe@openbsd:
+	ssh uwe@openbsd sh ./remote-build-check.sh $(PR)
 
 oldcheck-local:
 	QUIET=-q $(srcdir)/check.lrzsz $(srcdir) `pwd`
@@ -72,9 +76,6 @@ cvs-dist:
 rpm: $(PR).tar.gz Specfile
 	$(srcdir)/buildrpm $(srcdir)
 
-openbsd-check: dist $(PR).tar.gz
-	scp ./remote-build-check.sh $(PR).tar.gz uwe@openbsd:
-	ssh uwe@openbsd sh ./remote-build-check.sh $(PR)
 
 qa: asan msan ubsan coverage
 
