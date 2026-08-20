@@ -102,7 +102,7 @@ not perfectly trustworthy senders.
   facts listed above, lrz should not have.
 
 * the `-d / --dot-to-slash` option (DOS 8.3 filename transformation)
-  was removed.
+  was removed (it collided with the now extended pathname checking).
 
 * on 32bit systems the programs are now able to transfer files with 
   sizes in the range 2GB to just under 4GB (64bit systems did not
@@ -113,7 +113,7 @@ not perfectly trustworthy senders.
   in later published omen technology sources, and at least one 
   independent implementation.
 
-  Expect interoperability problems when transfering large files.
+  Expect interoperability problems when files of that size. 
 
 * lrz has a new option -A --segmentsize NNN. This turns on 
   `Segmented Streaming' if the sender supports it. This ZMODEM
@@ -131,6 +131,8 @@ not perfectly trustworthy senders.
   - double fclose in lrz.
   - a write before a buffer in lrz (80s).
   - a use of uninitialized memory in lsz (80s).
+  - a misbehaving receiver could cause an endless loop 
+    when the sender used a transmit window (80s).
  
 Version 0.12.20 - December 1998, Uwe Ohse
 
