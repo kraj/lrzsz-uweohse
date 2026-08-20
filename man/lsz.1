@@ -289,11 +289,14 @@ a smaller N speeds error recovery.
 The default is 128 below 300 baud, 256 above 300 baud, or 1024 above 2400 baud.
 .TP 
 .B "-m N, --min-bps N"
-Stop transmission if BPS-Rate (Bytes Per Second) falls below N for a 
+Stop transmission if BPS-Rate (Bytes Per Second) falls below N for a
 certain time (see --min-bps-time option).
+The check is per file: the timer resets at the start of each file.
 .TP
 .B "-M N, --min-bps-time"
 Used together with --min-bps. Default is 120 (seconds).
+The timeout is per file: a slow transfer of one file does not count
+toward the next file's timeout.
 .TP
 .B "-l N, --framelen N"
 Wait for the receiver to acknowledge correct data every

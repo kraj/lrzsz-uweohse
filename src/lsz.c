@@ -1734,6 +1734,10 @@ zsendfdata (struct zm_fileinfo *zi)
 	Lrxpos = 0;
 	junkcount = 0;
 	Beenhereb4 = 0;
+	last_bps = 0;
+	last_txpos = 0;
+	low_bps = 0;
+	not_printed = 0;
   somemore:
 	if (setjmp (intrjmp)) {
 	  if (play_with_sigint)

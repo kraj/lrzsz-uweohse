@@ -217,9 +217,12 @@ invocation.
 .B "-m N, --min-bps N"
 Stop transmission if BPS-Rate (Bytes Per Second) falls below N for a
 certain time (see --min-bps-time option).
+The check is per file: the timer resets at the start of each file.
 .TP
 .B "-M N, --min-bps-time"
 Used together with --min-bps. Default is 120 (seconds).
+The timeout is per file: a slow transfer of one file does not count
+toward the next file's timeout.
 .TP
 .B "-n, --newer"
 (ZMODEM) Accept file if the destination file does not exist.
