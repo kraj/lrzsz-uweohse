@@ -5,7 +5,7 @@ noinst_HEADERS = timing.h zglobal.h zmodem.h
 noinst_PROGRAMS = zmodemsnif linesimulator
 
 LDADD = ../lib/libzmodem.a @LIBINTL@
-AM_CPPFLAGS = -I.. -I$(srcdir) -I$(top_srcdir)/src -I$(top_srcdir)/lib -DLOCALEDIR=\"$(localedir)\" -D_FORTIFY_SOURCE=2
+AM_CPPFLAGS = -I.. -I$(srcdir) -I$(top_srcdir)/src -I$(top_srcdir)/lib -DLOCALEDIR=\"$(localedir)\" -D_FORTIFY_SOURCE=2 -D_POSIX_C_SOURCE=@MIN_POSIX_C_STD@
 AM_CFLAGS = @WARN_CFLAGS@ -Werror @LRZSZ_CFLAGS@
 AM_LDFLAGS = @LRZSZ_LDFLAGS@
 
