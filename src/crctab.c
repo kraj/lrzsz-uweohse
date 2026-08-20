@@ -2,6 +2,32 @@
  *  Crc calculation stuff
  */
 
+/*
+ * Programmers may incorporate any or all code into their programs,
+ * giving proper credit within the source. Publication of the
+ * source routines is permitted so long as proper credit is given
+ * to Stephen Satchell, Satchell Evaluations and Chuck Forsberg,
+ * Omen Technology.
+*/
+
+/*
+ * This is the CRC-16/CCITT (0x1021), also named 0x8810 after another
+ * representation of the same polynomial.
+ *
+ * It is a suboptimal polynomial for its width — research by Koopman et al. 
+ * has shown that better 16-bit polynomials exist with superior Hamming 
+ * distance properties at common block sizes, meaning that the 0x1021 misses 
+ * more multi-bit error patterns than necessary:
+ * https://users.ece.cmu.edu/~koopman/roses/dsn04/koopman04_crc_poly_embedded.pdf
+ *
+ * Additionally, its 16-bit CRC width gives a (1/65536) per-block collision 
+ * probability that becomes non-negligible over large transfers —
+ * 1000 blocks with random errors yields a ~1.5% chance of at least one 
+ * undetected corruption.
+ *
+ * This is why ZMODEM offered CRC-32 (ZBIN32) for data.
+ */
+
 /* crctab calculated by Mark G. Mendel, Network Systems Corporation */
 const unsigned short crctab[256] = {
     0x0000,  0x1021,  0x2042,  0x3063,  0x4084,  0x50a5,  0x60c6,  0x70e7,
@@ -38,19 +64,7 @@ const unsigned short crctab[256] = {
     0x6e17,  0x7e36,  0x4e55,  0x5e74,  0x2e93,  0x3eb2,  0x0ed1,  0x1ef0
 };
 
-/*
- * updcrc macro derived from article Copyright (C) 1986 Stephen Satchell. 
- *  NOTE: First srgument must be in range 0 to 255.
- *        Second argument is referenced twice.
- * 
- * Programmers may incorporate any or all code into their programs, 
- * giving proper credit within the source. Publication of the 
- * source routines is permitted so long as proper credit is given 
- * to Stephen Satchell, Satchell Evaluations and Chuck Forsberg, 
- * Omen Technology.
- */
 
-#define updcrc(cp, crc) ( crctab[((crc >> 8) & 255)] ^ (crc << 8) ^ cp)
 
 /*
  * Copyright (C) 1986 Gary S. Brown.  You may use this program, or
