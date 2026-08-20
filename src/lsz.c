@@ -1235,7 +1235,12 @@ filbuf(char *buf, size_t count)
 
 	if ( !Ascii) {
 		m = read(fileno(input_f), buf, count);
-		if (m <= 0)
+		if (m < 0) {
+			int er = errno;
+			lrzsz_warning(0, _("read error: %s"), strerror(er));
+			return 0;
+		}
+		if (m == 0)
 			return 0;
 		while (m < count)
 			buf[m++] = 032;
@@ -1271,8 +1276,13 @@ zfilbuf (struct zm_fileinfo *zi)
 	size_t n;
 
 	n = fread (txbuf, 1, blklen, input_f);
-	if (n < blklen)
+	if (n < blklen) {
+		if (ferror(input_f)) {
+			int er = errno;
+			lrzsz_warning(0, _("read error: %s"), strerror(er));
+		}
 		zi->eof_seen = 1;
+	}
 	else {
 		/* save one empty paket in case file ends ob blklen boundary */
 		int c = getc(input_f);
