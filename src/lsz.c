@@ -1235,14 +1235,15 @@ filbuf(char *buf, size_t count)
 	size_t m;
 
 	if ( !Ascii) {
-		m = read(fileno(input_f), buf, count);
-		if (m < 0) {
+		ssize_t r = read(fileno(input_f), buf, count);
+		if (r < 0) {
 			int er = errno;
 			lrzsz_warning(0, _("read error: %s"), strerror(er));
 			return 0;
 		}
-		if (m == 0)
+		if (r == 0)
 			return 0;
+		m = (size_t)r;
 		while (m < count)
 			buf[m++] = 032;
 		return count;
