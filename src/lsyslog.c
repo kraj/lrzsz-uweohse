@@ -33,7 +33,7 @@ lsyslog(int prio, const char *format, ...)
 #ifdef ENABLE_SYSLOG
     static char *username=NULL;
     static char uid_string[20]=""; /* i'd really hate this function to fail! */
-    char *s=NULL;
+    char s[1024];
     static int init_done=0;
     va_list ap;
     if (!enable_syslog)
@@ -54,14 +54,9 @@ lsyslog(int prio, const char *format, ...)
     }
 
     va_start(ap, format);
-    if (vasprintf(&s,format, ap) < 0) {
-        /* most likely: out of memory */
-        va_end(ap);
-        return;
-    }
+    vsnprintf(s, sizeof(s), format, ap);
     va_end(ap);
     syslog(prio,"[%s] %s",username, s);
-    free(s);
 #else
     (void) prio; /* get rid of warning */
     (void) format; /* get rid of warning */
