@@ -1021,8 +1021,8 @@ wctxpn(struct zm_fileinfo *zi)
 	 */
 	if (!Ascii && (input_f!=stdin) && *zi->fname && fstat(fileno(input_f), &f)!= -1)
 		snprintf(p, (size_t)(txbuf + MAX_BLOCK - p), "%lu %llo %o 0 %d %ld",
-              (long) f.st_size,
-              (long long) f.st_mtime,
+              (unsigned long) f.st_size,
+              (unsigned long long) f.st_mtime,
               (unsigned int)((no_unixmode) ? 0 : f.st_mode),
               Filesleft, Totalleft);
 	if (Verbose)
