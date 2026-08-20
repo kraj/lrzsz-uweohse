@@ -1866,6 +1866,7 @@ rzfile(struct zm_fileinfo *zi)
 	for (;;) {
 		stohdr(zi->bytes_received);
 		zshhdr(ZRPOS, Txhdr);
+	nxthdr:
 		c = zgethdr(Rxhdr, 0, NULL);
 		switch (c) {
 		default:
