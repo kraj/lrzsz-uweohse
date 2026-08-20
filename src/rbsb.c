@@ -157,6 +157,7 @@ int
 io_mode(int fd, int n)
 {
 	static int did0 = FALSE;
+	static int have_oldtty = FALSE;
 
 	vfile("mode:%d", n);
 
@@ -164,7 +165,10 @@ io_mode(int fd, int n)
 	case 2:		/* Un-raw mode used by sz, sb when -g detected */
 		if(!did0) {
 			did0 = TRUE;
-			tcgetattr(fd,&oldtty);
+			if (tcgetattr(fd,&oldtty) == 0)
+				have_oldtty = TRUE;
+			else
+				vfile("tcgetattr failed: %s", strerror(errno));
 		}
 		tty = oldtty;
 
@@ -191,14 +195,18 @@ io_mode(int fd, int n)
 		tty.c_cc[VMIN] = 1; /* 1 char satisfied reads */
 		tty.c_cc[VTIME] = 1; /* or in this many tenths of seconds */
 
-		tcsetattr(fd,TCSADRAIN,&tty);
+		if (tcsetattr(fd,TCSADRAIN,&tty) < 0)
+			vfile("tcsetattr failed: %s", strerror(errno));
 
 		return OK;
 	case 1:
 	case 3:
 		if(!did0) {
 			did0 = TRUE;
-			tcgetattr(fd,&oldtty);
+			if (tcgetattr(fd,&oldtty) == 0)
+				have_oldtty = TRUE;
+			else
+				vfile("tcgetattr failed: %s", strerror(errno));
 		}
 		tty = oldtty;
 
@@ -221,15 +229,19 @@ io_mode(int fd, int n)
 			tty.c_cflag |= CSTOPB;	/* Set two stop bits */
 		tty.c_cc[VMIN] = 1; /* This many chars satisfies reads */
 		tty.c_cc[VTIME] = 1;	/* or in this many tenths of seconds */
-		tcsetattr(fd,TCSADRAIN,&tty);
+		if (tcsetattr(fd,TCSADRAIN,&tty) < 0)
+			vfile("tcsetattr failed: %s", strerror(errno));
 		Baudrate = getspeed(cfgetospeed(&tty));
 		return OK;
 	case 0:
 		if(!did0)
 			return ERROR;
-		tcsetattr (fd,TCSANOW,&oldtty);
-		tcflush (fd,TCIOFLUSH); /* flush input queue */
-		tcflow (fd,TCOON); /* restart output */
+		if (have_oldtty) {
+			if (tcsetattr(fd,TCSANOW,&oldtty) < 0)
+				lrzsz_warning(0, _("tcsetattr failed: %s"), strerror(errno));
+		}
+		tcflush(fd,TCIOFLUSH); /* flush input queue */
+		tcflow(fd,TCOON); /* restart output */
 
 		return OK;
 	default:
