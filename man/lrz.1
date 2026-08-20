@@ -402,6 +402,22 @@ requests.
 The default is protect (-p) and binary (-b).
 
 The Unix versions support ZMODEM command execution.
+.SH CAVEATS
+The ZMODEM protocol uses 32-bit fields for file positions, imposing a
+hard limit of 4 GiB on transfer size.
+Furthermore, many ZMODEM implementations derived from the original
+Omen Technology codebase (including
+.IR crzsz ,
+.IR rzsz ,
+.IR lrzsz older than version 0.13,
+and other 1990s variants) and also at least some independent
+implementation use signed
+.I long
+internally, which on 32-bit platforms limits correct operation to
+files below 2 GiB.
+.B lrz
+itself handles positions up to 4 GiB correctly, but interoperation
+with older or 32-bit senders may fail for files larger than 2 GiB.
 .SH "HISTORICAL NOTES"
 The following options have been removed and are no longer functional.
 Using them prints an error message and exits.

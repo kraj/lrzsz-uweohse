@@ -895,6 +895,11 @@ wcs(const char *oname, const char *remotename)
 	zi.eof_seen=0;
 	timing(1,NULL);
 
+	if (!Quiet && zi.bytes_total > 0x7FFFFFFFUL)
+		lrzsz_warning(0, _("file %s is larger than 2 GiB; "
+			"transfers may fail with older ZMODEM implementations"),
+			name);
+
 	++Filcnt;
 	switch (wctxpn(&zi)) {
 	case ERROR:

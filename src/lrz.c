@@ -1945,7 +1945,7 @@ nxthdr:
 			zrdata(secbuf, MAX_BLOCK,&bytes_in_block);
 			continue;
 		case ZEOF:
-			if (rclhdr(Rxhdr) != (long) zi->bytes_received) {
+			if (rclhdr(Rxhdr) != (unsigned long) zi->bytes_received) {
 				/*
 				 * Ignore eof if it's at wrong place - force
 				 *  a timeout because the eof might have gone
@@ -1978,7 +1978,7 @@ nxthdr:
 			vfile("rzfile: Sender SKIPPED file");
 			return c;
 		case ZDATA:
-			if (rclhdr(Rxhdr) != (long) zi->bytes_received) {
+			if (rclhdr(Rxhdr) != (unsigned long) zi->bytes_received) {
 #if defined(SAVE_OOSB)
 				oosb_t *neu;
 				size_t pos=rclhdr(Rxhdr);

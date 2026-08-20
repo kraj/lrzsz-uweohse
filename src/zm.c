@@ -1014,7 +1014,7 @@ zsendline_init(void)
 void 
 stohdr(size_t pos)
 {
-	long lpos=(long) pos;
+	unsigned long lpos=(unsigned long) pos;
 	Txhdr[ZP0] = lpos;
 	Txhdr[ZP1] = lpos>>8;
 	Txhdr[ZP2] = lpos>>16;
@@ -1022,10 +1022,10 @@ stohdr(size_t pos)
 }
 
 /* Recover a long integer from a header */
-long
+unsigned long
 rclhdr(char *hdr)
 {
-	long l;
+	unsigned long l;
 
 	l = (hdr[ZP3] & 0377);
 	l = (l << 8) | (hdr[ZP2] & 0377);

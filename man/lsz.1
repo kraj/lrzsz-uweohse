@@ -518,6 +518,26 @@ direction of high speed transmission is reversed.
 The environment variable ZNULLS may be used to specify the number of nulls to
 send before a ZDATA frame.
 Values of 101 for a 4.77 MHz PC and 124 for an AT were typical. 
+.SH CAVEATS
+The ZMODEM protocol uses 32-bit fields for file positions, imposing a
+hard limit of 4 GiB on transfer size.
+Furthermore, many ZMODEM implementations derived from the original
+Omen Technology codebase (including
+.IR crzsz ,
+.IR rzsz ,
+.IR lrzsz older than version 0.13,
+and other 1990s variants) and also at least some independent
+implementation use signed
+.I long
+internally, which on 32-bit platforms limits correct operation to
+files below 2 GiB.
+.B lsz
+itself handles positions up to 4 GiB correctly, but interoperability
+with older or 32-bit receivers may fail for files larger than 2 GiB.
+.B lsz
+prints a warning when sending files larger than 2 GiB; use
+.B -q
+to suppress it.
 .SH "HISTORICAL NOTES"
 The following options and features have been removed and are no longer
 functional. Using the options prints an error message and exits.
