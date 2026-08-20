@@ -807,6 +807,8 @@ splat:
 	rxpos = (rxpos<<8) + (hdr[ZP2] & 0377);
 	rxpos = (rxpos<<8) + (hdr[ZP1] & 0377);
 	rxpos = (rxpos<<8) + (hdr[ZP0] & 0377);
+	if (Rxpos)
+		*Rxpos = rxpos;
         stat_for_file.total_message_bytes+=4;
 fifi:
 	if (Verbose > 2)
@@ -840,8 +842,6 @@ fifi:
     default:
 		VPRINTF(3,("zgethdr: %s %lx", frametype_to_string(c), (unsigned long) rxpos));
 	}
-	if (Rxpos)
-		*Rxpos=rxpos;
 	return c;
 }
 
