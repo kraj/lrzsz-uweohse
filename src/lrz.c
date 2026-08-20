@@ -1837,33 +1837,6 @@ rzfiles(struct zm_fileinfo *zi)
 	}
 }
 
-/* "OOSB" means Out Of Sync Block. I once thought that if sz sents
- * blocks a,b,c,d, of which a is ok, b fails, we might want to save 
- * c and d. But, alas, i never saw c and d.
- */
-#define SAVE_OOSB
-#ifdef SAVE_OOSB
-typedef struct oosb_t {
-	size_t pos;
-	size_t len;
-	char *data;
-	struct oosb_t *next;
-} oosb_t;
-struct oosb_t *anker=NULL;
-
-static void
-oosb_free(void)
-{
-	oosb_t *akt;
-	while (anker) {
-		akt = anker;
-		anker = akt->next;
-		free(akt->data);
-		free(akt);
-	}
-}
-#endif
-
 /*
  * Receive a file with ZMODEM protocol
  *  Assumes file name frame is in secbuf
@@ -1878,9 +1851,6 @@ rzfile(struct zm_fileinfo *zi)
 	long not_printed=0;
 	time_t low_bps=0;
 	size_t bytes_in_block=0;
-#ifdef SAVE_OOSB
-	oosb_free();
-#endif
 
 	zi->eof_seen=FALSE;
 
@@ -1896,35 +1866,6 @@ rzfile(struct zm_fileinfo *zi)
 	for (;;) {
 		stohdr(zi->bytes_received);
 		zshhdr(ZRPOS, Txhdr);
-		goto skip_oosb;
-nxthdr:
-#ifdef SAVE_OOSB
-		if (anker) {
-			oosb_t *akt,*last,*next;
-			for (akt=anker,last=NULL;akt;last= akt ? akt : last ,akt=next) {
-				if (akt->pos==zi->bytes_received) {
-					putsec(zi, akt->data, akt->len);
-					zi->bytes_received += akt->len;
-					vfile("using saved out-of-sync-paket %lx, len %ld",
-						  akt->pos,akt->len);
-					goto nxthdr;
-				}
-				next=akt->next;
-				if (akt->pos<zi->bytes_received) {
-					vfile("removing unneeded saved out-of-sync-paket %lx, len %ld",
-						  akt->pos,akt->len);
-					if (last)
-						last->next=akt->next;
-					else
-						anker=akt->next;
-					free(akt->data);
-					free(akt);
-					akt=NULL;
-				}
-			}
-		}
-#endif
-	skip_oosb:
 		c = zgethdr(Rxhdr, 0, NULL);
 		switch (c) {
 		default:
@@ -1979,49 +1920,12 @@ nxthdr:
 			return c;
 		case ZDATA:
 			if (rclhdr(Rxhdr) != (unsigned long) zi->bytes_received) {
-#if defined(SAVE_OOSB)
-				oosb_t *neu;
-				size_t pos=rclhdr(Rxhdr);
-#endif
 				if ( --n < 0) {
 					vfile("rzfile: out of sync");
 					DO_SYSLOG_FNAME((LOG_INFO, "%s/%s: error: out of sync",
 					   shortname, protname()));
 					return ERROR;
 				}
-#if defined(SAVE_OOSB)
-				switch (c = zrdata(secbuf, MAX_BLOCK,&bytes_in_block))
-				{
-				case GOTCRCW:
-				case GOTCRCG:
-				case GOTCRCE:
-				case GOTCRCQ:
-					if (pos>zi->bytes_received) {
-						neu=malloc(sizeof(oosb_t));
-						if (neu)
-							neu->data=malloc(bytes_in_block);
-						if (neu && neu->data) {
-#ifdef ENABLE_SYSLOG
-/* call syslog to tell me if this happens */
-							lsyslog(LOG_ERR, 
-								   "saving out-of-sync-block %lx, len %lu",
-								   pos, (unsigned long) bytes_in_block);
-#endif
-							vfile("saving out-of-sync-block %lx, len %lu",pos,
-								  (unsigned long) bytes_in_block);
-							memcpy(neu->data,secbuf,bytes_in_block);
-							neu->pos=pos;
-							neu->len=bytes_in_block;
-							neu->next=anker;
-							anker=neu;
-						}
-						else if (neu)
-							free(neu);
-					}
-                                default:
-                                        ;
-				}
-#endif
 				zmputs(Attn);  continue;
 			}
 moredata:
