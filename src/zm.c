@@ -826,6 +826,7 @@ fifi:
             break;
         default:
             /* nothing to do */
+            ;
         }
 
 	switch (c) {
