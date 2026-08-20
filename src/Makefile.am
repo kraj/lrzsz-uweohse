@@ -1,7 +1,7 @@
 bin_PROGRAMS=lrz lsz
 lrz_SOURCES=lrz.c timing.c zperr.c zreadline.c crctab.c rbsb.c zm.c protname.c lsyslog.c canit.c stats.c util.c
 lsz_SOURCES=lsz.c timing.c zperr.c zreadline.c crctab.c rbsb.c zm.c protname.c lsyslog.c canit.c stats.c util.c
-noinst_HEADERS = timing.h zglobal.h zmodem.h
+noinst_HEADERS = timing.h zglobal.h zmodem.h stats.h util.h
 noinst_PROGRAMS = zmodemsnif linesimulator
 
 LDADD = ../lib/libzmodem.a @LIBINTL@
