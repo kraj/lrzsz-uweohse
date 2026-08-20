@@ -29,6 +29,7 @@ double
 timing (int reset, time_t *nowp)
 {
   static double elaptime, starttime, stoptime;
+  static int initialized = 0;
   double yet;
 #ifdef HAVE_GETTIMEOFDAY
   struct timeval tv;
@@ -48,9 +49,14 @@ timing (int reset, time_t *nowp)
     *nowp=(time_t) yet;
   if (reset) {
     starttime = yet;
+    initialized = 1;
     return starttime;
   }
   else {
+    if (!initialized) {
+      starttime = yet;
+      initialized = 1;
+    }
     stoptime = yet;
     elaptime = stoptime - starttime;
     return elaptime;
