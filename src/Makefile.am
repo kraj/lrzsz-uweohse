@@ -2,7 +2,7 @@ bin_PROGRAMS=lrz lsz
 lrz_SOURCES=lrz.c timing.c zperr.c zreadline.c crctab.c rbsb.c zm.c protname.c lsyslog.c canit.c stats.c util.c
 lsz_SOURCES=lsz.c timing.c zperr.c zreadline.c crctab.c rbsb.c zm.c protname.c lsyslog.c canit.c stats.c util.c
 noinst_HEADERS = timing.h zglobal.h zmodem.h stats.h util.h
-noinst_PROGRAMS = zmodemsnif linesimulator
+noinst_PROGRAMS = zmodemsnif linesimulator timestamp
 
 LDADD = ../lib/libzmodem.a @LIBINTL@
 AM_CPPFLAGS = -I.. -I$(srcdir) -I$(top_srcdir)/src -I$(top_srcdir)/lib -DLOCALEDIR=\"$(localedir)\" -D_FORTIFY_SOURCE=2 -D_POSIX_C_SOURCE=@MIN_POSIX_C_STD@
