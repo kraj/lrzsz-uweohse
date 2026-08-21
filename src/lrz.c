@@ -646,7 +646,7 @@ wcreceive(int argc, char **argp)
 			if (c)
 				goto fubar;
 		} else {
-                        // YMODEM path.
+                        /* YMODEM path. */
 			for (;;) {
 			if (Verbose > 1 || enable_syslog)
 				timing(1,NULL);
@@ -722,7 +722,7 @@ wcreceive(int argc, char **argp)
                 if (wcrx(&zi)==ERROR) {
                     goto fubar;
                 }
-                // stat_for_file.files_ok++; done by wcrx.
+                /*  stat_for_file.files_ok++; done by wcrx. */
                 stats_account_one();
                 if (Verbose > 1 || enable_syslog) {
                     double d;
@@ -856,7 +856,7 @@ wcrx(struct zm_fileinfo *zi)
             purgeline(0);	/* Do read next time ... */
             return OK;
         }
-        else if (sectcurr==ERROR) // wcgetsec accounted for stats.
+        else if (sectcurr==ERROR) /* wcgetsec accounted for stats. */
             return ERROR;
         else {
             zperr( _("Sync Error"));

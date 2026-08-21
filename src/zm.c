@@ -253,7 +253,7 @@ zsendline(int c)
 
 	switch(zsendline_tab[(unsigned) (c&=0377)])
 	{
-        default: // can't happen
+        default: /* can't happen */
 	case 0: 
 		xsendline(lastsent = c); 
 		break;
@@ -297,7 +297,7 @@ zsendline_s(const char *s, size_t count)
 		if (last_esc) {
 			int c=*s;
 			switch(last_esc) {
-                        default: // can't happen
+                        default: /* can't happen */
 			case 0: 
 				xsendline(lastsent = c); 
 				break;

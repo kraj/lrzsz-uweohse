@@ -52,7 +52,7 @@ write_stats_line(FILE *out, struct lrzsz_stat *st, bool forone)
             dur=end-st->start_time;
         }
     }
-    // no summary for one file.
+    /* no summary for one file. */
     if (!forone && st->files_ok+st->files_err+st->policy_rejects+st->skipped < 2) {
         return;
     }
@@ -62,14 +62,14 @@ write_stats_line(FILE *out, struct lrzsz_stat *st, bool forone)
     else
         fprintf(out,"ts=%ld",(long)time(NULL));
 
-    fprintf(out," prog=%s", lrzsz_progname); // TODO: can contain spaces. urks.
+    fprintf(out," prog=%s", lrzsz_progname); /* TODO: can contain spaces. urks. */
     dir = (st->direction == 's') ? "tx" : "rx";
 
     fprintf(out," dir=%s", dir);
     fprintf(out," proto=%c", protocol == ZM_XMODEM ? 'x' : protocol == ZM_YMODEM ? 'y' : 'z');
     if (forone) {
         fprintf(out," filename=");
-        fprintf_sanitized(out, st->filename ? st->filename : "unknown"); // unknown: coding error or out of memory.
+        fprintf_sanitized(out, st->filename ? st->filename : "unknown"); /* unknown: coding error or out of memory. */
         if (st->files_ok) {
             fprintf(out," status=ok");
         } else if (st->files_err) {
