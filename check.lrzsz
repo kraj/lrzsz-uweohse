@@ -41,6 +41,7 @@ SZ="$objdir/src/lsz"
 RZ="$objdir/src/lrz"
 SNIF="$objdir/src/zmodemsnif"
 SIMU="$objdir/src/linesimulator"
+TIMESTAMP="$objdir/src/timestamp"
 
 
 # z_test_files: files to test zmodem with.
@@ -99,6 +100,11 @@ binary_1m=$(find /usr/bin/ /usr/lib -size +1100000c -a -size -5000000c |xargs ls
 dd if="$binary_1m" of="$testdir/binary_1m" bs=1024 count=1024 2>&5
 binary_1m="$testdir/binary_1m"
 
+binary_2m=$testdir/2m.bin
+for i in $(seq 0 1) ; do
+    cat $binary_1m >>$binary_2m
+done
+
 binary_8m=$testdir/8m.bin
 for i in $(seq 0 7) ; do
     cat $binary_1m >>$binary_8m
@@ -152,16 +158,16 @@ for i in $(seq 32 255); do printf "\\$(printf '%03o' "$i")"; done >> $nocontrols
 #for i in $(seq 64 95); do printf "\\$(printf '%03o' "$i")"; done >> $nocontrols_file
 #for i in $(seq 160 255); do printf "\\$(printf '%03o' "$i")"; done >> $nocontrols_file
 # a real file for once:
-po_file=$objdir/po/de.po
-po_file_crlf=$testdir/de.po.crlf
-po_file_crlf_padded_128=$testdir/de.po.crlf.padded_128
-sed 's/$/\r/' <$po_file >$po_file_crlf
+man_file=$objdir/man/lsz.1
+man_file_crlf=$testdir/lsz.1.crlf
+man_file_crlf_padded_128=$testdir/lsz.1.crlf.padded_128
+sed "s/\$/$(printf '\015')/" <$man_file >$man_file_crlf
 
-cp $po_file_crlf $po_file_crlf_padded_128
-sz=$(wc -c < $po_file_crlf)
+cp $man_file_crlf $man_file_crlf_padded_128
+sz=$(wc -c < $man_file_crlf)
 pad=$(( 128 - (sz % 128) ))
 [ $pad -eq 1024 ] && pad=0
-[ $pad -gt 0 ] && dd if=/dev/zero bs=1 count=$pad 2>/dev/null | tr '\0' '\032' >>$po_file_crlf_padded_128
+[ $pad -gt 0 ] && dd if=/dev/zero bs=1 count=$pad 2>/dev/null | tr '\0' '\032' >>$man_file_crlf_padded_128
 
 # $$ is the main, not the sub shell
 getpid(){
@@ -196,10 +202,11 @@ doit() {
     $ECHO "$doit_key - $title"
     
     failed=0
-    start=$(date +%s.%N)
+    start=$($TIMESTAMP)
     
     MYSNIF=""
     if test -n "$ONLY" ; then
+        MYSNIF="strace -vs 1280 -fo /tmp/sniff.trace $SNIF"
         MYSNIF="$SNIF"
     fi
     if test -n "$NOSNIF" ; then
@@ -212,25 +219,33 @@ doit() {
         TRACE_SZ="strace -vs 1280 -Ttt -fo $TRACEFILE_SZ"
         TRACE_RZ="strace -vs 1280 -Ttt -fo $TRACEFILE_RZ"
     fi
-
+#rz="$rz -vvvv";
     echo "$doit_key - $title" >>$runlog
     echo "pid: $$" >>$runlog
     echo "cmd: ($sz $files ) <$testdir/pipe | (cd $testdir/$doit_key ; exec $FAULT $MYSNIF $rz >>../pipe )" >>$runlog
         (echo "pid-sender: " $(getpid) >>$runlog ; exec $TRACE_SZ $sz $files ) <$testdir/pipe | 
         (echo "pid-receiver: $(getpid)" >>$runlog ; cd $testdir/$doit_key ; exec $FAULT $MYSNIF $TRACE_RZ $rz >>../pipe )
-    end=$(date +%s.%N)
+    end=$($TIMESTAMP)
     echo "cmp: $cmp" >>$runlog
     for doit_i in $files ; do 
             doit_bn=`basename $doit_i`
+            _st="";
+            _res="";
             if test -f $cmp ; then
+                _res=" $testdir/$doit_key/$doit_bn = $cmp"
                 cmp "$cmp" $testdir/$doit_key/$doit_bn
+                _st=$?
             elif test "$cmp" = "missing" ; then
+                _res=" $testdir/$doit_key/$doit_bn is missing as it should"
                 test ! -e "$testdir/$doit_key/$doit_bn"
+                _st=$?
             else
-                $cmp $doit_i $testdir/$doit_key/$doit_bn
+                _res=" $doit_i and $testdir/$doit_key/$doit_bn passed cmp function $cmp"
+                $cmp "$doit_i" "$testdir/$doit_key/$doit_bn"
+                _st=$?
             fi
-            if test $? -eq 0 ; then
-                    echo "filecheck-success: $doit_i" >>$runlog
+            if test $_st -eq 0 ; then
+                    echo "filecheck-success: $doit_i ($_res)" >>$runlog
                     rm -f $testdir/$doit_key/$doit_bn
             else
                     echo "filecheck-fail: $doit_i" >>$runlog
@@ -266,9 +281,15 @@ doit() {
             dur=$(echo "$end - $start" | bc)
             durshort=$(echo "scale=3; $end - $start" | bc)
             bps=$(echo "scale=2; $bytes / $dur" | bc)
-            mbps=$(echo "scale=2; $bps / 1000000.0" | bc)
-            echo "$bps byte/sec ($mbps MB/s): $doit_key, $bytes bytes transmitted in $durshort seconds" >>$testdir/perf.log
-            echo "$bps byte/sec ($mbps MB/s): $doit_key, $bytes bytes transmitted in $durshort seconds" >>$runlog
+            mbps=$(echo "scale=1; $bps / 1000000.0" | bc)
+            if test "$mbps" = "0" ; then
+                kbps=$(echo "scale=1; $bps / 1000.0" | bc)
+                pres_bps="$kbps KB/s"
+            else
+                pres_bps="$mbps MB/s"
+            fi
+            echo "$bps byte/sec ($pres_bps): $doit_key, $bytes bytes transmitted in $durshort seconds" >>$testdir/perf.log
+            echo "$bps byte/sec ($pres_bps): $doit_key, $bytes bytes transmitted in $durshort seconds" >>$runlog
     fi
     echo >>$runlog
 }
@@ -659,21 +680,21 @@ xcompat() {
             bn=$(basename $nocontrols_file)
             test -n "$r_ascii_opt" && \
                 doit "xmodem-lsz-$otherrz-small-ascii" "lsz sending to $otherrz" "$SZ -q -X" "$TEST_RX $r_ascii_opt $bn" cmp "$nocontrols_file" 
-            bn=$(basename $po_file)
+            bn=$(basename $man_file)
             test -n "$r_ascii_opt" && \
-                doit "xmodem-lsz-$otherrz-medium-ascii" "lsz sending to $otherrz" "$SZ -q -X" "$TEST_RX  $r_ascii_opt $bn" cmp "$po_file" 
+                doit "xmodem-lsz-$otherrz-medium-ascii" "lsz sending to $otherrz" "$SZ -q -X" "$TEST_RX  $r_ascii_opt $bn" cmp "$man_file" 
             test -n "$r_ascii_opt" && test -n "$r_xmodem_crc_opt" && \
-                doit "xmodem-lsz-$otherrz-medium-ascii-crc" "lsz sending to $otherrz" "$SZ -q -X" "$TEST_RX $r_xmodem_crc_opt $r_ascii_opt $bn" cmp "$po_file" 
+                doit "xmodem-lsz-$otherrz-medium-ascii-crc" "lsz sending to $otherrz" "$SZ -q -X" "$TEST_RX $r_xmodem_crc_opt $r_ascii_opt $bn" cmp "$man_file" 
             test -n "$r_ascii_opt" && test -n "$r_can_xmodem_1k" && \
-                doit "xmodem-lsz-$otherrz-medium-ascii-1k" "lsz sending to $otherrz" "$SZ -k -q -X" "$TEST_RX $r_ascii_opt $bn" cmp "$po_file" 
+                doit "xmodem-lsz-$otherrz-medium-ascii-1k" "lsz sending to $otherrz" "$SZ -k -q -X" "$TEST_RX $r_ascii_opt $bn" cmp "$man_file" 
             test -n "$r_ascii_opt" && test -n "$r_xmodem_crc_opt" && test -n "$r_can_xmodem_1k" && \
-                doit "xmodem-lsz-$otherrz-medium-ascii-1k-crc" "lsz sending to $otherrz" "$SZ -q -k -X" "$TEST_RX $r_xmodem_crc_opt $r_ascii_opt $bn" cmp "$po_file" 
+                doit "xmodem-lsz-$otherrz-medium-ascii-1k-crc" "lsz sending to $otherrz" "$SZ -q -k -X" "$TEST_RX $r_xmodem_crc_opt $r_ascii_opt $bn" cmp "$man_file" 
 
             # sender -a option: \n => \r\n. because, well, featuritis?
             # problem: rz -a removes the \r again. rz -b adds ^Zs. so we use a padded comparison file.
             if test -n "$r_binary_opt"; then
-                bn=$(basename $po_file)
-                doit "xmodem-lsz-$otherrz-medium-crlf" "lsz sending to $otherrz" "$SZ -a -q -X" "$TEST_RX $r_binary_opt $bn" "$po_file_crlf_padded_128" "$po_file" 
+                bn=$(basename $man_file)
+                doit "xmodem-lsz-$otherrz-medium-crlf" "lsz sending to $otherrz" "$SZ -a -q -X" "$TEST_RX $r_binary_opt $bn" "$man_file_crlf_padded_128" "$man_file" 
             fi
 
         fi
@@ -697,19 +718,19 @@ xcompat() {
 
             bn=$(basename $nocontrols_file)
             doit "xmodem-$othersz-lrz-small-ascii" "XMODEM: small ascii transfer: $otherrz sending to lrz" "$TEST_SX" "$RZ -q -X -a $bn" cmp "$nocontrols_file" 
-            bn=$(basename $po_file)
-            doit "xmodem-$othersz-lrz-medium-ascii" "XMODEM: medium ascii transfer: $otherrz sending to lrz" "$TEST_SX" "$RZ -q -X -a $bn" cmp "$po_file" 
-            doit "xmodem-$othersz-lrz-medium-ascii-crc" "XMODEM/CRC: medium ascii transfer: $otherrz sending to lrz" "$TEST_SX" "$RZ -q -X -c -a $bn" cmp "$po_file" 
+            bn=$(basename $man_file)
+            doit "xmodem-$othersz-lrz-medium-ascii" "XMODEM: medium ascii transfer: $otherrz sending to lrz" "$TEST_SX" "$RZ -q -X -a $bn" cmp "$man_file" 
+            doit "xmodem-$othersz-lrz-medium-ascii-crc" "XMODEM/CRC: medium ascii transfer: $otherrz sending to lrz" "$TEST_SX" "$RZ -q -X -c -a $bn" cmp "$man_file" 
 
-            bn=$(basename $po_file)
+            bn=$(basename $man_file)
             test -n "$s_1k_opt" && \
-                doit "xmodem-$othersz-lrz-medium-ascii-1k" "XMODEM/1k: medium ascii transfer: $otherrz sending to lrz" "$TEST_SX $s_1k_opt" "$RZ -q -X -a $bn" cmp "$po_file" 
+                doit "xmodem-$othersz-lrz-medium-ascii-1k" "XMODEM/1k: medium ascii transfer: $otherrz sending to lrz" "$TEST_SX $s_1k_opt" "$RZ -q -X -a $bn" cmp "$man_file" 
             test -n "$s_1k_opt" && \
-                doit "xmodem-$othersz-lrz-medium-ascii-1k-crc" "XMODEM/1k/CRC: medium ascii transfer: $otherrz sending to lrz" "$TEST_SX $s_1k_opt" "$RZ -q -X -c -a $bn" cmp "$po_file" 
+                doit "xmodem-$othersz-lrz-medium-ascii-1k-crc" "XMODEM/1k/CRC: medium ascii transfer: $otherrz sending to lrz" "$TEST_SX $s_1k_opt" "$RZ -q -X -c -a $bn" cmp "$man_file" 
 
-            bn=$(basename $po_file)
+            bn=$(basename $man_file)
             test -n "$s_ascii_opt" && \
-                doit "xmodem-$othersz-lrz-medium-crlf" "XMODEM CR/LF conversion: medium ascii transfer: $otherrz sending to lrz" "$TEST_SX $s_ascii_opt" "$RZ -q -X -b $bn" "$po_file_crlf_padded_128" "$po_file" 
+                doit "xmodem-$othersz-lrz-medium-crlf" "XMODEM CR/LF conversion: medium ascii transfer: $otherrz sending to lrz" "$TEST_SX $s_ascii_opt" "$RZ -q -X -b $bn" "$man_file_crlf_padded_128" "$man_file" 
         fi
     done
 }
@@ -1031,44 +1052,54 @@ zbenchmark() {
         done
         return
     fi
-    for sender in $available ; do
-        for receiver in $available ; do
-            # blacklist of known problem combos
-            case "$sender-$receiver" in
-            zmtxzmrx-crzsz)
-                # crzsz for some reason falls back to XMODEM.
-                continue;
-                ;;
-            sexyz-zmtxzmrx)
-                # sexyz stumbles (a) over the ZACK zmrx sends for ZFILE, and (b) over the wrong ZACK position in other ZACKs.
-                continue;
-                ;;
-            esac
-            for kparm in "" 2k 4k 8k ; do
-                TEST_S=$(config $sender sz $kparm)
-                if test -z "$TEST_S" ; then continue ; fi
-                t=""
-                if test -n "$kparm" ; then
-                    t="r_can_$kparm"
-                fi
-                TEST_R=$(config $receiver rz $t)
-                if test -z "$TEST_R" ; then continue ; fi
-                #for speed in unlimited 8m 1m 115200; do
-                for speed in 5ms 4ms 3ms 2ms 1ms; do
-                    case $speed in
-                    unlimited) FAULT="" ;;
-                    *ms) FAULT="$SIMU -s 1 -d $speed" ;;
-                    *) FAULT="$SIMU -s 1 -r $speed" ;;
+    #for speed in unlimited 8m 1m 115200 38400 25ms 20ms 15ms 10ms 5ms 2ms; do
+    for speed in unlimited 115200 38400 25ms 20ms ; do
+        for kparm in "" 2k 4k 8k ; do
+            for sender in $available ; do
+                for receiver in $available ; do
+                    # blacklist of known problem combos
+                    case "$sender-$receiver" in
+                    zmtxzmrx-crzsz)
+                        # crzsz for some reason falls back to XMODEM.
+                        continue;
+                        ;;
+                    sexyz-zmtxzmrx)
+                        # sexyz stumbles (a) over the ZACK zmrx sends for ZFILE, and (b) over the wrong ZACK position in other ZACKs.
+                        continue;
+                        ;;
                     esac
+            
+                    TEST_S=$(config $sender sz $kparm)
+                    if test -z "$TEST_S" ; then continue ; fi
+                    t=""
+                    if test -n "$kparm" ; then
+                        t="r_can_$kparm"
+                    fi
+                    TEST_R=$(config $receiver rz $t)
+                    if test -z "$TEST_R" ; then continue ; fi
 
                     case "$speed" in
-                    38400|5ms|0ms) all_binaries="$all_256_file $binary_8k $binary_64k" ;;
-                    115200) all_binaries="$all_256_file $binary_2k $binary_16k $binary_128k" ;;
-                    1m) all_binaries="$all_256_file $binary_4k $binary_16k $binary_128k $binary_256k" ;;
-                    8m) all_binaries="$binary_1m" ;;
-                    #8m) all_binaries="$all_256_file $binary_4k $binary_16k $binary_128k $binary_256k $binary_1m" ;;
+                    unlimited) FAULT="" ;;
+                    *ms) FAULT="strace -vs 1280 -Ttt -o /tmp/o77 $SIMU -s 1 -d $speed -b 128" ;;
+                    *) FAULT="$SIMU -s 1 -r $speed" ;;
+                    esac
+                    #echo "FAULT=$FAULT for $speed"
+
+                    case "$speed" in
+                    38400) all_binaries="$all_256_file $binary_2k $binary_8k " ;;
+                    115200) all_binaries="$all_256_file $binary_2k $binary_4k $binary_8k $binary_16k" ;;
+                    2ms) all_binaries="$all_256_file $binary_4k $binary_16k $binary_32k $binary_256k" ;;
+                    5ms) all_binaries="$all_256_file $binary_8k $binary_16k $binary_64k" ;;
+                    10ms) all_binaries="$all_256_file $binary_8k $binary_32k" ;;
+                    15ms) all_binaries="$all_256_file $binary_8k $binary_16k" ;;
+                    20ms) all_binaries="$all_256_file $binary_4k $binary_16k" ;;
+                    25ms) all_binaries="$all_256_file $binary_2k $binary_16k" ;;
+                    *ms) all_binaries="$all_256_file $binary_4k $binary_16k $binary_128k $binary_256k" ;;
+                    1m) all_binaries="$all_256_file $binary_2k $binary_4k $binary_8k $binary_16k $binary_256k" ;;
+                    8m) all_binaries="$all_256_file $binary_2k $binary_4k $binary_8k $binary_16k $binary_32k $binary_64k $binary_128k $binary_256k $binary_2m" ;;
                     *) all_binaries="$all_256_file $binary_4k $binary_16k $binary_128k $binary_256k $binary_1m $binary_8m" ;;
                     esac
+                    #echo speed="$speed" bins="$all_binaries"
 
                     t="1k"
                     if test -n "$kparm" ; then
