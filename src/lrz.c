@@ -1882,7 +1882,10 @@ rzfile(struct zm_fileinfo *zi)
 				vfile("rzfile: zgethdr returned %d", c);
 				return ERROR;
 			}
-                        /* FALLTHROUGH */
+                        /* traditionally we fell through to the ZFILE block and did an ZRDATA,
+                         * but that is wrong.
+                         */
+                        continue;
 		case ZFILE:
 			zrdata(secbuf, MAX_BLOCK,&bytes_in_block);
 			continue;
