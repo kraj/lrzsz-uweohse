@@ -599,8 +599,10 @@ main(int argc, char **argv)
 
     /* Seed RNG */
     if (seed >= 0) {
+        /* Reproducible Number Generator */
         actual_seed = (unsigned long)seed;
     } else {
+        /* Random Number Generator */
         FILE *urand = fopen("/dev/urandom", "rb");
         if (urand) {
             if (fread(&actual_seed, sizeof(actual_seed), 1, urand) != 1)
