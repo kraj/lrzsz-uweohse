@@ -286,7 +286,6 @@ extern int Crc32;      /* Display flag indicating 32 bit CRC being received */
 extern int Znulls;     /* Number of nulls to send at beginning of ZDATA hdr */
 extern char Attn[ZATTNLEN+1];  /* Attention string rx sends to tx on err */
 
-extern void zsendline (int c);
 extern void zsendline_init (void);
 void zsbhdr (int type, char *hdr);
 void zshhdr (int type, char *hdr);

@@ -247,7 +247,7 @@ again2:
  * Send character c with ZMODEM escape sequence encoding.
  *  Escape XON, XOFF. Escape CR following @ (Telenet net escape)
  */
-inline void 
+static inline void 
 zsendline(int c)
 {
 
