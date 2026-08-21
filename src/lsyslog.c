@@ -29,7 +29,9 @@ void
 lsyslog(int prio, const char *format, ...)
 {
     static char *username=NULL;
-    static char uid_string[20]=""; /* i'd really hate this function to fail! */
+    /* i'd really hate this function to fail! 21 is enough for \0 plus 
+     * uint64_t uids, which most likely will never exist... */
+    static char uid_string[21]="";
     char s[1024];
     static int init_done=0;
     va_list ap;
