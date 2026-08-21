@@ -39,6 +39,9 @@ buildcheck+:
 buildcheck-openbsd: dist $(PR).tar.gz
 	scp ./remote-build-check.sh $(PR).tar.gz uwe@openbsd:
 	ssh uwe@openbsd sh ./remote-build-check.sh $(PR)
+buildcheck-alpine: dist $(PR).tar.gz
+	scp ./remote-build-check.sh $(PR).tar.gz uwe@dev:
+	ssh uwe@dev sh ./remote-build-check.sh $(PR)
 
 oldcheck-local:
 	QUIET=-q $(srcdir)/check.lrzsz $(srcdir) `pwd`
@@ -79,6 +82,7 @@ rpm: $(PR).tar.gz Specfile
 
 qa: asan msan ubsan coverage
 
+# make is so strange.
 SANITIZERS = asan msan ubsan
 $(SANITIZERS): CC_LIST = clang gcc
 msan: CC_LIST = clang
