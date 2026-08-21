@@ -24,8 +24,8 @@
  *    05-23-87  Chuck Forsberg Omen Technology Inc
 */
 #define ZPAD '*'	/* 052 Padding character begins frames */
-#define ZDLE 030	/* Ctrl-X Zmodem escape - `ala BISYNC DLE */
-#define ZDLEE (ZDLE^0100)	/* Escaped ZDLE as transmitted */
+#define ZDLE  24	/* Ctrl-X Zmodem escape - `ala BISYNC DLE */
+#define ZDLEE (ZDLE^0x40)	/* Escaped ZDLE as transmitted */
 #define ZBIN 'A'	/* Binary frame indicator */
 #define ZHEX 'B'	/* HEX frame indicator */
 #define ZBIN32 'C'	/* Binary frame with 32 bit FCS */
@@ -62,12 +62,12 @@
 
 /* zdlread return values (internal) */
 /* -1 is general error, -2 is timeout */
-#define GOTOR 0400
+#define GOTOR 0x0100
 #define GOTCRCE (ZCRCE|GOTOR)	/* ZDLE-ZCRCE received */
 #define GOTCRCG (ZCRCG|GOTOR)	/* ZDLE-ZCRCG received */
 #define GOTCRCQ (ZCRCQ|GOTOR)	/* ZDLE-ZCRCQ received */
 #define GOTCRCW (ZCRCW|GOTOR)	/* ZDLE-ZCRCW received */
-#define GOTCAN	(GOTOR|030)	/* CAN*5 seen */
+#define GOTCAN	(  CAN|GOTOR)	/* CAN*5 seen */
 
 /* Byte positions within header array */
 #define ZF0	3	/* First flags byte */
@@ -94,8 +94,8 @@
 /* Parameters for ZSINIT frame */
 #define ZATTNLEN 32	/* Max length of attention string */
 /* Bit Masks for ZSINIT flags byte ZF0 */
-#define TESCCTL 0100	/* Transmitter expects ctl chars to be escaped */
-#define TESC8   0200	/* Transmitter expects 8th bit to be escaped */
+#define TESCCTL 0x40	/* Transmitter expects ctl chars to be escaped */
+#define TESC8   0x80	/* Transmitter expects 8th bit to be escaped */
 
 /* Parameters for ZFILE frame */
 /* Conversion options one of these in ZF0 */

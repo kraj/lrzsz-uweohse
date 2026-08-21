@@ -111,12 +111,12 @@ noxrd7(void)
 	for (;;) {
 		if ((c = READLINE_PF(Rxtimeout)) < 0)
 			return c;
-		switch (c &= 0177) {
+		switch (c &= 0x7f) {
 		case XON:
 		case XOFF:
 			continue;
 		default:
-			if (Zctlesc && !(c & 0140))
+			if (Zctlesc && !(c & 0x60))
 				continue;
                         return c;
 		case '\r':
@@ -172,7 +172,7 @@ zdlread(void)
 	if ((c = READLINE_PF(Rxtimeout)) < 0)
 		return c;
 	/* Quick check for non control characters */
-	if (c & 0140)
+	if (c & 0x60)
 		return c;
 	return zdlread2(c);
 }
@@ -186,19 +186,19 @@ again:
 	/* Quick check for non control characters */
 	if ((c = READLINE_PF(Rxtimeout)) < 0)
 		return c;
-	if (c & 0140)
+	if (c & 0x60)
 		return c;
 jump_over:
 	switch (c) {
 	case ZDLE:
 		break;
 	case XON:
-	case (XON|0200):
+	case (XON|0x80):
 	case XOFF:
-	case (XOFF|0200):
+	case (XOFF|0x80):
 		goto again;
 	default:
-		if (Zctlesc && !(c & 0140)) {
+		if (Zctlesc && !(c & 0x60)) {
 			goto again;
 		}
 		return c;
@@ -221,20 +221,20 @@ again2:
 	case ZCRCW:
 		return (c | GOTOR);
 	case ZRUB0:
-		return 0177;
+		return 0x7f;
 	case ZRUB1:
-		return 0377;
+		return 0xff;
 	case XON:
-	case (XON|0200):
+	case (XON|0x80):
 	case XOFF:
-	case (XOFF|0200):
+	case (XOFF|0x80):
 		goto again2;
 	default:
-		if (Zctlesc && ! (c & 0140)) {
+		if (Zctlesc && ! (c & 0x60)) {
 			goto again2;
 		}
-		if ((c & 0140) ==  0100)
-			return (c ^ 0100);
+		if ((c & 0x60) ==  0x40)
+			return (c ^ 0x40);
 		break;
 	}
 	VPRINTF(2,(_("Bad escape sequence %x"), c));
@@ -251,7 +251,7 @@ static inline void
 zsendline(int c)
 {
 
-	switch(zsendline_tab[(unsigned) (c&=0377)])
+	switch(zsendline_tab[(unsigned) (c&=0xff)])
 	{
         default: /* can't happen */
 	case 0: 
@@ -259,15 +259,15 @@ zsendline(int c)
 		break;
 	case 1:
 		xsendline(ZDLE);
-		c ^= 0100;
+		c ^= 0x40;
 		xsendline(lastsent = c);
 		break;
 	case 2:
-		if ((lastsent & 0177) != '@') {
+		if ((lastsent & 0x7f) != 0x40) {
 			xsendline(lastsent = c);
 		} else {
 			xsendline(ZDLE);
-			c ^= 0100;
+			c ^= 0x40;
 			xsendline(lastsent = c);
 		}
 		break;
@@ -283,7 +283,7 @@ zsendline_s(const char *s, size_t count)
 		int last_esc=0;
 		const char *t=s;
 		while (t!=end) {
-			last_esc=zsendline_tab[(unsigned) ((*t) & 0377)];
+			last_esc=zsendline_tab[(unsigned) ((*t) & 0xff)];
 			if (last_esc) 
 				break;
 			t++;
@@ -303,15 +303,15 @@ zsendline_s(const char *s, size_t count)
 				break;
 			case 1:
 				xsendline(ZDLE);
-				c ^= 0100;
+				c ^= 0x40;
 				xsendline(lastsent = c);
 				break;
 			case 2:
-				if ((lastsent & 0177) != '@') {
+				if ((lastsent & 0x7f) != 0x40) {
 					xsendline(lastsent = c);
 				} else {
 					xsendline(ZDLE);
-					c ^= 0100;
+					c ^= 0x40;
 					xsendline(lastsent = c);
 				}
 				break;
@@ -344,7 +344,7 @@ zsbhdr(int type, char *hdr)
 
 		for (n=4; --n >= 0; ++hdr) {
 			zsendline(*hdr);
-			crc = updcrc((0377& *hdr), crc);
+			crc = updcrc((0xff& *hdr), crc);
 		}
 		crc = updcrc(0,updcrc(0,crc));
 		zsendline(crc>>8);
@@ -366,7 +366,7 @@ zsbh32(char *hdr, int type)
 	crc = 0xFFFFFFFFL; crc = UPDC32(type, crc);
 
 	for (n=4; --n >= 0; ++hdr) {
-		crc = UPDC32((0377 & *hdr), crc);
+		crc = UPDC32((0xff & *hdr), crc);
 		zsendline(*hdr);
 	}
 	crc = ~crc;
@@ -398,7 +398,7 @@ zshhdr(int type, char *hdr)
 	for (n=4; --n >= 0; ++hdr) {
 		zputhex(*hdr,s+len); 
 		len += 2;
-		crc = updcrc((0377 & *hdr), crc);
+		crc = updcrc((0xff & *hdr), crc);
 	}
 	crc = updcrc(0,updcrc(0,crc));
 	zputhex(crc>>8,s+len); 
@@ -406,14 +406,14 @@ zshhdr(int type, char *hdr)
 	len+=4;
 
 	/* Make it printable on remote machine */
-	s[len++]=015;
-	s[len++]=0212;
+	s[len++]='\r';
+	s[len++]='\r'|0x80;
 	/*
 	 * Uncork the remote in case a fake XOFF has stopped data flow
 	 */
 	if (type != ZFIN && type != ZACK)
 	{
-		s[len++]=021;
+		s[len++]=XON;
 	}
 	fwrite(s, 1, len, stdout);
 	flushmo();
@@ -433,7 +433,7 @@ zsdata(const char *buf, size_t length, int frameend)
 	crc = 0;
 
 	for( ; length; length--) {
-	  zsendline(*buf); crc = updcrc((0377 & *buf), crc);
+	  zsendline(*buf); crc = updcrc((0xff & *buf), crc);
 	  buf++;
 	}
 
@@ -458,7 +458,7 @@ zsda32(const char *buf, size_t length, int frameend)
 	crc = 0xFFFFFFFFL;
 	zsendline_s(buf,length);
 	for (; length; length--) {
-		c = *buf & 0377;
+		c = *buf & 0xff;
 		crc = UPDC32(c, crc);
 		buf++;
 	}
@@ -468,7 +468,7 @@ zsda32(const char *buf, size_t length, int frameend)
 	crc = ~crc;
 	for (i=4; --i >= 0;) {
 		c=(int) crc;
-		if (c & 0140)
+		if (c & 0x60)
 			xsendline(lastsent = c);
 		else
 			zsendline(c);
@@ -553,7 +553,7 @@ zrdata(char *buf, int length, size_t *bytes_received)
 
 	crc = 0;  end = buf + length;
 	while (buf <= end) {
-		if ((c = zdlread()) & ~0377) {
+		if ((c = zdlread()) & ~0xff) {
 crcfoo:
 			switch (c) {
 			case GOTCRCE:
@@ -562,12 +562,12 @@ crcfoo:
 			case GOTCRCW:
 				{ 
 					d = c;
-					c &= 0377;
+					c &= 0xff;
 					crc = updcrc(c, crc);
-					if ((c = zdlread()) & ~0377)
+					if ((c = zdlread()) & ~0xff)
 						goto crcfoo;
 					crc = updcrc(c, crc);
-					if ((c = zdlread()) & ~0377)
+					if ((c = zdlread()) & ~0xff)
 						goto crcfoo;
 					crc = updcrc(c, crc);
 
@@ -617,7 +617,7 @@ zrdat32(char *buf, int length, size_t *bytes_received)
 
 	crc = 0xFFFFFFFFL;  end = buf + length;
 	while (buf <= end) {
-		if ((c = zdlread()) & ~0377) {
+		if ((c = zdlread()) & ~0xff) {
 crcfoo:
 			switch (c) {
 			case GOTCRCE:
@@ -625,18 +625,18 @@ crcfoo:
 			case GOTCRCQ:
 			case GOTCRCW:
 				d = c;
-				c &= 0377;
+				c &= 0xff;
 				crc = UPDC32(c, crc);
-				if ((c = zdlread()) & ~0377)
+				if ((c = zdlread()) & ~0xff)
 					goto crcfoo;
 				crc = UPDC32(c, crc);
-				if ((c = zdlread()) & ~0377)
+				if ((c = zdlread()) & ~0xff)
 					goto crcfoo;
 				crc = UPDC32(c, crc);
-				if ((c = zdlread()) & ~0377)
+				if ((c = zdlread()) & ~0xff)
 					goto crcfoo;
 				crc = UPDC32(c, crc);
-				if ((c = zdlread()) & ~0377)
+				if ((c = zdlread()) & ~0xff)
 					goto crcfoo;
 				crc = UPDC32(c, crc);
                                 stat_for_file.total_message_bytes += length - (end - buf);
@@ -738,12 +738,12 @@ gotcan:
 			zperr(_("Garbage count exceeded"));
 			return(ERROR);
 		}
-		if (eflag && ((c &= 0177) & 0140) && Verbose)
+		if (eflag && ((c &= 0x7f) & 0x60) && Verbose)
 			vchar(c);
 		else if (eflag > 1 && Verbose)
 			vchar(c);
 		goto startover;
-	case ZPAD|0200:		/* This is what we want. */
+	case ZPAD|0x80:		/* This is what we want. */
 	case ZPAD:		/* This is what we want. */
 		break;
 	}
@@ -798,10 +798,10 @@ splat:
                 stat_for_file.format_errors++;
 		goto agn2;
 	}
-	rxpos = hdr[ZP3] & 0377;
-	rxpos = (rxpos<<8) + (hdr[ZP2] & 0377);
-	rxpos = (rxpos<<8) + (hdr[ZP1] & 0377);
-	rxpos = (rxpos<<8) + (hdr[ZP0] & 0377);
+	rxpos = hdr[ZP3] & 0xff;
+	rxpos = (rxpos<<8) + (hdr[ZP2] & 0xff);
+	rxpos = (rxpos<<8) + (hdr[ZP1] & 0xff);
+	rxpos = (rxpos<<8) + (hdr[ZP0] & 0xff);
 	if (Rxpos)
 		*Rxpos = rxpos;
         stat_for_file.total_message_bytes+=4;
@@ -848,21 +848,21 @@ zrbhdr(char *hdr)
 	int c, n;
 	unsigned short crc;
 
-	if ((c = zdlread()) & ~0377)
+	if ((c = zdlread()) & ~0xff)
 		return c;
 	Rxtype = c;
 	crc = updcrc(c, 0);
 
 	for (n=4; --n >= 0; ++hdr) {
-		if ((c = zdlread()) & ~0377)
+		if ((c = zdlread()) & ~0xff)
 			return c;
 		crc = updcrc(c, crc);
 		*hdr = c;
 	}
-	if ((c = zdlread()) & ~0377)
+	if ((c = zdlread()) & ~0xff)
 		return c;
 	crc = updcrc(c, crc);
-	if ((c = zdlread()) & ~0377)
+	if ((c = zdlread()) & ~0xff)
 		return c;
 	crc = updcrc(c, crc);
 	if (crc & 0xFFFF) {
@@ -881,19 +881,19 @@ zrbhdr32(char *hdr)
 	int c, n;
 	unsigned long crc;
 
-	if ((c = zdlread()) & ~0377)
+	if ((c = zdlread()) & ~0xff)
 		return c;
 	Rxtype = c;
 	crc = 0xFFFFFFFFL; crc = UPDC32(c, crc);
 
 	for (n=4; --n >= 0; ++hdr) {
-		if ((c = zdlread()) & ~0377)
+		if ((c = zdlread()) & ~0xff)
 			return c;
 		crc = UPDC32(c, crc);
 		*hdr = c;
 	}
 	for (n=4; --n >= 0;) {
-		if ((c = zdlread()) & ~0377)
+		if ((c = zdlread()) & ~0xff)
 			return c;
 		crc = UPDC32(c, crc);
 	}
@@ -936,9 +936,9 @@ zrhhdr(char *hdr)
 		zperr(badcrc); return ERROR;
 	}
 	switch ( c = READLINE_PF(1)) {
-	case 0215:
+	case '\r'|0x80:
 		/* **** FALL THRU TO **** */
-	case 015:
+	case '\r':
 	 	/* Throw away possible cr/lf */
 		READLINE_PF(1);
 		break;
@@ -966,7 +966,7 @@ zsendline_init(void)
 {
 	int i;
 	for (i=0;i<256;i++) {	
-		if (i & 0140)
+		if (i & 0x60)
 			zsendline_tab[i]=0;
 		else {
 			switch(i)
@@ -974,19 +974,19 @@ zsendline_init(void)
 			case ZDLE:
 			case XOFF: /* ^Q */
 			case XON: /* ^S */
-			case (XOFF | 0200):
-			case (XON | 0200):
+			case (XOFF | 0x80):
+			case (XON | 0x80):
 				zsendline_tab[i]=1;
 				break;
-			case 020: /* ^P */
-			case 0220:
+			case 0x10: /* ^P */
+			case 0x10|0x80:
 				if (turbo_escape)
 					zsendline_tab[i]=0;
 				else
 					zsendline_tab[i]=1;
 				break;
-			case 015:
-			case 0215:
+			case '\r':
+			case '\r'|0x80:
 				if (Zctlesc)
 					zsendline_tab[i]=1;
 				else if (!turbo_escape)
@@ -1023,10 +1023,10 @@ rclhdr(char *hdr)
 {
 	unsigned long l;
 
-	l = (hdr[ZP3] & 0377);
-	l = (l << 8) | (hdr[ZP2] & 0377);
-	l = (l << 8) | (hdr[ZP1] & 0377);
-	l = (l << 8) | (hdr[ZP0] & 0377);
+	l = (hdr[ZP3] & 0xff);
+	l = (l << 8) | (hdr[ZP2] & 0xff);
+	l = (l << 8) | (hdr[ZP1] & 0xff);
+	l = (l << 8) | (hdr[ZP0] & 0xff);
 	return l;
 }
 

@@ -182,7 +182,7 @@ io_mode(int fd, int n)
 			tty.c_cflag |= CSTOPB;	/* Set two stop bits */
 
 		tty.c_lflag = protocol==ZM_ZMODEM ? 0 : ISIG;
-		tty.c_cc[VINTR] = protocol==ZM_ZMODEM ? -1 : 030;	/* Interrupt char */
+		tty.c_cc[VINTR] = protocol==ZM_ZMODEM ? -1 : CAN;	/* Interrupt char */
 #ifdef _POSIX_VDISABLE
 		if (((int) _POSIX_VDISABLE)!=(-1)) {
 			tty.c_cc[VQUIT] = _POSIX_VDISABLE;		/* Quit char */

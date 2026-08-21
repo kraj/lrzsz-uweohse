@@ -62,7 +62,8 @@ write_stats_line(FILE *out, struct lrzsz_stat *st, bool forone)
     else
         fprintf(out,"ts=%ld",(long)time(NULL));
 
-    fprintf(out," prog=%s", lrzsz_progname); /* TODO: can contain spaces. urks. */
+    fprintf(out," prog=");
+    fprintf_sanitized(out, lrzsz_progname);
     dir = (st->direction == 's') ? "tx" : "rx";
 
     fprintf(out," dir=%s", dir);
