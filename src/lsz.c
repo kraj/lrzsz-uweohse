@@ -1394,6 +1394,7 @@ getzrxinit(void)
 	struct stat f;
 	size_t rxpos;
 	int timeouts=0;
+        int gotblock;
 
 	Rxtimeout=100; /* 10 seconds */
 	/* XXX purgeline(io_mode_fd); this makes _real_ trouble. why? -- uwe */
@@ -1412,7 +1413,8 @@ getzrxinit(void)
 		}
 		dont_send_zrqinit=0;
 
-		switch (zgethdr(Rxhdr, 1,&rxpos)) {
+		gotblock = zgethdr(Rxhdr, 1,&rxpos);
+		switch (gotblock) {
 		case ZCHALLENGE:	/* Echo receiver's challenge numbr */
 			stohdr(rxpos);
 			zshhdr(ZACK, Txhdr);
@@ -1498,9 +1500,11 @@ getzrxinit(void)
 		case ZRQINIT:
 			if (Rxhdr[ZF0] == ZCOMMAND)
 				continue;
+                        stohdr(gotblock); /* debug hack */
 			zshhdr(ZNAK, Txhdr);
 			continue;
 		default:
+                        stohdr(gotblock); /* debug hack */
 			zshhdr(ZNAK, Txhdr);
 			continue;
 		}
@@ -1709,6 +1713,7 @@ zsendfdata (struct zm_fileinfo *zi)
 	static long total_sent = 0;
 	static time_t low_bps=0;
         int newcnt;
+        int need_wait = 1;
 
 #ifdef HAVE_MMAP
 	if (use_mmap && !mm_addr)
@@ -1778,7 +1783,6 @@ zsendfdata (struct zm_fileinfo *zi)
 			return OK;
 		}
 
-                /* we got something, just not what we want. */
 		while (fd_readable (io_mode_fd)) {
                         c=READLINE_PF(1);
                         if (TIMEOUT == c) {
@@ -1789,6 +1793,7 @@ zsendfdata (struct zm_fileinfo *zi)
 			case CAN:
 			case ZPAD:
 				c = getinsync (zi, 1);
+                                need_wait = 1;
 				goto gotack;
 			case XOFF:			/* Wait a while for an XON */
 			case XOFF | 0200:
@@ -1847,6 +1852,11 @@ zsendfdata (struct zm_fileinfo *zi)
 			e = ZCRCQ;
 			if (Verbose>3)
 				vstring("e=ZCRCQ/Window");
+		} else if (need_wait) {
+			e = ZCRCW;
+                        need_wait = 0;
+			if (Verbose>3)
+				vstring("e=ZCRCW/need_wait");
 		} else {
 			e = ZCRCG;
 			if (Verbose>3)
@@ -2023,6 +2033,40 @@ calc_blklen(long total_sent)
 		return 0;
 	}
 
+        /*
+         * to avoid synchronization problems on faulty lines we limit the Rxbuflen and the window.
+         * The problem to solve:
+         * - on a high bandwidth pipe a mass of ZDATE data subpackets will be in flight.
+         * - the receiver sends back an ZRPOS (#1)
+         * - still datapackets will come in
+         * - the receiver sends back an ZRPOS (#2)
+         * - [still datapackets will come in, and new ZRPOS will be created] (#3)
+         * - now the receiver sees a new ZDATA for ZPOS #1
+         * - and many data subpackets
+         * - now the receiver sees a new ZDATA for ZPOS #2
+         * - and the many data subpackets again.
+         * the critical point is #3. Repeat that often enough, and synchronization
+         * will not happen.
+         * 
+         * This will not happen with a "low" Rxbuflen, because then the sender waits
+         * for a receivers ACK. 
+         *
+         * Fun fact: this brute force solution is good for the performance.
+         */
+        if (error_count) {
+            if (!Rxbuflen) {
+                Rxbuflen=32768;
+            }
+            if (last_bytes_per_error <=    512000 && Rxbuflen>32768) Rxbuflen=32768;
+            if (last_bytes_per_error <=    256000 && Rxbuflen>16384) Rxbuflen=16384;
+            if (last_bytes_per_error <=    128000 && Rxbuflen> 8192) Rxbuflen= 8192;
+            if (last_bytes_per_error <=     64000 && Rxbuflen> 4096) Rxbuflen= 4096;
+            if (last_bytes_per_error <=     32000 && Rxbuflen> 2096) Rxbuflen= 2096;
+            Txwindow=(Rxbuflen)/2;
+            Txwindow = (Rxbuflen/2/64) * 64;
+            Txwspac = Txwindow/4;
+        }
+
 	/* it's not good to calc blklen too early */
 	if (calcs_done++ < 5) {
 		if (error_count && start_blklen >1024)
@@ -2179,6 +2223,7 @@ getinsync(struct zm_fileinfo *zi, int flag)
 		case ERROR:
 		default:
 			error_count++;
+                        stohdr(gotblock); /* debug hack */
 			zsbhdr(ZNAK, Txhdr);
 			continue;
 		}
