@@ -84,7 +84,6 @@ static int install_signal_handler (int sig);
 static int wcsend (int argc, char *argp[]);
 static int wcputsec (char *buf, int sectnum, size_t cseclen);
 
-#ifdef ENABLE_SYSLOG
 #define DO_SYSLOG(message) do { \
     if (enable_syslog) { \
         const char *shortname; \
@@ -100,9 +99,6 @@ static int wcputsec (char *buf, int sectnum, size_t cseclen);
         lsyslog message ; \
 	 } \
   } while(0)
-#else
-#define DO_SYSLOG(message) do { } while(0)
-#endif
 
 #define ZSDATA(x,y,z) \
 	do { if (Crc32t) {zsda32(x,y,z); } else {zsdata(x,y,z);}} while(0)
@@ -182,13 +178,7 @@ int error_count;
 
 #define MK_STRING(x) #x
 
-#ifdef ENABLE_SYSLOG
-#  if defined(ENABLE_SYSLOG_FORCE) || defined(ENABLE_SYSLOG_DEFAULT)
 int enable_syslog=TRUE;
-#  else
-int enable_syslog=FALSE;
-#  endif
-#endif
 
 jmp_buf intrjmp;	/* For the interrupt on RX CAN */
 
@@ -364,9 +354,7 @@ main(int argc, char **argv)
             stats_journal_open(journal_filename);
         }
 
-#ifdef ENABLE_SYSLOG
-	openlog(lrzsz_progname,LOG_PID,ENABLE_SYSLOG);
-#endif
+	openlog(lrzsz_progname,LOG_PID,SYSLOG_FACILITY);
 
 	setlocale (LC_ALL, "");
 	setlocale (LC_TIME, "C"); /* do not translate just the timestamp of a syslog message. uh. */
@@ -534,8 +522,6 @@ main(int argc, char **argv)
 		case 'y':
 			Lzmanag = ZF1_ZMCLOB; break;
 		case 2:
-#ifdef ENABLE_SYSLOG
-#  ifndef ENABLE_SYSLOG_FORCE
 			if (optarg && (!strcmp(optarg,"off") || !strcmp(optarg,"no")))
 			{
 				if (under_rsh)
@@ -545,10 +531,6 @@ main(int argc, char **argv)
 			}
 			else
 				enable_syslog=TRUE;
-#  else
-			lrzsz_warning(0, _("cannot turnoff syslog"));
-#  endif
-#endif
 			break;
 		case 4:
                         startup_delay = (unsigned int) lrzsz_strtoul( "--delay-startup", optarg, NULL, 1, 0);
@@ -767,14 +749,12 @@ wcs(const char *oname, const char *remotename)
 #ifdef HAVE_MMAP
 	int dont_mmap_this=0;
 #endif
-#ifdef ENABLE_SYSLOG
 	const char *shortname;
 	shortname=strrchr(oname,'/');
 	if (shortname)
 		shortname++;
 	else
 		shortname=oname;
-#endif
 
 	free(name);
 	name=NULL;
@@ -904,37 +884,27 @@ wcs(const char *oname, const char *remotename)
 	++Filcnt;
 	switch (wctxpn(&zi)) {
 	case ERROR:
-#ifdef ENABLE_SYSLOG
 		if (enable_syslog)
 			lsyslog(LOG_INFO, _("%s/%s: error occured"),protname(),shortname);
-#endif
 		return ERROR;
 	case ZSKIP:
 		lrzsz_warning(0, _("skipped: %s"),name);
-#ifdef ENABLE_SYSLOG
 		if (enable_syslog)
 			lsyslog(LOG_INFO, _("%s/%s: skipped"),protname(),shortname);
-#endif
 		return OK;
         default:
                 ;
 	}
 	if (!zmodem_requested && wctx(&zi)==ERROR)
 	{
-#ifdef ENABLE_SYSLOG
 		if (enable_syslog)
 			lsyslog(LOG_INFO, _("%s/%s: error occured"),protname(),shortname);
-#endif
 		return ERROR;
 	}
 	if (Unlinkafter)
 		unlink(oname);
 
-	if (Verbose > 1
-#ifdef ENABLE_SYSLOG
-		|| enable_syslog
-#endif
-		) {
+	if (Verbose > 1 || enable_syslog) {
 		long bps;
 		double d=timing(0,NULL);
 		if (d==0) /* can happen if timing() uses time() */
@@ -945,11 +915,9 @@ wcs(const char *oname, const char *remotename)
 		if (Verbose > 1)
 			vstringf(_("Bytes Sent:%7ld   BPS:%-8ld                        \n"),
 				(long) zi.bytes_sent,bps);
-#ifdef ENABLE_SYSLOG
 		if (enable_syslog)
 			lsyslog(LOG_INFO, "%s/%s: %ld Bytes, %ld BPS",shortname,
 				protname(), (long) zi.bytes_sent,bps);
-#endif
 	}
 	return 0;
 

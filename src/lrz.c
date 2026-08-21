@@ -167,12 +167,8 @@ unsigned int Zrwindow = 1400;	/* RX window size (controls garbage count) */
 int tryzhdrtype=ZRINIT;	/* Header type to send corresponding to Last rx close */
 time_t stop_time;
 
-#ifdef ENABLE_SYSLOG
-#  if defined(ENABLE_SYSLOG_FORCE) || defined(ENABLE_SYSLOG_DEFAULT)
 int enable_syslog=TRUE;
-#  else
-int enable_syslog=FALSE;
-#  endif
+
 #define DO_SYSLOG_FNAME(message) do { \
 	if (enable_syslog) { \
 		const char *shortname; \
@@ -193,10 +189,6 @@ int enable_syslog=FALSE;
         lsyslog message ; \
 	} \
 } while(0)
-#else
-#define DO_SYSLOG_FNAME(message) do { } while(0)
-#define DO_SYSLOG(message) do { } while(0)
-#endif
 
 
 /* async-signal-safe signal handler */
@@ -340,9 +332,7 @@ main(int argc, char *argv[])
             stats_journal_open(journal_filename);
         }
 
-#ifdef ENABLE_SYSLOG
-	openlog(lrzsz_progname,LOG_PID,ENABLE_SYSLOG);
-#endif
+	openlog(lrzsz_progname,LOG_PID,SYSLOG_FACILITY);
 
 	setlocale (LC_ALL, "");
         setlocale (LC_TIME, "C"); /* do not translate just the timestamp of a syslog message. uh. */
@@ -462,8 +452,6 @@ main(int argc, char *argv[])
 		case 'y':
 			Rxclob=TRUE; break;
 		case 2:
-#ifdef ENABLE_SYSLOG
-#  ifndef ENABLE_SYSLOG_FORCE
 			if (optarg && (!strcmp(optarg,"off") || !strcmp(optarg,"no"))) {
 				if (under_rsh)
 					lrzsz_warning(0, _("cannot turnoff syslog"));
@@ -472,10 +460,6 @@ main(int argc, char *argv[])
 			}
 			else
 				enable_syslog=TRUE;
-#  else
-			lrzsz_warning(0, _("cannot turnoff syslog"));
-#  endif
-#endif
 			break;
                 case 4:
                         startup_delay = (unsigned int) lrzsz_strtoul( "--delay-startup", optarg, NULL, 0, 0);
@@ -637,9 +621,7 @@ wcreceive(int argc, char **argp)
 {
 	int c;
 	struct zm_fileinfo zi;
-#ifdef ENABLE_SYSLOG
 	const char *shortname=NULL;;
-#endif
 	zi.fname=NULL;
 	zi.modtime=0;
 	zi.mode=0;
@@ -660,23 +642,15 @@ wcreceive(int argc, char **argp)
 				goto fubar;
 			c = rzfiles(&zi);
 
-#ifdef ENABLE_SYSLOG
 			shortname=NULL;
-#endif
 			if (c)
 				goto fubar;
 		} else {
                         // YMODEM path.
 			for (;;) {
-				if (Verbose > 1
-#ifdef ENABLE_SYSLOG
-					|| enable_syslog
-#endif
-				)
-					timing(1,NULL);
-#ifdef ENABLE_SYSLOG
-				shortname=NULL;
-#endif
+			if (Verbose > 1 || enable_syslog)
+				timing(1,NULL);
+			shortname=NULL;
 				if (wcrxpn(&zi,secbuf)== ERROR)
 					goto fubar;
 				if (secbuf[0]==0)
@@ -684,21 +658,15 @@ wcreceive(int argc, char **argp)
 				if (procheader(secbuf, &zi) == ERROR)
 					goto fubar;
                                 stats_set_filename(zi.fname);
-#ifdef ENABLE_SYSLOG
 				shortname=strrchr(zi.fname,'/');
 				if (shortname)
 					shortname++;
 				else
 					shortname=zi.fname;
-#endif
 				if (wcrx(&zi)==ERROR)
 					goto fubar;
 
-				if (Verbose > 1
-#ifdef ENABLE_SYSLOG
-					|| enable_syslog
-#endif
-				) {
+				if (Verbose > 1 || enable_syslog) {
 					double d;
 					long bps;
 					d=timing(0,NULL);
@@ -711,11 +679,9 @@ wcreceive(int argc, char **argp)
 							_("\rBytes received: %7ld/%7ld   BPS:%-6ld                \r\n"),
 							(long) zi.bytes_received, (long) zi.bytes_total, bps);
 					}
-#ifdef ENABLE_SYSLOG
 					if (enable_syslog)
 						lsyslog(LOG_INFO,"%s/%s: %ld Bytes, %ld BPS",
 							shortname,protname(),zi.bytes_received, bps);
-#endif
 				}
                                 stat_for_file.files_ok++;
                                 stats_account_one();
@@ -727,11 +693,7 @@ wcreceive(int argc, char **argp)
 		dummy[1]='\0'; /* procheader uses name + 1 + strlen(name) */
 		zi.bytes_total = DEFBYTL;
 
-		if (Verbose > 1
-#ifdef ENABLE_SYSLOG
-			|| enable_syslog
-#endif
-			) 
+		if (Verbose > 1 || enable_syslog)
 			timing(1,NULL);
 		procheader(dummy, &zi);
 
@@ -742,13 +704,11 @@ wcreceive(int argc, char **argp)
 
                 checkpath(Pathname);
                 stats_set_filename(Pathname);
-#ifdef ENABLE_SYSLOG
                 shortname=strrchr(*argp,'/');
                 if (shortname)
                     shortname++;
                 else
                     shortname=*argp;
-#endif
                 if (Verbose>1) {
                     vchar('\n');
                     vstringf(_("%s: ready to receive %s"), lrzsz_progname, Pathname);
@@ -756,11 +716,9 @@ wcreceive(int argc, char **argp)
                 }
 
                 if ((fout=safe_open(Pathname, "w")) == NULL) {
-#ifdef ENABLE_SYSLOG
                     if (enable_syslog)
                         lsyslog(LOG_ERR,"%s/%s: cannot open: %s",
                                 shortname,protname(), strerror(errno));
-#endif
                     return ERROR;
                 }
                 if (wcrx(&zi)==ERROR) {
@@ -768,11 +726,7 @@ wcreceive(int argc, char **argp)
                 }
                 // stat_for_file.files_ok++; done by wcrx.
                 stats_account_one();
-                if (Verbose > 1
-#ifdef ENABLE_SYSLOG
-                        || enable_syslog
-#endif
-                   ) {
+                if (Verbose > 1 || enable_syslog) {
                     double d;
                     long bps;
                     d=timing(0,NULL);
@@ -784,20 +738,16 @@ wcreceive(int argc, char **argp)
                                 _("\rBytes received: %7ld   BPS:%-6ld                \r\n"),
                                 (long) zi.bytes_received, bps);
                     }
-#ifdef ENABLE_SYSLOG
                     if (enable_syslog)
                         lsyslog(LOG_INFO,"%s/%s: %ld Bytes, %ld BPS",
                                 shortname,protname(),zi.bytes_received, bps);
-#endif
                 }
         }
         return OK;
 fubar:
-#ifdef ENABLE_SYSLOG
         if (enable_syslog)
-            lsyslog(LOG_ERR,"%s/%s: got error", 
+            lsyslog(LOG_ERR,"%s/%s: got error",
                     shortname ? shortname : "no.name", protname());
-#endif
         canit(STDOUT_FILENO);
         if (fout) {
             fclose(fout);
@@ -1248,9 +1198,7 @@ procheader(char *name, struct zm_fileinfo *zi)
         int i;
         if (zmanag == ZF1_ZMNEW || zmanag==ZF1_ZMNEWL) {
             if (-1==fstat(fileno(fout),&sta)) {
-#ifdef ENABLE_SYSLOG
                 int e=errno;
-#endif
                 if (Verbose)
                     vstringf(_("file exists, skipped: %s\n"),name);
                 DO_SYSLOG((LOG_ERR,"cannot fstat open file %s: %s",
@@ -1415,9 +1363,7 @@ procheader(char *name, struct zm_fileinfo *zi)
 #endif
         if ( !fout)
         {
-#ifdef ENABLE_SYSLOG
                 int e=errno;
-#endif
                 stat_for_file.local_errors+=1;
                 zpfatal(_("cannot open %s"), name_static);
                 DO_SYSLOG((LOG_ERR,"%s: cannot open: %s",
@@ -1790,11 +1736,7 @@ rzfiles(struct zm_fileinfo *zi)
 		c = rzfile(zi);
 		switch (c) {
 		case ZEOF:
-			if (Verbose > 1
-#ifdef ENABLE_SYSLOG
-				|| enable_syslog
-#endif
-	 		) {
+			if (Verbose > 1 || enable_syslog) {
 				double d;
 				long bps;
 				d=timing(0,NULL);

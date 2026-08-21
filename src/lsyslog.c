@@ -19,18 +19,15 @@
 
 */
 #include "config.h"
-#ifdef ENABLE_SYSLOG
 #include "zglobal.h"
 #include <pwd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#endif
 
 void
 lsyslog(int prio, const char *format, ...)
 {
-#ifdef ENABLE_SYSLOG
     static char *username=NULL;
     static char uid_string[20]=""; /* i'd really hate this function to fail! */
     char s[1024];
@@ -57,9 +54,4 @@ lsyslog(int prio, const char *format, ...)
     vsnprintf(s, sizeof(s), format, ap);
     va_end(ap);
     syslog(prio,"[%s] %s",username, s);
-#else
-    (void) prio; /* get rid of warning */
-    (void) format; /* get rid of warning */
-#endif
 }
-

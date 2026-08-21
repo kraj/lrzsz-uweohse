@@ -37,36 +37,14 @@ AC_ARG_ENABLE(mkdir,
 	  	AC_DEFINE([ENABLE_MKDIR], [], [Define to 1 if lrz shall create directories if needed.])
 	  fi],
 	[AC_DEFINE([ENABLE_MKDIR], [], [Define to 1 if lrz shall create directories if needed.])])
-AC_ARG_ENABLE(syslog,
-	[  --enable-syslog=FACILITY,{force,default,optional} include syslogsupport],
-	[
-	  if test "$enableval" = "no" ; then 
-		:
-	  else
-	    case "$enableval" in
-	    *,*)
-			level=`echo $enableval|sed -e 's/^.*,//'`
-			fac=`echo $enableval|sed -e 's/,.*$//'`
-			AC_DEFINE_UNQUOTED([ENABLE_SYSLOG],$fac,[Define to LOG_xxx (a syslog facility) if syslog() shall be used.])
-			;;
-		*)
-			lookup_facility=LOG_UUCP
-			level="$enableval"
-			;;
-		esac
-	  	if test "$level" = "force" ; then
-		  AC_DEFINE([ENABLE_SYSLOG_FORCE], [], [Define to 1 if syslogging shall be forced.])
-	  	else 
-	  	  if test "$level" = "optional" ; then
-	  	    :
-	  	  else
-		    AC_DEFINE([ENABLE_SYSLOG_DEFAULT], [], [Define to 1 if syslogging shall be default.])
-		  fi
-	  	fi
-	  fi],[
-		AC_DEFINE([ENABLE_SYSLOG_DEFAULT], [], [Define to 1 if syslogging shall be default.])
-		lookup_facility=LOG_UUCP
-	  ])
+AC_ARG_WITH([syslog-facility],
+	[  --with-syslog-facility=FACILITY  syslog facility (default: LOG_UUCP)],
+	[AS_CASE([$withval],
+		[yes|no|""], [syslog_facility=LOG_UUCP],
+		[syslog_facility=$withval])],
+	[syslog_facility=LOG_UUCP])
+AC_DEFINE_UNQUOTED([SYSLOG_FACILITY], [$syslog_facility],
+	[Define to the syslog facility constant to use for openlog().])
 have_std=
 AC_ARG_ENABLE([std],
               [  --enable-std=STD Use a specific C std ($supported_c_stds)],
@@ -141,10 +119,6 @@ if test "$want_ubsan" != "no" ; then
 fi
 
 dnl Checks for libraries.
-dnl SCO needs this.
-AC_CHECK_LIB(socket,syslog,,,)
-dnl BeOS needs this
-AC_CHECK_LIB(be,syslog,,,)
 dnl slowlartis needs this
 AC_CHECK_LIB(nsl,gethostbyname,,,)
 
@@ -187,32 +161,6 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
   [AC_DEFINE([HAVE_O_NOFOLLOW], [1])
    AC_MSG_RESULT([yes])],
    [AC_MSG_RESULT([no])])
-
-
-if test "x$lookup_facility" = x ; then
-	:
-else
-	AC_MSG_CHECKING([for $lookup_facility])
-	AC_CACHE_VAL(lrzsz_cv_lookup_facility,[
-		AC_PREPROC_IFELSE([AC_LANG_SOURCE([[
-#ifdef HAVE_SYSLOG_H
-#include <syslog.h>
-#else
-#include <sys/syslog.h>
-#endif
-#ifndef $lookup_facility
-#error $lookup_facility not defined
-#endif
-		]])], [lrzsz_cv_lookup_facility=yes], [lrzsz_cv_lookup_facility=no])
-	])
-	if test $lrzsz_cv_lookup_facility = yes ; then
-		AC_MSG_RESULT(yes)
-		AC_DEFINE_UNQUOTED([ENABLE_SYSLOG],$lookup_facility,[Define to LOG_xxx (a syslog facility) if syslog() shall be used.])
-	else
-		AC_DEFINE([ENABLE_SYSLOG],[LOG_USER],[Define to LOG_xxx (a syslog facility) if syslog() shall be used.])
-		AC_MSG_RESULT(no)
-	fi
-fi
 
 
 AC_SUBST(CFLAGS)

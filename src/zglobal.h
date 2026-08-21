@@ -112,10 +112,12 @@ struct termios;
 # define _(Text) Text
 #endif
 
-#ifdef ENABLE_SYSLOG
-#  include <syslog.h>
-extern int enable_syslog;
+#ifdef HAVE_SYSLOG_H
+# include <syslog.h>
+#elif defined HAVE_SYS_SYSLOG_H
+# include <sys/syslog.h>
 #endif
+extern int enable_syslog;
 
 #if defined HAVE_UNISTD_H
 # include <unistd.h>
