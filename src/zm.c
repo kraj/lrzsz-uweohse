@@ -407,7 +407,7 @@ zshhdr(int type, char *hdr)
 
 	/* Make it printable on remote machine */
 	s[len++]='\r';
-	s[len++]='\r'|0x80;
+	s[len++]='\n'|0x80;
 	/*
 	 * Uncork the remote in case a fake XOFF has stopped data flow
 	 */
