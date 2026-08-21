@@ -127,6 +127,9 @@ not perfectly trustworthy senders.
   better on faulty lines than other implementations optimized for 
   the perfect world.
 
+* syslog support is now always compiled in. In earlier releases
+  there we configure options to deselect it.
+
 * a number of possible security problems have been fixed:
   - double fclose in lrz.
   - a write before a buffer in lrz (80s).
