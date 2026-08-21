@@ -33,14 +33,7 @@ timing (int reset, time_t *nowp)
   double yet;
 #ifdef HAVE_GETTIMEOFDAY
   struct timeval tv;
-  struct timezone tz;
-
-#ifdef DST_NONE
-  tz.tz_dsttime = DST_NONE;
-#else
-  tz.tz_dsttime = 0;
-#endif
-  gettimeofday (&tv, &tz);
+  gettimeofday(&tv, NULL);
   yet=tv.tv_sec + tv.tv_usec/1000000.0;
 #else
   yet=(double) time(NULL);
