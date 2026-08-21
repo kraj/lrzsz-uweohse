@@ -688,9 +688,7 @@ wcreceive(int argc, char **argp)
 			}
 		}
 	} else {
-		char dummy[128];
-		dummy[0]='\0'; /* pre-ANSI HPUX cc demands this */
-		dummy[1]='\0'; /* procheader uses name + 1 + strlen(name) */
+		char dummy[128] = ""; /* empty filename; procheader uses name + 1 + strlen(name) */
 		zi.bytes_total = DEFBYTL;
 
 		if (Verbose > 1 || enable_syslog)
