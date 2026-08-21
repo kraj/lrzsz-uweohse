@@ -57,7 +57,7 @@ unsigned Txwcnt;	/* Counter used to space ack requests */
 size_t Lrxpos;		/* Receiver's last reported offset */
 int errors;
 enum zm_type_enum protocol;
-int under_rsh=FALSE;
+int under_rsh=false;
 extern int turbo_escape;
 static int no_unixmode;
 
@@ -151,7 +151,7 @@ unsigned Tframlen = 0;	/* Override for tx frame length */
 unsigned blkopt=0;		/* Override value for zmodem blklen */
 int Rxflags = 0;
 size_t bytcnt;
-int Wantfcs32 = TRUE;	/* want to send 32 bit FCS */
+int Wantfcs32 = true;	/* want to send 32 bit FCS */
 char Lzconv;	/* Local ZMODEM file conversion request */
 char Lzmanag;	/* Local ZMODEM file management request */
 int Lskipnocor;
@@ -166,7 +166,7 @@ int Exitcode;
 size_t Lastsync;		/* Last offset to which we got a ZRPOS */
 int Beenhereb4;		/* How many times we've been ZRPOS'd same place */
 
-int no_timeout=FALSE;
+int no_timeout=false;
 size_t max_blklen=1024;
 size_t start_blklen=0;
 int zmodem_requested;
@@ -178,7 +178,7 @@ int error_count;
 
 #define MK_STRING(x) #x
 
-int enable_syslog=TRUE;
+int enable_syslog=true;
 
 jmp_buf intrjmp;	/* For the interrupt on RX CAN */
 
@@ -340,7 +340,7 @@ main(int argc, char **argv)
 		if (strcmp(base, "rsh") == 0 || strcmp(base, "rksh") == 0
 			|| strcmp(base, "rbash") == 0 || strcmp(base, "rshell") == 0)
 		{
-			under_rsh=TRUE;
+			under_rsh=true;
 			Restricted=1;
 		}
 	}
@@ -375,7 +375,7 @@ main(int argc, char **argv)
 		case 0:
 			break;
 		case '+': Lzmanag = ZF1_ZMAPND; break;
-		case '2': Twostop = TRUE; break;
+		case '2': Twostop = true; break;
 		case '8':
 			if (max_blklen==8192)
 				start_blklen=8192;
@@ -396,7 +396,7 @@ main(int argc, char **argv)
 			start_blklen=4096;
 			max_blklen=4096;
 			break;
-		case 'a': Lzconv = ZCNL; Ascii = TRUE; break;
+		case 'a': Lzconv = ZCNL; Ascii = true; break;
 		case 'b': Lzconv = ZCBIN; break;
 		case 'B':
 			if (0==strcmp(optarg,"auto"))
@@ -412,17 +412,17 @@ main(int argc, char **argv)
 			break;
 		case 'i':
 			Cmdack1 = ZCACK1;
-			command_mode = TRUE;
+			command_mode = true;
 			Cmdstr = optarg;
 			break;
 		case 'c':
-			command_mode = TRUE;
+			command_mode = true;
 			Cmdstr = optarg;
 			break;
 		case 'd':
 			fatal_error(1,0,_("this option has been removed; see the manual"));
 			break;
-		case 'f': Fullname=TRUE; break;
+		case 'f': Fullname=true; break;
 		case 'e': Zctlesc = 1; break;
 		case 'E': Lzmanag = ZF1_ZMCHNG; break;
 		case 'h': usage(0,NULL); break;
@@ -445,8 +445,8 @@ main(int argc, char **argv)
 			break;
 		case 'N': Lzmanag = ZF1_ZMNEWL;  break;
 		case 'n': Lzmanag = ZF1_ZMNEW;  break;
-		case 'o': Wantfcs32 = FALSE; break;
-		case 'O': no_timeout = TRUE; break;
+		case 'o': Wantfcs32 = false; break;
+		case 'O': no_timeout = true; break;
 		case 'p': Lzmanag = ZF1_ZMPROT;  break;
 		case 'r':
 			if (Lzconv == ZCRESUM)
@@ -454,8 +454,8 @@ main(int argc, char **argv)
 			else
 				Lzconv = ZCRESUM;
 			break;
-		case 'R': Restricted = TRUE; break;
-		case 'q': Quiet=TRUE; Verbose=0; break;
+		case 'R': Restricted = true; break;
+		case 'q': Quiet=true; Verbose=0; break;
 		case 's':
 			if (isdigit((unsigned char) (*optarg))) {
 				struct tm *tm;
@@ -516,7 +516,7 @@ main(int argc, char **argv)
 		case 'g': protocol=ZM_YMODEM; break;
 		case 'Z': protocol=ZM_ZMODEM; break;
 		case 'Y':
-			Lskipnocor = TRUE;
+			Lskipnocor = true;
 			Lzmanag = ZF1_ZMCLOB;
                         break;
 		case 'y':
@@ -527,10 +527,10 @@ main(int argc, char **argv)
 				if (under_rsh)
 					lrzsz_warning(0, _("cannot turnoff syslog"));
 				else
-					enable_syslog=FALSE;
+					enable_syslog=false;
 			}
 			else
-				enable_syslog=TRUE;
+				enable_syslog=true;
 			break;
 		case 4:
                         startup_delay = (unsigned int) lrzsz_strtoul( "--delay-startup", optarg, NULL, 1, 0);
@@ -701,8 +701,8 @@ wcsend (int argc, char *argp[])
 {
 	int n;
 
-	Crcflg = FALSE;
-	firstsec = TRUE;
+	Crcflg = false;
+	firstsec = true;
 	bytcnt = (size_t) -1;
 
 	for (n = 0; n < argc; ++n) {
@@ -1026,12 +1026,12 @@ getnak(void)
 			if (getzrxinit())
 				return ERROR;
 			Ascii = 0;	/* Receiver does the conversion */
-			return FALSE;
+			return false;
 		case TIMEOUT:
 			/* 30 seconds are enough */
 			if (tries==3) {
 				zperr(_("Timeout on pathname"));
-				return TRUE;
+				return true;
 			}
 			/* don't send a second ZRQINIT _directly_ after the
 			 * first one. Never send more then 4 ZRQINIT, because
@@ -1047,18 +1047,18 @@ getnak(void)
 			continue;
 		case WANTG:
 			io_mode(io_mode_fd,2);	/* Set cbreak, XON/XOFF, etc. */
-			Optiong = TRUE;
+			Optiong = true;
 			blklen=1024;
-			Crcflg = TRUE;
-                        return FALSE;
+			Crcflg = true;
+                        return false;
 		case WANTCRC:
-			Crcflg = TRUE;
-			return FALSE;
+			Crcflg = true;
+			return false;
 		case NAK:
-			return FALSE;
+			return false;
 		case CAN:
 			if ((firstch = READLINE_PF(20)) == CAN && Lastrx == CAN)
-				return TRUE;
+				return true;
 		default:
 			break;
 		}
@@ -1073,7 +1073,7 @@ wctx(struct zm_fileinfo *zi)
 	size_t thisblklen;
 	int sectnum, attempts, firstch;
 
-	firstsec=TRUE;  thisblklen = blklen;
+	firstsec=true;  thisblklen = blklen;
 	vfile("wctx:file length=%ld", (long) zi->bytes_total);
 
 	while ((firstch=READLINE_PF(Rxtimeout))!=NAK && firstch != WANTCRC
@@ -1084,9 +1084,9 @@ wctx(struct zm_fileinfo *zi)
 		return ERROR;
 	}
 	if (firstch==WANTCRC)
-		Crcflg=TRUE;
+		Crcflg=true;
 	if (firstch==WANTG)
-		Crcflg=TRUE;
+		Crcflg=true;
 	sectnum=0;
 	for (;;) {
 		if (zi->bytes_total <= (zi->bytes_sent + 896L))
@@ -1153,7 +1153,7 @@ wcputsec(char *buf, int sectnum, size_t cseclen)
 
 		flushmo();
 		if (Optiong) {
-			firstsec = FALSE; return OK;
+			firstsec = false; return OK;
 		}
 		firstch = READLINE_PF(Rxtimeout);
 gotnak:
@@ -1168,12 +1168,12 @@ cancan:
 			zperr(_("Timeout on sector ACK")); continue;
 		case WANTCRC:
 			if (firstsec)
-				Crcflg = TRUE;
+				Crcflg = true;
                         continue;
 		case NAK:
 			zperr(_("NAK on sector")); continue;
 		case ACK:
-			firstsec=FALSE;
+			firstsec=false;
 			Totsecs += (cseclen>>7);
 			return OK;
 		case ERROR:
@@ -1224,7 +1224,7 @@ filbuf(char *buf, size_t count)
 		if (c == 012) {
 			*buf++ = 015;
 			if (--m == 0) {
-				Lfseen = TRUE; break;
+				Lfseen = true; break;
 			}
 		}
 		*buf++ =c;

@@ -156,17 +156,17 @@ struct termios oldtty, tty;
 int 
 io_mode(int fd, int n)
 {
-	static int did0 = FALSE;
-	static int have_oldtty = FALSE;
+	static int did0 = false;
+	static int have_oldtty = false;
 
 	vfile("mode:%d", n);
 
 	switch(n) {
 	case 2:		/* Un-raw mode used by sz, sb when -g detected */
 		if(!did0) {
-			did0 = TRUE;
+			did0 = true;
 			if (tcgetattr(fd,&oldtty) == 0)
-				have_oldtty = TRUE;
+				have_oldtty = true;
 			else
 				vfile("tcgetattr failed: %s", strerror(errno));
 		}
@@ -202,9 +202,9 @@ io_mode(int fd, int n)
 	case 1:
 	case 3:
 		if(!did0) {
-			did0 = TRUE;
+			did0 = true;
 			if (tcgetattr(fd,&oldtty) == 0)
-				have_oldtty = TRUE;
+				have_oldtty = true;
 			else
 				vfile("tcgetattr failed: %s", strerror(errno));
 		}

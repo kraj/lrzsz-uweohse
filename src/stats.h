@@ -1,8 +1,6 @@
 #ifndef LRZSZ_STATS_H
 #define LRZSZ_STATS_H
 
-#include <stdbool.h>
-
 struct lrzsz_stat {
     unsigned int n_files;
     char *filename;

@@ -46,6 +46,7 @@ char *alloca ();
 #endif
 
 #include <stdarg.h>
+#include <stdbool.h>
 
 #  include <sys/time.h>
 #  include <time.h>
@@ -159,8 +160,6 @@ extern int enable_syslog;
 #include "util.h"
 
 #define OK 0
-#define FALSE 0
-#define TRUE 1
 #define ERROR (-1)
 
 /* Ward Christensen / CP/M parameters - Don't change these! */

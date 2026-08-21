@@ -33,7 +33,7 @@ int Rxtype;		/* Type of header received */
 char Rxhdr[4];		/* Received header */
 char Txhdr[4];		/* Transmitted header */
 long Txpos;		/* Transmitted file position */
-int Txfcs32;		/* TRUE means send binary frames with 32 bit FCS */
+int Txfcs32;		/* true means send binary frames with 32 bit FCS */
 int Crc32t;		/* Display flag indicating 32 bit CRC being sent */
 int Crc32;		/* Display flag indicating 32 bit CRC being received */
 int Znulls;		/* Number of nulls to send at beginning of ZDATA hdr */
@@ -766,7 +766,8 @@ splat:
 	case TIMEOUT:
 		goto fifi;
 	case ZBIN:
-		Rxframeind = ZBIN;  Crc32 = FALSE;
+		Rxframeind = ZBIN;
+                Crc32 = false;
 		c =  zrbhdr(hdr);
                 if (c==ERROR) {
                     stat_for_file.invalid_messages++;
@@ -775,7 +776,8 @@ splat:
                 }
 		break;
 	case ZBIN32:
-		Crc32 = Rxframeind = ZBIN32;
+                Rxframeind = ZBIN32;
+		Crc32 = true;
 		c =  zrbhdr32(hdr);
                 if (c==ERROR) {
                     stat_for_file.invalid_messages++;
@@ -784,7 +786,8 @@ splat:
                 }
 		break;
 	case ZHEX:
-		Rxframeind = ZHEX;  Crc32 = FALSE;
+		Rxframeind = ZHEX;
+                Crc32 = false;
 		c =  zrhhdr(hdr);
                 if (c==ERROR) {
                     stat_for_file.invalid_messages++;
@@ -870,7 +873,7 @@ zrbhdr(char *hdr)
 		return ERROR;
 	}
 	protocol = ZM_ZMODEM;
-	zmodem_requested=TRUE;
+	zmodem_requested=true;
 	return Rxtype;
 }
 
@@ -902,7 +905,7 @@ zrbhdr32(char *hdr)
 		return ERROR;
 	}
 	protocol = ZM_ZMODEM;
-	zmodem_requested=TRUE;
+	zmodem_requested=true;
 	return Rxtype;
 }
 
@@ -946,7 +949,7 @@ zrhhdr(char *hdr)
                 ;
 	}
 	protocol = ZM_ZMODEM;
-	zmodem_requested=TRUE;
+	zmodem_requested=true;
 	return Rxtype;
 }
 

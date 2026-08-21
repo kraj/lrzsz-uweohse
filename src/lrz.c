@@ -62,20 +62,20 @@ unsigned int Segmentsize = 0;
 
 char *Pathname;
 
-int MakeLCPathname=TRUE;	/* make received pathname lower case */
+int MakeLCPathname=true;	/* make received pathname lower case */
 int Verbose=0;
 int Quiet=0;		/* overrides logic that would otherwise set verbose */
 int Nflag = 0;		/* Don't really transfer files */
-int Rxclob=FALSE;	/* Clobber existing file */
-int Rxbinary=FALSE;	/* receive all files in bin mode */
-int Rxascii=FALSE;	/* receive files in ascii (translate) mode */
+int Rxclob=false;	/* Clobber existing file */
+int Rxbinary=false;	/* receive all files in bin mode */
+int Rxascii=false;	/* receive files in ascii (translate) mode */
 int Thisbinary;		/* current file is to be received in bin mode */
-int try_resume=FALSE;
-int junk_path=FALSE;
-int no_timeout=FALSE;
+int try_resume=false;
+int junk_path=false;
+int no_timeout=false;
 enum zm_type_enum protocol;
-int	under_rsh=FALSE;
-int zmodem_requested=FALSE;
+int	under_rsh=false;
+int zmodem_requested=false;
 
 static char *secbuf;
 
@@ -167,7 +167,7 @@ unsigned int Zrwindow = 1400;	/* RX window size (controls garbage count) */
 int tryzhdrtype=ZRINIT;	/* Header type to send corresponding to Last rx close */
 time_t stop_time;
 
-int enable_syslog=TRUE;
+int enable_syslog=true;
 
 #define DO_SYSLOG_FNAME(message) do { \
 	if (enable_syslog) { \
@@ -313,7 +313,7 @@ main(int argc, char *argv[])
 		base = base ? base + 1 : cp;
 		if (strcmp(base, "rsh") == 0 || strcmp(base, "rksh") == 0
 			|| strcmp(base, "rbash") == 0 || strcmp(base, "rshell") == 0)
-			under_rsh=TRUE;
+			under_rsh=true;
 	}
 	if ((cp=getenv("ZMODEM_RESTRICTED"))!=NULL)
 		Restricted=2;
@@ -350,18 +350,18 @@ main(int argc, char *argv[])
 		case 0:
 			break;
 		case '+': Lzmanag = ZF1_ZMAPND; break;
-		case 'a': Rxascii=TRUE;  break;
+		case 'a': Rxascii=true;  break;
                 case 'A':
                         Segmentsize = (unsigned int) lrzsz_strtoul( "-A / --segmentsize-tries", optarg, NULL, 0, 65536);
                         break;
-		case 'b': Rxbinary=TRUE; break;
+		case 'b': Rxbinary=true; break;
 		case 'B': 
 			if (strcmp(optarg,"auto")==0)
 				fatal_error(1,0,_("the auto buffersize option has been removed; see the manual"));
                         buffersize = lrzsz_strtoul( _("-B / --bufsize"), optarg, "km", 0, 0);
 			break;
-		case 'c': Crcflg=TRUE; break;
-		case 'D': Nflag = TRUE; break;
+		case 'c': Crcflg=true; break;
+		case 'D': Nflag = true; break;
 		case 'E': Lzmanag = ZF1_ZMCHNG; break;
 		case 'e': Zctlesc = 1; break;
 	case 'h': usage(0,NULL); break;
@@ -369,7 +369,7 @@ main(int argc, char *argv[])
 		stats_journal_open(optarg);
 		break;
 	case 'H': Lzmanag= ZF1_ZMCRC; break;
-		case 'j': junk_path=TRUE; break;
+		case 'j': junk_path=true; break;
 		case 'm':
 			min_bps = lrzsz_strtoul( _("-m / --min-bps"), optarg, "km", 0, 0);
 			break;
@@ -378,9 +378,9 @@ main(int argc, char *argv[])
 			break;
 		case 'N': Lzmanag = ZF1_ZMNEWL;  break;
 		case 'n': Lzmanag = ZF1_ZMNEW;  break;
-		case 'O': no_timeout=TRUE; break;
+		case 'O': no_timeout=true; break;
 		case 'p': Lzmanag = ZF1_ZMPROT;  break;
-		case 'q': Quiet=TRUE; Verbose=0; break;
+		case 'q': Quiet=true; Verbose=0; break;
 		case 's':
 			if (isdigit((unsigned char) (*optarg))) {
 				struct tm *tm;
@@ -417,7 +417,7 @@ main(int argc, char *argv[])
 			if (try_resume) 
 				Lzmanag= ZF1_ZMCRC;
 			else
-				try_resume=TRUE;  
+				try_resume=true;  
 			break;
 		case 'R': Restricted++;  break;
 		case 'C':
@@ -432,7 +432,7 @@ main(int argc, char *argv[])
                         Zrwindow = (unsigned int) lrzsz_strtoul( "-w / --windowsize", optarg, NULL, 1, 8192);
 			break;
 		case 'u':
-			MakeLCPathname=FALSE; break;
+			MakeLCPathname=false; break;
 		case 'U':
 			if (!under_rsh)
 				Restricted=0;
@@ -450,16 +450,16 @@ main(int argc, char *argv[])
 		case 'g':   protocol=ZM_YMODEM; break;
 		case 'Z': protocol=ZM_ZMODEM; break;
 		case 'y':
-			Rxclob=TRUE; break;
+			Rxclob=true; break;
 		case 2:
 			if (optarg && (!strcmp(optarg,"off") || !strcmp(optarg,"no"))) {
 				if (under_rsh)
 					lrzsz_warning(0, _("cannot turnoff syslog"));
 				else
-					enable_syslog=FALSE;
+					enable_syslog=false;
 			}
 			else
-				enable_syslog=TRUE;
+				enable_syslog=true;
 			break;
                 case 4:
                         startup_delay = (unsigned int) lrzsz_strtoul( "--delay-startup", optarg, NULL, 0, 0);
@@ -778,8 +778,8 @@ wcrxpn(struct zm_fileinfo *zi, char *rpn)
     READLINE_PF(1);
 
 et_tu:
-    Firstsec=TRUE;
-    zi->eof_seen=FALSE;
+    Firstsec=true;
+    zi->eof_seen=false;
     sendline(Crcflg?WANTCRC:NAK);
     flushmo();
     purgeline(0); /* Do read next time ... */
@@ -815,8 +815,8 @@ wcrx(struct zm_fileinfo *zi)
     char sendchar;
     size_t Blklen;
 
-    Firstsec=TRUE;sectnum=0; 
-    zi->eof_seen=FALSE;
+    Firstsec=true;sectnum=0; 
+    zi->eof_seen=false;
     sendchar=Crcflg?WANTCRC:NAK;
 
     for (;;) {
@@ -912,14 +912,14 @@ get2:
                         stat_for_file.invalid_messages+=1;
                         zperr( _("CRC"));
                     } else {
-                        Firstsec=FALSE;
+                        Firstsec=false;
                         stat_for_file.valid_messages+=1;
                         return sectcurr;
                     }
                 } else {
                     stat_for_file.total_message_bytes+=*Blklen;
                     if (((checksum-firstch)&0377)==0) {
-                        Firstsec=FALSE;
+                        Firstsec=false;
                         stat_for_file.valid_messages+=1;
                         return sectcurr;
                     }
@@ -1159,7 +1159,7 @@ procheader(char *name, struct zm_fileinfo *zi)
     if (!Rxbinary && zconv == ZCNL)	/* Remote ASCII override */
         Thisbinary = 0;
     if (zconv == ZCBIN)	/* Remote Binary override */
-        Thisbinary = TRUE;
+        Thisbinary = true;
     if (Thisbinary && zconv == ZCBIN && try_resume)
         zconv=ZCRESUM;
     if (zmanag == ZF1_ZMAPND && zconv!=ZCRESUM)
@@ -1317,7 +1317,7 @@ procheader(char *name, struct zm_fileinfo *zi)
                 fout = safe_open(name_static, "r+");
                 if (fout && 0==fstat(fileno(fout),&st))
                 {
-                        int can_resume=TRUE;
+                        int can_resume=true;
                         if (zmanag==ZF1_ZMCRC) {
                                 int r=do_crc_check(fout,zi->bytes_total,st.st_size);
                                 if (r==ERROR) {
@@ -1326,11 +1326,11 @@ procheader(char *name, struct zm_fileinfo *zi)
                                         return ERROR;
                                 }
                                 if (r==ZCRC_DIFFERS) {
-                                        can_resume=FALSE;
+                                        can_resume=false;
                                 }
                         }
                         if ((unsigned long)st.st_size > zi->bytes_total) {
-                                can_resume=FALSE;
+                                can_resume=false;
                         }
                         /* retransfer whole blocks */
                         zi->bytes_skipped = st.st_size & ~(1023);
@@ -1474,7 +1474,7 @@ putsec(struct zm_fileinfo *zi, char *buf, size_t n)
 			if ( *p == '\r')
 				continue;
 			if (*p == CPMEOF) {
-				zi->eof_seen=TRUE;
+				zi->eof_seen=true;
 				return OK;
 			}
 			putc(*p ,fout);
@@ -1492,15 +1492,15 @@ uncaps(char *s)
 			*s = tolower((unsigned char)(*s));
 }
 /*
- * IsAnyLower returns TRUE if string s has lower case letters.
+ * IsAnyLower returns true if string s has lower case letters.
  */
 static int 
 IsAnyLower(const char *s)
 {
 	for ( ; *s; ++s)
 		if (islower((unsigned char)(*s)))
-			return TRUE;
-	return FALSE;
+			return true;
+	return false;
 }
 
 static void
@@ -1653,7 +1653,7 @@ again:
 				zconv=ZCBIN;
 			if (Rxhdr[ZF1] & ZF1_ZMSKNOLOC) {
 				Rxhdr[ZF1] &= ~(ZF1_ZMSKNOLOC);
-				skip_if_not_found=TRUE;
+				skip_if_not_found=true;
 			}
 			zmanag = Rxhdr[ZF1];
 			ztrans = Rxhdr[ZF2];
@@ -1792,7 +1792,7 @@ rzfile(struct zm_fileinfo *zi)
 	time_t low_bps=0;
 	size_t bytes_in_block=0;
 
-	zi->eof_seen=FALSE;
+	zi->eof_seen=false;
 
 	n = 20;
 
