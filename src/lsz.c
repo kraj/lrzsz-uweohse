@@ -215,7 +215,7 @@ bibi(int n)
 	canit(STDOUT_FILENO);
 	fflush(stdout);
 	io_mode(io_mode_fd, 0);
-        lrzsz_warning(0, 0, _("caught signal %d; exiting"), n);
+        lrzsz_warning(0, _("caught signal %d; exiting"), n);
 	if (n == SIGQUIT)
 		abort();
 	exit(128 + n);
