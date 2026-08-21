@@ -209,9 +209,9 @@ extern enum zm_type_enum protocol;
 extern const char *program_name;        /* the name by which we were called */
 extern int Verbose;
 extern int errors;
-extern int no_timeout;
-extern int Zctlesc;    /* Encode control characters */
-extern int under_rsh;
+extern bool no_timeout;
+extern bool Zctlesc;    /* Encode control characters */
+extern bool under_rsh;
 
 void bibi (int n);
 
@@ -231,8 +231,8 @@ void readline_setup (int fd, size_t readnum, size_t buffer_size);
 
 
 /* rbsb.c */
-extern int Fromcu;
-extern int Twostop;
+extern bool Fromcu;
+extern bool Twostop;
 extern int iofd;
 extern unsigned int Baudrate;
 

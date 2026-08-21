@@ -57,7 +57,7 @@ unsigned Txwcnt;	/* Counter used to space ack requests */
 size_t Lrxpos;		/* Receiver's last reported offset */
 int errors;
 enum zm_type_enum protocol;
-int under_rsh=false;
+bool under_rsh=false;
 extern int turbo_escape;
 static int no_unixmode;
 
@@ -166,7 +166,7 @@ int Exitcode;
 size_t Lastsync;		/* Last offset to which we got a ZRPOS */
 int Beenhereb4;		/* How many times we've been ZRPOS'd same place */
 
-int no_timeout=false;
+bool no_timeout=false;
 size_t max_blklen=1024;
 size_t start_blklen=0;
 int zmodem_requested;
@@ -245,7 +245,7 @@ onintr(int n)
 	longjmp(intrjmp, -1);
 }
 
-int Zctlesc;	/* Encode control characters */
+bool Zctlesc;	/* Encode control characters */
 unsigned int Zrwindow = 1400;	/* RX window size (controls garbage count) */
 
 #ifdef HAVE_GETOPT_LONG

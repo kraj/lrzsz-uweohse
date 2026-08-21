@@ -109,7 +109,7 @@ getspeed(speed_t code)
  *  indicating this program operating with a modem on a
  *  different line
  */
-int Fromcu;		/* Were called from cu or yam */
+bool Fromcu;		/* Were called from cu or yam */
 int 
 from_cu(void)
 {
@@ -142,7 +142,7 @@ from_cu(void)
 
 
 
-int Twostop;		/* Use two stop bits */
+bool Twostop;		/* Use two stop bits */
 
 struct termios oldtty, tty;
 

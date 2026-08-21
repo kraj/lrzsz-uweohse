@@ -72,9 +72,9 @@ int Rxascii=false;	/* receive files in ascii (translate) mode */
 int Thisbinary;		/* current file is to be received in bin mode */
 int try_resume=false;
 int junk_path=false;
-int no_timeout=false;
+bool no_timeout=false;
 enum zm_type_enum protocol;
-int	under_rsh=false;
+bool under_rsh=false;
 int zmodem_requested=false;
 
 static char *secbuf;
@@ -161,7 +161,7 @@ char Lzmanag;		/* Local file management request */
 char zconv;		/* ZMODEM file conversion request */
 char zmanag;		/* ZMODEM file management request */
 char ztrans;		/* ZMODEM file transport request */
-int Zctlesc;		/* Encode control characters */
+bool Zctlesc;		/* Encode control characters */
 unsigned int Zrwindow = 1400;	/* RX window size (controls garbage count) */
 
 int tryzhdrtype=ZRINIT;	/* Header type to send corresponding to Last rx close */
