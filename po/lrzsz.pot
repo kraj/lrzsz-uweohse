@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: lrzsz 0.13.0-alpha\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-08-20 18:04+0200\n"
+"POT-Creation-Date: 2026-08-20 21:17+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -337,41 +337,41 @@ msgstr ""
 msgid "receiver not advancing after %d ACKs"
 msgstr ""
 
-#: src/lsz.c:2053
+#: src/lsz.c:2087
 #, c-format
 msgid "calc_blklen: reduced to %d due to error\n"
 msgstr ""
 
-#: src/lsz.c:2086
+#: src/lsz.c:2120
 #, c-format
 msgid "calc_blklen: returned old value %d due to low bpe diff\n"
 msgstr ""
 
-#: src/lsz.c:2088
+#: src/lsz.c:2122
 #, c-format
 msgid "calc_blklen: old %ld, new %ld, d %ld\n"
 msgstr ""
 
-#: src/lsz.c:2097
+#: src/lsz.c:2131
 #, c-format
 msgid "calc_blklen: calc total_bytes=%ld, bpe=%ld, ec=%ld\n"
 msgstr ""
 
-#: src/lsz.c:2108
+#: src/lsz.c:2142
 #, c-format
 msgid "calc_blklen: blklen %d, ok %ld, failed %ld -> %lu\n"
 msgstr ""
 
-#: src/lsz.c:2120
+#: src/lsz.c:2154
 #, c-format
 msgid "calc_blklen: returned %d as best\n"
 msgstr ""
 
-#: src/lsz.c:2252
+#: src/lsz.c:2286
 msgid "got a ZRQINIT packet: the other side is trying to send, too"
 msgstr ""
 
-#: src/lsz.c:2316
+#: src/lsz.c:2350
 #, c-format
 msgid ""
 "\n"
