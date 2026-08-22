@@ -657,13 +657,13 @@ main(int argc, char **argv)
 
 	if (Cmdstr) {
 		if (getzrxinit()) {
-			Exitcode=0200; canit(STDOUT_FILENO);
+			Exitcode=0x80; canit(STDOUT_FILENO);
 		}
 		else if (zsendcmd(Cmdstr, strlen(Cmdstr)+1)) {
-			Exitcode=0200; canit(STDOUT_FILENO);
+			Exitcode=0x80; canit(STDOUT_FILENO);
 		}
 	} else if (wcsend(npats, patts)==ERROR) {
-		Exitcode=0200;
+		Exitcode=0x80;
 		canit(STDOUT_FILENO);
 	}
 	fflush(stdout);
@@ -1131,7 +1131,7 @@ wcputsec(char *buf, int sectnum, size_t cseclen)
 		oldcrc=checksum=0;
 		for (wcj=cseclen,cp=buf; --wcj>=0; ) {
 			sendline(*cp);
-			oldcrc=updcrc((0377& *cp), oldcrc);
+			oldcrc=updcrc((0xff& *cp), oldcrc);
 			checksum += *cp++;
 		}
 		if (Crcflg) {
@@ -1204,16 +1204,16 @@ filbuf(char *buf, size_t count)
 			return 0;
 		m = (size_t)r;
 		while (m < count)
-			buf[m++] = 032;
+			buf[m++] = CPMEOF;
 		return count;
 	}
 	m=count;
 	if (Lfseen) {
-		*buf++ = 012; --m; Lfseen = 0;
+		*buf++ = '\n'; --m; Lfseen = 0;
 	}
 	while ((c=getc(input_f))!=EOF) {
-		if (c == 012) {
-			*buf++ = 015;
+		if (c == '\n') {
+			*buf++ = '\r';
 			if (--m == 0) {
 				Lfseen = true; break;
 			}
@@ -1382,7 +1382,7 @@ getzrxinit(void)
 			/* ??? Since when does a receiver send ZCOMMAND?  -- uwe */
 			continue;
 		case ZRINIT:
-			Rxflags = 0377 & Rxhdr[ZF0];
+			Rxflags = 0xff & Rxhdr[ZF0];
 			Txfcs32 = (Wantfcs32 && (Rxflags & CANFC32));
 			{
 				int old=Zctlesc;
@@ -1391,7 +1391,7 @@ getzrxinit(void)
 				if (Zctlesc && !old)
 					zsendline_init();
 			}
-			Rxbuflen = (0377 & Rxhdr[ZP0])+((0377 & Rxhdr[ZP1])<<8);
+			Rxbuflen = (0xff & Rxhdr[ZP0])+((0xff & Rxhdr[ZP1])<<8);
 			if ( !(Rxflags & CANFDX))
 				Txwindow = 0;
 			vfile("Rxbuflen=%u Tframlen=%u", Rxbuflen, Tframlen);
@@ -1755,7 +1755,7 @@ zsendfdata (struct zm_fileinfo *zi)
                                 need_wait = 1;
 				goto gotack;
 			case XOFF:			/* Wait a while for an XON */
-			case XOFF | 0200:
+			case XOFF | 0x80:
 				READLINE_PF (100);
                         default:
                                 ;
@@ -1898,7 +1898,7 @@ zsendfdata (struct zm_fileinfo *zi)
 				ZSDATA (txbuf, 0, ZCRCE);
 				goto gotack;
 			case XOFF:			/* Wait a while for an XON */
-			case XOFF | 0200:
+			case XOFF | 0x80:
 				READLINE_PF (100);
                                 /* FALLTHROUGH */
 			default:

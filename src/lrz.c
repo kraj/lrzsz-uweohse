@@ -522,7 +522,7 @@ main(int argc, char *argv[])
 	install_signal_handler(SIGTERM);
 	install_signal_handler(SIGPIPE);
 	if (wcreceive(npats, patts)==ERROR) {
-		exitcode=0200;
+		exitcode=0x80;
 		canit(STDOUT_FILENO);
 	}
 	io_mode(0,0);
@@ -823,8 +823,8 @@ wcrx(struct zm_fileinfo *zi)
         flushmo();
         purgeline(0);	/* Do read next time ... */
         sectcurr=wcgetsec(&Blklen, secbuf, 
-                (unsigned int) ((sectnum&0177) ? 50 : 130));
-        if (sectcurr==((sectnum+1) &0377)) {
+                (unsigned int) ((sectnum&0x7f) ? 50 : 130));
+        if (sectcurr==((sectnum+1) &0xff)) {
             sectnum++;
             /* report the real section/block number, not sectcurr
              * this is (a) more correct, and
@@ -839,7 +839,7 @@ wcrx(struct zm_fileinfo *zi)
                 return ERROR;
             sendchar=ACK;
         }
-        else if (sectcurr==(sectnum&0377)) {
+        else if (sectcurr==(sectnum&0xff)) {
             zperr( _("Received dup Sector"));
             sendchar=ACK;
             stat_for_file.out_of_sync_messages+=1;
@@ -891,7 +891,7 @@ wcgetsec(size_t *Blklen, char *rxbuf, unsigned int maxtime)
             *Blklen=128;
 get2:
             sectcurr=READLINE_PF(1);
-            if ((sectcurr+(oldcrc=READLINE_PF(1)))==0377) {
+            if ((sectcurr+(oldcrc=READLINE_PF(1)))==0xff) {
                 oldcrc=checksum=0;
                 for (p=rxbuf,wcj=*Blklen; --wcj>=0; ) {
                     if ((firstch=READLINE_PF(1)) < 0)
@@ -917,7 +917,7 @@ get2:
                     }
                 } else {
                     stat_for_file.total_message_bytes+=*Blklen;
-                    if (((checksum-firstch)&0377)==0) {
+                    if (((checksum-firstch)&0xff)==0) {
                         Firstsec=false;
                         stat_for_file.valid_messages+=1;
                         return sectcurr;

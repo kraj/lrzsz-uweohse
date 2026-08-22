@@ -163,18 +163,18 @@ extern int enable_syslog;
 #define ERROR (-1)
 
 /* Ward Christensen / CP/M parameters - Don't change these! */
-#define ENQ 005
-#define CAN ('X'&037)
-#define XOFF ('s'&037)
-#define XON ('q'&037)
-#define SOH 1
-#define STX 2
-#define EOT 4
-#define ACK 6
-#define NAK 025
-#define CPMEOF 032
-#define WANTCRC 0103    /* send C not NAK to get crc not checksum */
-#define WANTG 0107  /* Send G not NAK to get nonstop batch xmsn */
+#define ENQ 0x05
+#define CAN ('X'&0x1f)
+#define XOFF ('s'&0x1f)
+#define XON ('q'&0x1f)
+#define SOH 0x01
+#define STX 0x02
+#define EOT 0x04
+#define ACK 0x06
+#define NAK 0x15
+#define CPMEOF 0x1a
+#define WANTCRC 0x43    /* send C not NAK to get crc not checksum */
+#define WANTG 0x47  /* Send G not NAK to get nonstop batch xmsn */
 #define TIMEOUT (-2)
 #define RCDO (-3)
 #define WCEOT (-10)
