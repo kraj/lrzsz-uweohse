@@ -272,7 +272,7 @@ print_zrinit_flags(unsigned char f0, const unsigned char *hdr)
         */
         unsigned int buflen = ((unsigned int)(unsigned char)hdr[ZP0]) |
            ((unsigned int)(unsigned char)hdr[ZP1] << 8);
-        fprintf(stderr, " Rxbuflen=%d %x", buflen, buflen);
+        fprintf(stderr, " Rxbuflen=%u %x", buflen, buflen);
         fprintf(stderr, " ZP[0-3]=[%x", (unsigned int) (unsigned char) hdr[ZP0]);
         fprintf(stderr, " ,%x", (unsigned int) (unsigned char) hdr[ZP1]);
         fprintf(stderr, " ,%x", (unsigned int) (unsigned char) hdr[ZP2]);

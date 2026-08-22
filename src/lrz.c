@@ -1913,7 +1913,7 @@ moredata:
 				}
 				
 				if (Verbose > 1) {
-					vstringf(_("\rBytes received: %7ld/%7ld   BPS:%-6ld ETA %02d:%02d  "),
+					vstringf(_("\rBytes received: %7ld/%7ld   BPS:%-6lu ETA %02d:%02d  "),
 						(long) zi->bytes_received, (long) zi->bytes_total, 
 						last_bps, minleft, secleft);
 					last_rxbytes=zi->bytes_received;

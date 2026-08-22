@@ -173,7 +173,7 @@ AM_GNU_GETTEXT_REQUIRE_VERSION([0.23])
 
 dnl AC_DEFINE_UNQUOTED(LOCALEDIR,"$prefix/$DATADIRNAME","Description… autoheader wants this")
 
-AC_CONFIG_FILES([Makefile lib/Makefile testsuite/Makefile \
+AC_CONFIG_FILES([Makefile lib/Makefile \
 man/Makefile po/Makefile.in src/Makefile Specfile])
 AC_CONFIG_COMMANDS([default],[
 test -z "$CONFIG_HEADERS" || echo timestamp > stamp-h],[])

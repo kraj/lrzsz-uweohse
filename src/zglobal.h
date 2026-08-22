@@ -207,7 +207,7 @@ void bibi (int n);
 #define flushmo() do { fflush(stdout); stat_for_file.net_write_ops++;} while(0)
 
 /* zreadline.c */
-extern char *readline_ptr; /* pointer for removing chars from linbuf */
+extern unsigned char *readline_ptr; /* pointer for removing chars from linbuf */
 extern int readline_left; /* number of buffered chars left to read */
 #define READLINE_PF(timeout) \
     (--readline_left >= 0? (*readline_ptr++ & 0377) : readline_internal(timeout))

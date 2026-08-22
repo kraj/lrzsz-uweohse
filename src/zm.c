@@ -70,7 +70,7 @@ static const char *frametypes[] = {
 #define FRMAX (sizeof(frametypes) / sizeof(frametypes[0]))
 
 static const char *
-frametype_to_string(int type)
+frametype_to_string(unsigned int type)
 {
 	static char unknown[32];
 	unsigned int idx = (unsigned int)type + FTOFFSET;
@@ -86,7 +86,7 @@ static inline int noxrd7 (void);
 static inline int zdlread (void);
 static int zdlread2 (int);
 static inline int zgeth1 (void);
-static void zputhex (int c, unsigned char *pos);
+static void zputhex (unsigned int c, unsigned char *pos);
 static inline int zgethex (void);
 static int zrbhdr (unsigned char *hdr);
 static int zrbhdr32 (unsigned char *hdr);
@@ -154,7 +154,7 @@ zgethex(void)
 	int c;
 
 	c = zgeth1();
-	VPRINTF(9,("zgethex: %02X", c));
+	VPRINTF(9,("zgethex: %02X", (unsigned int) c));
 	return c;
 }
 
@@ -234,7 +234,7 @@ again2:
 			return (c ^ 0x40);
 		break;
 	}
-	VPRINTF(2,(_("Bad escape sequence %x"), c));
+	VPRINTF(2,(_("Bad escape sequence 0x%x"), (unsigned int) c));
 	return ERROR;
 }
 
@@ -893,7 +893,7 @@ zrhhdr(unsigned char *hdr)
 
 /* Write a byte as two hex digits */
 static void 
-zputhex(int c, unsigned char *pos)
+zputhex(unsigned int c, unsigned char *pos)
 {
 	static char	digits[]	= "0123456789abcdef";
 

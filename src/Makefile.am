@@ -14,19 +14,22 @@ AM_LDFLAGS = @LRZSZ_LDFLAGS@
 install-exec-local: install-binPROGRAMS
 	rm -f $(DESTDIR)/$(bindir)/`echo lsb | sed -e '$(transform)'`
 	ln $(DESTDIR)/$(bindir)/`echo lsz |sed -e '$(transform)'` \
-		$(DESTDIR)/$(bindir)/`echo lsb |sed -e '$(transform)'` 
+		$(DESTDIR)/$(bindir)/`echo lsb |sed -e '$(transform)'`
 	rm -f $(DESTDIR)/$(bindir)/`echo lsx | sed -e '$(transform)'`
 	ln $(DESTDIR)/$(bindir)/`echo lsz |sed -e '$(transform)'` \
-		$(DESTDIR)/$(bindir)/`echo lsx |sed -e '$(transform)'` 
+		$(DESTDIR)/$(bindir)/`echo lsx |sed -e '$(transform)'`
 	rm -f $(DESTDIR)/$(bindir)/`echo lrb | sed -e '$(transform)'`
 	ln $(DESTDIR)/$(bindir)/`echo lrz |sed -e '$(transform)'` \
-		$(DESTDIR)/$(bindir)/`echo lrb |sed -e '$(transform)'` 
+		$(DESTDIR)/$(bindir)/`echo lrb |sed -e '$(transform)'`
 	rm -f $(DESTDIR)/$(bindir)/`echo lrx | sed -e '$(transform)'`
 	ln $(DESTDIR)/$(bindir)/`echo lrz |sed -e '$(transform)'` \
-		$(DESTDIR)/$(bindir)/`echo lrx |sed -e '$(transform)'` 
+		$(DESTDIR)/$(bindir)/`echo lrx |sed -e '$(transform)'`
 
 uninstall-local:
-	rm -f $(DESTDIR)/$(bindir)/`echo lsb |sed -e '$(transform)'` 
-	rm -f $(DESTDIR)/$(bindir)/`echo lsx |sed -e '$(transform)'` 
-	rm -f $(DESTDIR)/$(bindir)/`echo lrb |sed -e '$(transform)'` 
-	rm -f $(DESTDIR)/$(bindir)/`echo lrx |sed -e '$(transform)'` 
+	rm -f $(DESTDIR)/$(bindir)/`echo lsb |sed -e '$(transform)'`
+	rm -f $(DESTDIR)/$(bindir)/`echo lsx |sed -e '$(transform)'`
+	rm -f $(DESTDIR)/$(bindir)/`echo lrb |sed -e '$(transform)'`
+	rm -f $(DESTDIR)/$(bindir)/`echo lrx |sed -e '$(transform)'`
+
+tidy: $(SOURCES) $(HEADERS)
+	clang-tidy --checks='-clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling' $(SOURCES) -- $(AM_CPPFLAGS) $(AM_CFLAGS)

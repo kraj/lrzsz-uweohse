@@ -1575,21 +1575,25 @@ again:
 				}
 				crc = ~crc;
 			} else if (Canseek >= 0) {
-				if (rxpos==0) {
-					struct stat st;
-					if (0==fstat(fileno(input_f),&st)) {
-						rxpos=st.st_size;
-					} else {
-						int er=errno;
-						lrzsz_warning(0, _("fstat failed: %s"), strerror(er));
-						rxpos=SIZE_MAX;
-					}
-				}
-				while (rxpos-- && ((gotchar = getc(input_f)) != EOF))
-					crc = UPDC32(gotchar, crc);
-				crc = ~crc;
-				clearerr(input_f);	/* Clear EOF */
-				fseeko(input_f, 0, 0);
+                                /* the input_f check is for the static analyzer clang-tidy,
+                                 * which doesn't catch the logic around input_f. */
+                                if (input_f) {
+                                    if (rxpos==0) {
+                                            struct stat st;
+                                            if (0==fstat(fileno(input_f),&st)) {
+                                                    rxpos=st.st_size;
+                                            } else {
+                                                    int er=errno;
+                                                    lrzsz_warning(0, _("fstat failed: %s"), strerror(er));
+                                                    rxpos=SIZE_MAX;
+                                            }
+                                    }
+                                    while (rxpos-- && ((gotchar = getc(input_f)) != EOF))
+                                            crc = UPDC32(gotchar, crc);
+                                    crc = ~crc;
+                                    clearerr(input_f);	/* Clear EOF */
+                                    fseeko(input_f, 0, 0);
+                                }
 			}
 			stohdr(crc);
 			zsbhdr(ZCRC, Txhdr);
@@ -1763,13 +1767,13 @@ zsendfdata (struct zm_fileinfo *zi)
 		} else if (bytcnt == Lastsync) {
 			e = ZCRCW;
 			if (Verbose>3)
-				vstringf("e=ZCRCW/bytcnt == Lastsync == %ld",
+				vstringf("e=ZCRCW/bytcnt == Lastsync == %lu",
 					(unsigned long) Lastsync);
                 /* segmented streaming. note: newcnt is reset to Rxbuflen in the goto jungle. */
                 } else if (Rxbuflen && (newcnt -= n) <= 0) {
                         e = ZCRCW;
                         if (Verbose>3)
-                                vstringf("e=ZCRCW/Rxbuflen(newcnt=%ld,n=%ld, Rxbuflen=%ld)",
+                                vstringf("e=ZCRCW/Rxbuflen(newcnt=%lu,n=%lu, Rxbuflen=%lu)",
                                         (unsigned long) newcnt,(unsigned long) n, (unsigned long) Rxbuflen);
 		} else if (Txwindow && (Txwcnt += n) >= Txwspac) {
 			Txwcnt = 0;
@@ -2073,7 +2077,7 @@ calcit:
 		transmitted=total_bytes + ok * OVERHEAD
 			+ failed * ((long) i+OVERHEAD+OVER_ERR);
 		if (Verbose > 4)
-			vstringf(_("calc_blklen: blklen %d, ok %ld, failed %ld -> %lu\n"),
+			vstringf(_("calc_blklen: blklen %u, ok %ld, failed %ld -> %lu\n"),
 				i,ok,failed,transmitted);
 		if (transmitted < best_bytes || !best_bytes)
 		{
@@ -2108,13 +2112,15 @@ getinsync(struct zm_fileinfo *zi, int flag)
 		case TIMEOUT:
 			return ERROR;
 		case ZRPOS:
-			/* ************************************* */
-			/*  If sending to a buffered modem, you  */
-			/*   might send a break at this point to */
-			/*   dump the modem's buffer.		 */
+			/*  If sending to a buffered modem, you
+			 *   might send a break at this point to
+			 *   dump the modem's buffer.		 */
 			if (input_f)
 				clearerr(input_f);	/* In case file EOF seen */
-			if (!mm_addr && fseeko(input_f, (off_t) rxpos, 0))
+
+                        /* the input_f check is for the static analyzer clang-tidy,
+                         * which doesn't catch the logic around input_f. */
+			if (!mm_addr && input_f && fseeko(input_f, (off_t) rxpos, 0))
 				return ERROR;
 			zi->eof_seen = 0;
 			bytcnt = Lrxpos = zi->bytes_sent = rxpos;

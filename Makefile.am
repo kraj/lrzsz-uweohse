@@ -14,7 +14,7 @@ QUICKCHECKS=xmodem-lsz-lrz-16k-binary xmodem-lsz-lrz-large-binary-1k-crc zmodem-
 #
 SUPPORTED_C_STANDARDS=@SUPPORTED_C_STDS@
 SUPPORTED_COMPILERS=gcc clang
-buildcheck: 
+buildcheck:
 	for cc in $(SUPPORTED_COMPILERS) ; do if type -p "$$cc" >/dev/null ; then \
 		for std in $(SUPPORTED_C_STANDARDS) ; do \
 			echo "running clean/configure/make with CC=$$cc --enable-std=$$std"; \
@@ -24,7 +24,7 @@ buildcheck:
 		done \
 	fi ; done ; \
         make -s V=0 clean >/dev/null
-buildcheck+: 
+buildcheck+:
 	for cc in $(SUPPORTED_COMPILERS) ; do if type -p "$$cc" >/dev/null ; then \
 		for std in $(SUPPORTED_C_STANDARDS) ; do \
 			echo "running clean/configure/make/vcheck with CC=$$cc --enable-std=$$std"; \
@@ -48,12 +48,6 @@ oldcheck-local:
 
 quickcheck:
 	$(srcdir)/check.lrzsz $(srcdir) `pwd` select $(QUICKCHECKS)
-
-fastcheck-beos: beos-runpiped
-	$(srcdir)/fastcheck.beos $(srcdir) `pwd`
-
-beos-runpiped: beos-runpiped.c
-	$(CC) -o $@ $<
 
 vcheck:
 	$(srcdir)/check.lrzsz $(srcdir) `pwd`
@@ -79,6 +73,8 @@ cvs-dist:
 rpm: $(PR).tar.gz Specfile
 	$(srcdir)/buildrpm $(srcdir)
 
+tidy:
+	@$(MAKE) -C src tidy
 
 qa: asan msan ubsan coverage
 

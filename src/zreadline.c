@@ -36,9 +36,9 @@
 
 static size_t readline_readnum;
 static int readline_fd;
-static char *readline_buffer;
+static unsigned char *readline_buffer;
 int readline_left=0;
-char *readline_ptr;
+unsigned char *readline_ptr;
 
 /*
  * This version of readline is reasonably well suited for
@@ -96,7 +96,7 @@ readline_internal(unsigned int timeout)
 			for (i=0;i<j;i++) {
 				if (i%24==0 && i)
 					vstring("\n    ");
-				vstringf("%02x ", readline_ptr[i] & 0377);
+				vstringf("%02x ", readline_ptr[i]);
 			}
 			vstringf("\n");
 		}
