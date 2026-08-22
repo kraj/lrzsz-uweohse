@@ -271,16 +271,12 @@ void canit (int fd);
 extern unsigned int Rxtimeout;        /* Tenths of seconds to wait for something */
 
 /* Globals used by ZMODEM functions */
-extern int Rxframeind;     /* ZBIN ZBIN32, or ZHEX type of frame received */
-extern int Rxtype;     /* Type of header received */
 extern unsigned int Zrwindow;       /* RX window size (controls garbage count) */
 /* extern int Rxcount; */       /* Count of data bytes received */
 extern unsigned char Rxhdr[4];      /* Received header */
 extern unsigned char Txhdr[4];      /* Transmitted header */
-extern long Txpos;     /* Transmitted file position */
 extern int Txfcs32;        /* TURE means send binary frames with 32 bit FCS */
 extern int Crc32t;     /* Display flag indicating 32 bit CRC being sent */
-extern int Crc32;      /* Display flag indicating 32 bit CRC being received */
 extern int Znulls;     /* Number of nulls to send at beginning of ZDATA hdr */
 extern char Attn[ZATTNLEN+1];  /* Attention string rx sends to tx on err */
 

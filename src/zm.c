@@ -28,14 +28,13 @@
 unsigned int Rxtimeout = 100;		/* Tenths of seconds to wait for something */
 
 /* Globals used by ZMODEM functions */
-int Rxframeind;		/* ZBIN ZBIN32, or ZHEX type of frame received */
-int Rxtype;		/* Type of header received */
+static int Rxframeind;	/* ZBIN ZBIN32, or ZHEX type of frame received */
+static int Rxtype;		/* Type of header received */
 unsigned char Rxhdr[4];		/* Received header */
 unsigned char Txhdr[4];		/* Transmitted header */
-long Txpos;		/* Transmitted file position */
 int Txfcs32;		/* true means send binary frames with 32 bit FCS */
 int Crc32t;		/* Display flag indicating 32 bit CRC being sent */
-int Crc32;		/* Display flag indicating 32 bit CRC being received */
+static int Crc32;		/* Display flag indicating 32 bit CRC being received */
 int Znulls;		/* Number of nulls to send at beginning of ZDATA hdr */
 char Attn[ZATTNLEN+1];	/* Attention string rx sends to tx on err */
 
@@ -799,10 +798,8 @@ splat:
                 stat_for_file.format_errors++;
 		goto agn2;
 	}
-	rxpos = hdr[ZP3] & 0xff;
-	rxpos = (rxpos<<8) + (hdr[ZP2] & 0xff);
-	rxpos = (rxpos<<8) + (hdr[ZP1] & 0xff);
-	rxpos = (rxpos<<8) + (hdr[ZP0] & 0xff);
+        rxpos = rclhdr(hdr);
+
 	if (Rxpos)
 		*Rxpos = rxpos;
         stat_for_file.total_message_bytes+=4;
