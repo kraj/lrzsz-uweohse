@@ -126,5 +126,8 @@
 /* Parameters for ZCOMMAND frame ZF0 (otherwise 0) */
 #define ZCACK1	1	/* Acknowledge, then do command */
 
+
+#define LRZSZ_MAX_SUBPACKET_LEN 8192
+
 /* End of ZMODEM.H */
 #endif

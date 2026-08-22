@@ -125,7 +125,6 @@ static char Myattn[] = { 0 };
 
 static FILE *input_f;
 
-#define MAX_BLOCK 8192
 static char *txbuf;
 
 static long vpos = 0;			/* Number of bytes read from file */
@@ -424,10 +423,10 @@ main(int argc, char **argv)
 			break;
 		case 'k': start_blklen=1024; break;
 		case 'L':
-                        blkopt = (unsigned int) lrzsz_strtoul( "-L / --packetlen", optarg, "ck", 24, MAX_BLOCK);
+                        blkopt = (unsigned int) lrzsz_strtoul( "-L / --packetlen", optarg, "ck", 24, LRZSZ_MAX_SUBPACKET_LEN);
 			break;
 		case 'l':
-                        Tframlen = (unsigned int) lrzsz_strtoul( "-l / --framelen", optarg, "ck", 32, MAX_BLOCK);
+                        Tframlen = (unsigned int) lrzsz_strtoul( "-l / --framelen", optarg, "ck", 32, LRZSZ_MAX_SUBPACKET_LEN);
 			break;
                 case 'm':
                         min_bps = (unsigned int) lrzsz_strtoul( "-m / --min-pbs", optarg, "km", 0, 0);
@@ -501,7 +500,7 @@ main(int argc, char **argv)
 			Txwindow = (Txwindow/64) * 64;
 			Txwspac = Txwindow/4;
 			if (blkopt > Txwspac
-			 || (!blkopt && Txwspac < MAX_BLOCK))
+			 || (!blkopt && Txwspac < LRZSZ_MAX_SUBPACKET_LEN))
 				blkopt = Txwspac;
 			break;
 		case 'X': protocol=ZM_XMODEM; break;
@@ -539,8 +538,7 @@ main(int argc, char **argv)
 		_("this program was never intended to be used setuid\n"));
 	}
 
-	txbuf=malloc(MAX_BLOCK);
-	if (!txbuf) fatal_error(1,0,_("out of memory"));
+	txbuf=xmalloc(LRZSZ_MAX_SUBPACKET_LEN);
 
 	zsendline_init();
 
@@ -980,7 +978,7 @@ wctxpn(struct zm_fileinfo *zi)
 	 * int. But i believe sending %lo instead of %o _could_ break compatability
 	 */
 	if (!Ascii && (input_f!=stdin) && *zi->fname && fstat(fileno(input_f), &f)!= -1)
-		snprintf(p, (size_t)(txbuf + MAX_BLOCK - p), "%lu %llo %o 0 %d %ld",
+		snprintf(p, (size_t)(txbuf + LRZSZ_MAX_SUBPACKET_LEN - p), "%lu %llo %o 0 %d %ld",
               (unsigned long) f.st_size,
               (unsigned long long) f.st_mtime,
               (unsigned int)((no_unixmode) ? 0 : f.st_mode),

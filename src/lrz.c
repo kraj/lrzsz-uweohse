@@ -47,8 +47,6 @@
 #define O_NOFOLLOW 0
 #endif
 
-#define MAX_BLOCK 8192
-
 unsigned Baudrate = 2400;
 
 static FILE *fout;
@@ -59,7 +57,7 @@ static int Crcflg;
 static int Firstsec;
 int errors;
 static int Restricted=1;	/* restricted; no /.. or ../ in filenames */
-static int Readnum = MAX_BLOCK;	/* Number of bytes to ask for in read() from modem */
+static int Readnum = LRZSZ_MAX_SUBPACKET_LEN;	/* Number of bytes to ask for in read() from modem */
 static int skip_if_not_found;
 static unsigned int Segmentsize = 0;
 
@@ -481,8 +479,7 @@ main(int argc, char *argv[])
 		_("this program was never intended to be used setuid\n"));
 	}
 
-	secbuf=malloc(1+MAX_BLOCK);
-	if (!secbuf) fatal_error(1,0,_("out of memory"));
+	secbuf=xmalloc(1+LRZSZ_MAX_SUBPACKET_LEN);
 
 	/* initialize zsendline tab */
 	zsendline_init();
@@ -517,7 +514,7 @@ main(int argc, char *argv[])
         stat_for_file.direction = 'r';
 
 	io_mode(0,1);
-	readline_setup(0, MAX_BLOCK, MAX_BLOCK*2);
+	readline_setup(0, LRZSZ_MAX_SUBPACKET_LEN, LRZSZ_MAX_SUBPACKET_LEN*2);
 	install_signal_handler(SIGINT);
 	install_signal_handler(SIGTERM);
 	install_signal_handler(SIGPIPE);
@@ -1653,7 +1650,7 @@ again:
 			zmanag = Rxhdr[ZF1];
 			ztrans = Rxhdr[ZF2];
 			tryzhdrtype = ZRINIT;
-			c = zrdata(secbuf, MAX_BLOCK,&bytes_in_block);
+			c = zrdata(secbuf, LRZSZ_MAX_SUBPACKET_LEN, &bytes_in_block);
 			io_mode(0,3);
 			if (c == GOTCRCW)
 				return ZFILE;
@@ -1682,7 +1679,7 @@ again:
 			zshhdr(ZACK, Txhdr);
 			goto again;
 		case ZCOMMAND:
-			if (zrdata(secbuf, MAX_BLOCK,&bytes_in_block) == GOTCRCW) {
+			if (zrdata(secbuf, LRZSZ_MAX_SUBPACKET_LEN, &bytes_in_block) == GOTCRCW) {
 				if (Verbose) {
 					vstringf("%s: %s\n", lrzsz_progname,
 						_("remote command execution denied"));
@@ -1822,7 +1819,7 @@ rzfile(struct zm_fileinfo *zi)
                          */
                         continue;
 		case ZFILE:
-			zrdata(secbuf, MAX_BLOCK,&bytes_in_block);
+			zrdata(secbuf, LRZSZ_MAX_SUBPACKET_LEN, &bytes_in_block);
 			continue;
 		case ZEOF:
 			if (rclhdr(Rxhdr) != (unsigned long) zi->bytes_received) {
@@ -1870,7 +1867,7 @@ rzfile(struct zm_fileinfo *zi)
                                  * the garbage max or the cancel max.
                                  * so we read and forget it.
                                  */
-				zrdata(secbuf, MAX_BLOCK, &bytes_in_block);
+				zrdata(secbuf, LRZSZ_MAX_SUBPACKET_LEN, &bytes_in_block);
 				zmputs(Attn);  continue;
 			}
 moredata:
@@ -1924,7 +1921,7 @@ moredata:
 				}
 			} else if (Verbose)
 				not_printed++;
-			switch (c = zrdata(secbuf, MAX_BLOCK,&bytes_in_block))
+			switch (c = zrdata(secbuf, LRZSZ_MAX_SUBPACKET_LEN, &bytes_in_block))
 			{
 			case ZCAN:
 				vfile("rzfile: zrdata returned %d", c);
