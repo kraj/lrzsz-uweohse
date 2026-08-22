@@ -863,7 +863,7 @@ wcs(const char *oname, const char *remotename)
 	zi.bytes_received=0;
 	zi.bytes_skipped=0;
 	zi.eof_seen=0;
-	timing(1,NULL);
+	timing_reset();
 
 	if (!Quiet && zi.bytes_total > 0x7FFFFFFFUL)
 		lrzsz_warning(0, _("file %s is larger than 2 GiB; "
@@ -895,8 +895,8 @@ wcs(const char *oname, const char *remotename)
 
 	if (Verbose > 1 || enable_syslog) {
 		long bps;
-		double d=timing(0,NULL);
-		if (d==0) /* can happen if timing() uses time() */
+		double d=timing_elapsed(NULL);
+		if (d==0) /* can happen if timing_elapsed() uses time() */
 			d=0.5;
 		bps=(long) (zi.bytes_sent/d);
                 if (Verbose)
@@ -1821,7 +1821,7 @@ zsendfdata (struct zm_fileinfo *zi)
 			int secleft = 0;
 			time_t now;
 			{
-				double d = timing(0, &now);
+				double d = timing_elapsed(&now);
 				if (d == 0)
 					d = 0.5;
 				last_bps = (long) ((zi->bytes_sent / d));

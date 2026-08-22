@@ -25,33 +25,38 @@
 
 #include "timing.h"
 
-double 
-timing (int reset, time_t *nowp)
+static double starttime;
+static int initialized = 0;
+
+static double
+timing_now(void)
 {
-  static double elaptime, starttime, stoptime;
-  static int initialized = 0;
-  double yet;
 #ifdef HAVE_GETTIMEOFDAY
   struct timeval tv;
   gettimeofday(&tv, NULL);
-  yet=tv.tv_sec + tv.tv_usec/1000000.0;
+  return tv.tv_sec + tv.tv_usec/1000000.0;
 #else
-  yet=(double) time(NULL);
+  return (double) time(NULL);
 #endif
+}
+
+void
+timing_reset(void)
+{
+  starttime = timing_now();
+  initialized = 1;
+}
+
+double
+timing_elapsed(time_t *nowp)
+{
+  double yet = timing_now();
   if (nowp)
-    *nowp=(time_t) yet;
-  if (reset) {
+    *nowp = (time_t) yet;
+  if (!initialized) {
     starttime = yet;
     initialized = 1;
-    return starttime;
   }
-  else {
-    if (!initialized) {
-      starttime = yet;
-      initialized = 1;
-    }
-    stoptime = yet;
-    elaptime = stoptime - starttime;
-    return elaptime;
-  }
+  return yet - starttime;
 }
+

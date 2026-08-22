@@ -647,7 +647,7 @@ wcreceive(int argc, char **argp)
                         /* YMODEM path. */
 			for (;;) {
 			if (Verbose > 1 || enable_syslog)
-				timing(1,NULL);
+				timing_reset();
 			shortname=NULL;
 				if (wcrxpn(&zi,secbuf)== ERROR)
 					goto fubar;
@@ -667,7 +667,7 @@ wcreceive(int argc, char **argp)
 				if (Verbose > 1 || enable_syslog) {
 					double d;
 					long bps;
-					d=timing(0,NULL);
+					d=timing_elapsed(NULL);
 					if (d==0)
 						d=0.5; /* can happen if timing uses time() */
 					bps=(long) ((zi.bytes_received-zi.bytes_skipped)/d);
@@ -690,7 +690,7 @@ wcreceive(int argc, char **argp)
 		zi.bytes_total = DEFBYTL;
 
 		if (Verbose > 1 || enable_syslog)
-			timing(1,NULL);
+		timing_reset();
 		procheader(dummy, &zi);
 
 		if (Pathname)
@@ -725,7 +725,7 @@ wcreceive(int argc, char **argp)
                 if (Verbose > 1 || enable_syslog) {
                     double d;
                     long bps;
-                    d=timing(0,NULL);
+                    d=timing_elapsed(NULL);
                     if (d==0)
                         d=0.5; /* can happen if timing uses time() */
                     bps=(long) ((zi.bytes_received-zi.bytes_skipped)/d);
@@ -1724,14 +1724,14 @@ rzfiles(struct zm_fileinfo *zi)
 	int c;
 
 	for (;;) {
-		timing(1,NULL);
+		timing_reset();
 		c = rzfile(zi);
 		switch (c) {
 		case ZEOF:
 			if (Verbose > 1 || enable_syslog) {
 				double d;
 				long bps;
-				d=timing(0,NULL);
+				d=timing_elapsed(NULL);
 				if (d==0)
 					d=0.5; /* can happen if timing uses time() */
 				bps=(long)((zi->bytes_received-zi->bytes_skipped)/d);
@@ -1880,9 +1880,9 @@ moredata:
 				int secleft =  0;
 				time_t now;
 				double d;
-				d=timing(0,&now);
+				d=timing_elapsed(&now);
 				if (d==0)
-					d=0.5; /* timing() might use time() */
+					d=0.5; /* timing_elapsed() might use time() */
 				last_bps=(unsigned long) (zi->bytes_received/d);
 				if (last_bps > 0) {
 					minleft =  (R_BYTESLEFT(zi))/last_bps/60;
