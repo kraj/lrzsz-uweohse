@@ -1020,7 +1020,7 @@ stohdr(size_t pos)
 
 /* Recover a long integer from a header */
 unsigned long
-rclhdr(unsigned char *hdr)
+rclhdr(const unsigned char *hdr)
 {
 	unsigned long l;
 
