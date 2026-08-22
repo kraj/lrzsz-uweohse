@@ -92,7 +92,7 @@ if test "$have_std" != "no" ; then
 fi
 
 AX_APPEND_COMPILE_FLAGS([ -fforce-addr -falign-loops=2 -falign-jumps=2 -falign-functions=2 -g3], [LRZSZ_CFLAGS])
-AX_APPEND_COMPILE_FLAGS([ -Wunused-result -Wpendantic -Wcast-qual -Wmissing-braces -Wcomments], [WARN_CFLAGS])
+AX_APPEND_COMPILE_FLAGS([ -Wunused-result -Wpendantic -Wcast-qual -Wmissing-braces -Wcomments -Wformat], [WARN_CFLAGS])
 
 if test "$want_coverage" != "no" ; then
     AX_APPEND_COMPILE_FLAGS([ --coverage ], [LRZSZ_CFLAGS])

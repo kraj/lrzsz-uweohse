@@ -245,7 +245,7 @@ print_zrinit_flags(unsigned char f0, const unsigned char *hdr)
     int first = 1;
     fprintf(stderr, "flags=");
 #define PF(flag, name) \
-    if (f0 & flag) { fprintf(stderr, "%s%s", first ? "" : "|", name); first = 0; }
+    do { if (f0 & flag) { fprintf(stderr, "%s%s", first ? "" : "|", name); first = 0; } } while(0)
     PF(CANFDX, "CANFDX");
     PF(CANOVIO, "CANOVIO");
     PF(CANBRK, "CANBRK");
@@ -286,7 +286,7 @@ print_zsinit_flags(unsigned char f0)
     int first = 1;
     fprintf(stderr, "flags=");
 #define PF(flag, name) \
-    if (f0 & flag) { fprintf(stderr, "%s%s", first ? "" : "|", name); first = 0; }
+    do { if (f0 & flag) { fprintf(stderr, "%s%s", first ? "" : "|", name); first = 0; } } while(0)
     PF(TESCCTL, "TESCCTL");
     PF(TESC8, "TESC8");
 #undef PF
@@ -723,11 +723,10 @@ process_byte(struct parser *p, unsigned char c)
                     /* Parse ZFILE metadata: filename\0 size mtime mode ... */
                     size_t namelen = strnlen((char *)p->data_buf, p->data_len);
                     const char *fname = (char *)p->data_buf;
-                    const char *rest = "";
                     long size_val = 0;
                     unsigned long mtime_val = 0, mode_val = 0;
                     if (namelen < p->data_len) {
-                        rest = (char *)p->data_buf + namelen + 1;
+                        const char *rest = (char *)p->data_buf + namelen + 1;
                         sscanf(rest, "%ld %lo %lo",
                                &size_val, &mtime_val, &mode_val);
                     }

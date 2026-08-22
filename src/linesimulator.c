@@ -525,7 +525,6 @@ main(int argc, char **argv)
     long seed = -1;          /* -1 = random */
     int err_dir = 3;         /* 1=tx only, 2=rx only, 3=both */
     struct range_list err_ranges;  /* empty = all bytes */
-    int has_ranges = 0;
 
     /* Variables used later */
     int c;
@@ -540,6 +539,8 @@ main(int argc, char **argv)
     int stdin_eof = 0, sub_stdout_eof = 0;
     int d;
     long tx_bps, rx_bps;
+
+    memset(&err_ranges, 0, sizeof(err_ranges));
 
     while ((c = getopt(argc, argv, "r:R:T:b:p:d:7ce:x:g:f:w:s:12h")) != -1) {
         switch (c) {
@@ -558,7 +559,6 @@ main(int argc, char **argv)
         case 'w':
             if (parse_ranges(optarg, &err_ranges) < 0)
                 return 1;
-            has_ranges = 1;
             break;
         case 's': seed = atol(optarg); break;
         case '1': err_dir = 1; break;
@@ -575,9 +575,6 @@ main(int argc, char **argv)
     }
 
     sub_argv = &argv[optind];
-
-    if (!has_ranges)
-        memset(&err_ranges, 0, sizeof(err_ranges));
 
     /* Resolve rate-limit mode */
     if (block_size > 0) {

@@ -212,6 +212,8 @@ extern int errors;
 extern bool no_timeout;
 extern bool Zctlesc;    /* Encode control characters */
 extern bool under_rsh;
+extern bool turbo_escape;
+extern bool zmodem_requested;
 
 void bibi (int n);
 
@@ -262,12 +264,7 @@ void purgeline (int fd);
 void canit (int fd);
 
 
-/* crctab.c */
-extern unsigned short crctab[256];
-/* updcrc macro derived from article Copyright (C) 1986 Stephen Satchell. */
-#define updcrc(cp, crc) ( crctab[((crc >> 8) & 255)] ^ (( (unsigned int)(crc&0x00ffffff)) << 8) ^ cp)
-extern unsigned long cr3tab[];
-#define UPDC32(b, c) (cr3tab[((int)c ^ b) & 0xff] ^ ((c >> 8) & 0x00FFFFFF))
+#include "crctab.h"
 
 /* zm.c */
 #include "zmodem.h"

@@ -24,7 +24,6 @@
 
 #include "zglobal.h"
 
-#define SS_NORMAL 0
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
@@ -48,34 +47,34 @@
 
 unsigned Baudrate = 2400;
 
-FILE *fout;
+static FILE *fout;
 
 
-int Lastrx;
-int Crcflg;
-int Firstsec;
+static int Lastrx;
+static int Crcflg;
+static int Firstsec;
 int errors;
-int Restricted=1;	/* restricted; no /.. or ../ in filenames */
-int Readnum = MAX_BLOCK;	/* Number of bytes to ask for in read() from modem */
-int skip_if_not_found;
-unsigned int Segmentsize = 0;
+static int Restricted=1;	/* restricted; no /.. or ../ in filenames */
+static int Readnum = MAX_BLOCK;	/* Number of bytes to ask for in read() from modem */
+static int skip_if_not_found;
+static unsigned int Segmentsize = 0;
 
-char *Pathname;
+static char *Pathname;
 
-int MakeLCPathname=true;	/* make received pathname lower case */
+static int MakeLCPathname=true;	/* make received pathname lower case */
 int Verbose=0;
-int Quiet=0;		/* overrides logic that would otherwise set verbose */
-int Nflag = 0;		/* Don't really transfer files */
-int Rxclob=false;	/* Clobber existing file */
-int Rxbinary=false;	/* receive all files in bin mode */
-int Rxascii=false;	/* receive files in ascii (translate) mode */
-int Thisbinary;		/* current file is to be received in bin mode */
-int try_resume=false;
-int junk_path=false;
+static int Quiet=0;		/* overrides logic that would otherwise set verbose */
+static int Nflag = 0;		/* Don't really transfer files */
+static int Rxclob=false;	/* Clobber existing file */
+static int Rxbinary=false;	/* receive all files in bin mode */
+static int Rxascii=false;	/* receive files in ascii (translate) mode */
+static int Thisbinary;		/* current file is to be received in bin mode */
+static bool try_resume=false;
+static bool junk_path=false;
 bool no_timeout=false;
 enum zm_type_enum protocol;
 bool under_rsh=false;
-int zmodem_requested=false;
+bool zmodem_requested=false;
 
 static char *secbuf;
 
@@ -157,15 +156,15 @@ static long buffersize=32768;
 static unsigned long min_bps=0;
 static long min_bps_time=120;
 
-char Lzmanag;		/* Local file management request */
-char zconv;		/* ZMODEM file conversion request */
-char zmanag;		/* ZMODEM file management request */
-char ztrans;		/* ZMODEM file transport request */
+static char Lzmanag;		/* Local file management request */
+static char zconv;		/* ZMODEM file conversion request */
+static char zmanag;		/* ZMODEM file management request */
+static char ztrans;		/* ZMODEM file transport request */
 bool Zctlesc;		/* Encode control characters */
 unsigned int Zrwindow = 1400;	/* RX window size (controls garbage count) */
 
-int tryzhdrtype=ZRINIT;	/* Header type to send corresponding to Last rx close */
-time_t stop_time;
+static int tryzhdrtype=ZRINIT;	/* Header type to send corresponding to Last rx close */
+static time_t stop_time;
 
 int enable_syslog=true;
 
@@ -315,7 +314,7 @@ main(int argc, char *argv[])
 			|| strcmp(base, "rbash") == 0 || strcmp(base, "rshell") == 0)
 			under_rsh=true;
 	}
-	if ((cp=getenv("ZMODEM_RESTRICTED"))!=NULL)
+	if ((getenv("ZMODEM_RESTRICTED"))!=NULL)
 		Restricted=2;
 
 	/* make temporary and unfinished files */
@@ -621,7 +620,7 @@ wcreceive(int argc, char **argp)
 {
 	int c;
 	struct zm_fileinfo zi;
-	const char *shortname=NULL;;
+	const char *shortname=NULL;
 	zi.fname=NULL;
 	zi.modtime=0;
 	zi.mode=0;
@@ -672,7 +671,7 @@ wcreceive(int argc, char **argp)
 					d=timing(0,NULL);
 					if (d==0)
 						d=0.5; /* can happen if timing uses time() */
-					bps=(zi.bytes_received-zi.bytes_skipped)/d;
+					bps=(long) ((zi.bytes_received-zi.bytes_skipped)/d);
 
 					if (Verbose>1) {
 						vstringf(
@@ -680,7 +679,7 @@ wcreceive(int argc, char **argp)
 							(long) zi.bytes_received, (long) zi.bytes_total, bps);
 					}
 					if (enable_syslog)
-						lsyslog(LOG_INFO,"%s/%s: %ld Bytes, %ld BPS",
+						lsyslog(LOG_INFO,"%s/%s: %zu Bytes, %ld BPS",
 							shortname,protname(),zi.bytes_received, bps);
 				}
                                 stat_for_file.files_ok++;
@@ -730,14 +729,14 @@ wcreceive(int argc, char **argp)
                     d=timing(0,NULL);
                     if (d==0)
                         d=0.5; /* can happen if timing uses time() */
-                    bps=(zi.bytes_received-zi.bytes_skipped)/d;
+                    bps=(long) ((zi.bytes_received-zi.bytes_skipped)/d);
                     if (Verbose) {
                         vstringf(
-                                _("\rBytes received: %7ld   BPS:%-6ld                \r\n"),
-                                (long) zi.bytes_received, bps);
+                                _("\rBytes received: %7zu   BPS:%-6ld                \r\n"),
+                                zi.bytes_received, bps);
                     }
                     if (enable_syslog)
-                        lsyslog(LOG_INFO,"%s/%s: %ld Bytes, %ld BPS",
+                        lsyslog(LOG_INFO,"%s/%s: %zu Bytes, %ld BPS",
                                 shortname,protname(),zi.bytes_received, bps);
                 }
         }
@@ -955,7 +954,7 @@ bilge:
             stat_for_file.timeouts+=1;
             zperr( _("TIMEOUT"));
         } else {
-            zperr( _("Got 0%o sector header"), firstch);
+            zperr( _("Got 0x%x sector header"), (unsigned int) firstch);
         }
 
 humbug:
@@ -1192,7 +1191,6 @@ procheader(char *name, struct zm_fileinfo *zi)
             && (fout=safe_open(name, "r"))) {
         struct stat sta;
         char *tmpname;
-        char *ptr;
         int i;
         if (zmanag == ZF1_ZMNEW || zmanag==ZF1_ZMNEWL) {
             if (-1==fstat(fileno(fout),&sta)) {
@@ -1243,7 +1241,7 @@ procheader(char *name, struct zm_fileinfo *zi)
             fclose(fout);
             fout = NULL;
         } else {
-            size_t namelen;
+            size_t newnamelen;
             fclose(fout);
             fout = NULL;
             if ((zmanag & ZF1_ZMMASK)!=ZF1_ZMCHNG) {
@@ -1253,14 +1251,11 @@ procheader(char *name, struct zm_fileinfo *zi)
                 return ERROR;
             }
             /* try to rename */
-            namelen=strlen(name);
-            tmpname=alloca(namelen+5);
-            memcpy(tmpname,name,namelen);
-            ptr=tmpname+namelen;
-            *ptr++='.';
+            newnamelen=strlen(name)+5;
+            tmpname = xmalloc(newnamelen);
             i=0;
             do {
-                sprintf(ptr,"%d",i++);
+                snprintf(tmpname,newnamelen, "%s.%d",name,i++);
             } while (i<1000 && stat(tmpname,&sta)==0);
             if (i==1000) {
                 stat_for_file.policy_rejects+=1;
@@ -1273,7 +1268,7 @@ procheader(char *name, struct zm_fileinfo *zi)
                 return ERROR;
             }
             free(name_static);
-            name_static=xstrdup(tmpname);
+            name_static=tmpname;
             zi->fname=name_static;
         }
     }
@@ -1740,7 +1735,7 @@ rzfiles(struct zm_fileinfo *zi)
 				d=timing(0,NULL);
 				if (d==0)
 					d=0.5; /* can happen if timing uses time() */
-				bps=(zi->bytes_received-zi->bytes_skipped)/d;
+				bps=(long)((zi->bytes_received-zi->bytes_skipped)/d);
 				if (Verbose > 1) {
 					vstringf(
 						_("\rBytes received: %7ld/%7ld   BPS:%-6ld                \r\n"),
@@ -1889,7 +1884,7 @@ moredata:
 				d=timing(0,&now);
 				if (d==0)
 					d=0.5; /* timing() might use time() */
-				last_bps=zi->bytes_received/d;
+				last_bps=(unsigned long) (zi->bytes_received/d);
 				if (last_bps > 0) {
 					minleft =  (R_BYTESLEFT(zi))/last_bps/60;
 					secleft =  ((R_BYTESLEFT(zi))/last_bps)%60;
@@ -1899,9 +1894,9 @@ moredata:
 						if (last_bps<min_bps) {
 							if (now-low_bps>=min_bps_time) {
 								/* too bad */
-								vfile(_("rzfile: bps rate %ld below min %ld"), 
+								vfile(_("rzfile: bps rate %lu below min %lu"), 
 									  last_bps, min_bps);
-								DO_SYSLOG_FNAME((LOG_INFO, "%s/%s: bps rate low: %ld < %ld",
+								DO_SYSLOG_FNAME((LOG_INFO, "%s/%s: bps rate low: %lu < %lu",
 										   shortname, protname(), last_bps, min_bps));
 								return ERROR;
 							}

@@ -23,9 +23,6 @@
 */
 #include "zglobal.h"
 
-/* char *getenv(); */
-
-#define SS_NORMAL 0
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
@@ -42,26 +39,25 @@
 
 #if defined(HAVE_SYS_MMAN_H) && defined(HAVE_MMAP)
 #  include <sys/mman.h>
-size_t mm_size;
-void *mm_addr=NULL;
+static size_t mm_size;
+static void *mm_addr=NULL;
 #else
 #  undef HAVE_MMAP
 #endif
 #include "timing.h"
 #include "long-options.h"
 
-unsigned Baudrate=2400;	/* Default, should be set by first mode() call */
-unsigned Txwindow;	/* Control the size of the transmitted window */
-unsigned Txwspac;	/* Spacing between zcrcq requests */
-unsigned Txwcnt;	/* Counter used to space ack requests */
-size_t Lrxpos;		/* Receiver's last reported offset */
+unsigned int Baudrate=2400;	/* Default, should be set by first mode() call */
+static unsigned int Txwindow;	/* Control the size of the transmitted window */
+static unsigned int Txwspac;	/* Spacing between zcrcq requests */
+static unsigned int Txwcnt;	/* Counter used to space ack requests */
+static size_t Lrxpos;		/* Receiver's last reported offset */
 int errors;
 enum zm_type_enum protocol;
 bool under_rsh=false;
-extern int turbo_escape;
 static int no_unixmode;
 
-int Canseek=1; /* 1: can; 0: only rewind, -1: neither */
+static int Canseek=1; /* 1: can; 0: only rewind, -1: neither */
 
 static int zsendfile (struct zm_fileinfo *zi, const char *buf, size_t blen);
 static int getnak (void);
@@ -108,11 +104,11 @@ static int wcputsec (char *buf, int sectnum, size_t cseclen);
 #define DATAADR (txbuf)
 #endif
 
-int Filesleft;
-long Totalleft;
-size_t buffersize=16384;
+static int Filesleft;
+static long Totalleft;
+static size_t buffersize=16384;
 #ifdef HAVE_MMAP
-int use_mmap=1;
+static int use_mmap=1;
 #endif
 
 /*
@@ -120,67 +116,62 @@ int use_mmap=1;
  *  when an error is detected.  A pause (0336) may be needed before the
  *  ^C (03) or after it.
  */
-char Myattn[] = { 0 };
+static char Myattn[] = { 0 };
 /* alternative: char Myattn[] = { 03, 0336, 0 }; when READCHECK was not defined (but it always was under linux). */
 
-FILE *input_f;
+static FILE *input_f;
 
 #define MAX_BLOCK 8192
-char *txbuf;
+static char *txbuf;
 
-long vpos = 0;			/* Number of bytes read from file */
+static long vpos = 0;			/* Number of bytes read from file */
 
-char Lastrx;
-char Crcflg;
+static char Lastrx;
+static char Crcflg;
 int Verbose=0;
-int Restricted=0;	/* restricted; no /.. or ../ in filenames */
-int Quiet=0;		/* overrides logic that would otherwise set verbose */
-int Ascii=0;		/* Add CR's for brain damaged programs */
-int Fullname=0;		/* transmit full pathname */
-int Unlinkafter=0;	/* Unlink file after it is sent */
-int firstsec;
-int errcnt=0;		/* number of files unreadable */
-size_t blklen=128;		/* length of transmitted records */
-int Optiong;		/* Let it rip no wait for sector ACK's */
-int Totsecs;		/* total number of sectors this file */
-int Filcnt=0;		/* count of number of files opened */
-int Lfseen=0;
+static int Restricted=0;	/* restricted; no /.. or ../ in filenames */
+static int Quiet=0;		/* overrides logic that would otherwise set verbose */
+static int Ascii=0;		/* Add CR's for brain damaged programs */
+static int Fullname=0;		/* transmit full pathname */
+static int Unlinkafter=0;	/* Unlink file after it is sent */
+static int firstsec;
+static int errcnt=0;		/* number of files unreadable */
+static size_t blklen=128;		/* length of transmitted records */
+static int Optiong;		/* Let it rip no wait for sector ACK's */
+static int Totsecs;		/* total number of sectors this file */
+static int Filcnt=0;		/* count of number of files opened */
+static int Lfseen=0;
 #define DEFAULT_RXBUFLEN (16*1024)
-unsigned Rxbuflen = DEFAULT_RXBUFLEN;	/* Receiver's max buffer length */
-unsigned Tframlen = 0;	/* Override for tx frame length */
-unsigned blkopt=0;		/* Override value for zmodem blklen */
-int Rxflags = 0;
-size_t bytcnt;
-int Wantfcs32 = true;	/* want to send 32 bit FCS */
-char Lzconv;	/* Local ZMODEM file conversion request */
-char Lzmanag;	/* Local ZMODEM file management request */
-int Lskipnocor;
-char Lztrans;
-char zconv;		/* ZMODEM file conversion request */
-char zmanag;		/* ZMODEM file management request */
-char ztrans;		/* ZMODEM file transport request */
-int command_mode;		/* Send a command, then exit. */
-int Cmdtries = 11;
-int Cmdack1;		/* Rx ACKs command, then do it */
-int Exitcode;
-size_t Lastsync;		/* Last offset to which we got a ZRPOS */
-int Beenhereb4;		/* How many times we've been ZRPOS'd same place */
+static unsigned Rxbuflen = DEFAULT_RXBUFLEN;	/* Receiver's max buffer length */
+static unsigned Tframlen = 0;	/* Override for tx frame length */
+static unsigned blkopt=0;		/* Override value for zmodem blklen */
+static int Rxflags = 0;
+static size_t bytcnt;
+static int Wantfcs32 = true;	/* want to send 32 bit FCS */
+static char Lzconv;	/* Local ZMODEM file conversion request */
+static char Lzmanag;	/* Local ZMODEM file management request */
+static int Lskipnocor;
+static char Lztrans;
+static int command_mode;		/* Send a command, then exit. */
+static int Cmdtries = 11;
+static int Cmdack1;		/* Rx ACKs command, then do it */
+static int Exitcode;
+static size_t Lastsync;		/* Last offset to which we got a ZRPOS */
+static int Beenhereb4;		/* How many times we've been ZRPOS'd same place */
 
 bool no_timeout=false;
-size_t max_blklen=1024;
-size_t start_blklen=0;
-int zmodem_requested;
-time_t stop_time=0;
+static size_t max_blklen=1024;
+static size_t start_blklen=0;
+bool zmodem_requested;
+static time_t stop_time=0;
 
-int error_count;
+static int error_count;
 #define OVERHEAD 18
 #define OVER_ERR 20
 
-#define MK_STRING(x) #x
-
 int enable_syslog=true;
 
-jmp_buf intrjmp;	/* For the interrupt on RX CAN */
+static jmp_buf intrjmp;	/* For the interrupt on RX CAN */
 
 static long min_bps;
 static long min_bps_time;
@@ -344,7 +335,7 @@ main(int argc, char **argv)
 			Restricted=1;
 		}
 	}
-	if ((cp=getenv("ZMODEM_RESTRICTED"))!=NULL)
+	if (getenv("ZMODEM_RESTRICTED")!=NULL)
 		Restricted=1;
 	from_cu();
 	chkinvok(argv[0]);
@@ -720,12 +711,9 @@ wcsend (int argc, char *argp[])
 	}
 	if (zmodem_requested)
 		saybibi ();
-	else if (protocol != ZM_XMODEM) {
+	else if (protocol == ZM_YMODEM) {
 		struct zm_fileinfo zi;
-		char *pa;
-		pa=alloca(PATH_MAX+1);
-		*pa='\0';
-		zi.fname = pa;
+		zi.fname = xstrdup(""); /* empty filename packet signals end of batch */
 		zi.modtime = 0;
 		zi.mode = 0;
 		zi.bytes_total = 0;
@@ -733,6 +721,7 @@ wcsend (int argc, char *argp[])
 		zi.bytes_received = 0;
 		zi.bytes_skipped = 0;
 		wctxpn (&zi);
+                free(zi.fname);
 	}
 	return OK;
 }
@@ -909,7 +898,7 @@ wcs(const char *oname, const char *remotename)
 		double d=timing(0,NULL);
 		if (d==0) /* can happen if timing() uses time() */
 			d=0.5;
-		bps=zi.bytes_sent/d;
+		bps=(long) (zi.bytes_sent/d);
                 if (Verbose)
                     vchar('\r');
 		if (Verbose > 1)
@@ -926,7 +915,6 @@ violation:
 	vchar('\r');
 	fatal_error(1,0,
 		_("security violation: not allowed to upload from %s"),oname);
-	exit(1);
 }
 
 /*
@@ -984,6 +972,9 @@ wctxpn(struct zm_fileinfo *zi)
 		*q++ = 0;
 		p=q;
 	}
+
+        f.st_size=0; /* TODO: smelly code below */
+
 	/* note that we may lose some information here in case mode_t is wider than an
 	 * int. But i believe sending %lo instead of %o _could_ break compatability
 	 */
@@ -1104,7 +1095,7 @@ wctx(struct zm_fileinfo *zi)
 		sendline(EOT);
 		flushmo();
 		++attempts;
-	} while ((firstch = READLINE_PF(Rxtimeout)) != ACK && attempts < RETRYMAX);
+	} while (READLINE_PF(Rxtimeout) != ACK && attempts < RETRYMAX);
 	if (attempts == RETRYMAX) {
 		zperr(_("No ACK on EOT"));
 		return ERROR;
@@ -1179,7 +1170,7 @@ cancan:
 		case ERROR:
 			zperr(_("Got burst for sector ACK")); break;
 		default:
-			zperr(_("Got %02x for sector ACK"), firstch); break;
+			zperr(_("Got %02x for sector ACK"), (unsigned int) firstch); break;
 		}
 		for (;;) {
 			Lastrx = firstch;
@@ -1403,7 +1394,7 @@ getzrxinit(void)
 			Rxbuflen = (0377 & Rxhdr[ZP0])+((0377 & Rxhdr[ZP1])<<8);
 			if ( !(Rxflags & CANFDX))
 				Txwindow = 0;
-			vfile("Rxbuflen=%d Tframlen=%d", Rxbuflen, Tframlen);
+			vfile("Rxbuflen=%u Tframlen=%u", Rxbuflen, Tframlen);
 			if ( play_with_sigint)
 				signal(SIGINT, SIG_IGN);
 
@@ -1414,7 +1405,7 @@ getzrxinit(void)
 				Rxbuflen = Tframlen;
 			if ( !Rxbuflen)
 				Rxbuflen = DEFAULT_RXBUFLEN;
-			vfile("Rxbuflen=%d", Rxbuflen);
+			vfile("Rxbuflen=%u", Rxbuflen);
 
 #if 0
 			/* If using a pipe for testing set lower buf len */
@@ -1456,8 +1447,8 @@ getzrxinit(void)
 				blklen = Rxbuflen;
 			if (blkopt && blklen > blkopt)
 				blklen = blkopt;
-			vfile("Rxbuflen=%d blklen=%lu", Rxbuflen, blklen);
-			vfile("Txwindow = %u Txwspac = %d", Txwindow, Txwspac);
+			vfile("Rxbuflen=%u blklen=%lu", Rxbuflen, blklen);
+			vfile("Txwindow = %u Txwspac = %u", Txwindow, Txwspac);
 			Rxtimeout=old_timeout;
 			return (sendzsinit());
 		case ZCAN:
@@ -1840,7 +1831,7 @@ zsendfdata (struct zm_fileinfo *zi)
 				double d = timing(0, &now);
 				if (d == 0)
 					d = 0.5;
-				last_bps = (zi->bytes_sent / d);
+				last_bps = (long) ((zi->bytes_sent / d));
 			}
 			if (last_bps > 0) {
 				minleft = (zi->bytes_total - zi->bytes_sent) / last_bps / 60;
@@ -1921,7 +1912,7 @@ zsendfdata (struct zm_fileinfo *zi)
 			size_t prev_lrxpos = Lrxpos;
 			while (zi->bytes_sent >= Lrxpos &&
 			       (tcount = zi->bytes_sent - Lrxpos) >= Txwindow) {
-				vfile ("%ld (%ld,%ld) window >= %u", tcount,
+				vfile ("%zu (%ld,%ld) window >= %u", tcount,
 					(long) zi->bytes_sent, (long) Lrxpos,
 					Txwindow);
 				if (e != ZCRCQ)
@@ -1943,7 +1934,7 @@ zsendfdata (struct zm_fileinfo *zi)
 					prev_lrxpos = Lrxpos;
 				}
 			}
-			vfile ("window = %ld", tcount);
+			vfile ("window = %zu", tcount);
 		}
 	} while (!zi->eof_seen);
 

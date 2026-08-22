@@ -40,7 +40,7 @@ int Znulls;		/* Number of nulls to send at beginning of ZDATA hdr */
 char Attn[ZATTNLEN+1];	/* Attention string rx sends to tx on err */
 
 static char lastsent;	/* Last char we sent */
-int turbo_escape;
+bool turbo_escape;
 
 static const char *frametypes[] = {
 	"Carrier Lost",		/* -3 */
@@ -96,8 +96,6 @@ static unsigned char zsendline_tab[256];
 static int zrdat32 (char *buf, int length, size_t *);
 static void zsbh32 (char *hdr, int type);
 static inline void zsendline_s (const char *s, size_t count);
-
-extern int zmodem_requested;
 
 /*
  * Read a character from the modem line with timeout.
@@ -713,7 +711,7 @@ gotcan:
 			goto again;
 		case ZCRCW:
 			c = ERROR;
-	        /* FALLTHROUGH */
+			goto fifi;
 		case RCDO:
 			goto fifi;
 		default:
@@ -730,7 +728,7 @@ gotcan:
 		garbage_count++;
 		if (Verbose > 2 && (garbage_count <= 3 || garbage_count % 1000 == 0))
 			vfile("zgethdr: garbage[%d]=0x%02x, max_garbage_left=%u",
-			      garbage_count, c & 0xff, max_garbage);
+			      garbage_count, (unsigned int) (c & 0xff), max_garbage);
 		if ( --max_garbage == 0) {
 			if (Verbose > 2)
 				vfile("zgethdr: garbage count exceeded after %d bytes",
@@ -938,7 +936,7 @@ zrhhdr(char *hdr)
 	if (crc & 0xFFFF) {
 		zperr(badcrc); return ERROR;
 	}
-	switch ( c = READLINE_PF(1)) {
+	switch (READLINE_PF(1)) {
 	case '\r'|0x80:
 		/* **** FALL THRU TO **** */
 	case '\r':

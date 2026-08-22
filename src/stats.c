@@ -38,15 +38,13 @@ write_stats_line(FILE *out, struct lrzsz_stat *st, bool forone)
     struct termios tty;
     struct timespec end_timespec;
     struct timespec wall_timespec;
-    double end;
     double dur=-1;
     int ret;
     const char *dir;
 
     ret=clock_gettime(CLOCK_MONOTONIC, &end_timespec);
-    if (ret) {
-        end=0;
-    } else {
+    if (!ret) {
+        double end;
         end=end_timespec.tv_sec+((double)end_timespec.tv_nsec/1e9);
         if (st->start_time>0) {
             dur=end-st->start_time;

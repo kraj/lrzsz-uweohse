@@ -117,7 +117,7 @@ from_cu(void)
 #if defined(makedev)
 	dev_t help=makedev(0,0);
 #else
-	int help=0;
+	dev_t help=0;
 #endif
 
 	/* in case fstat fails */
@@ -144,7 +144,7 @@ from_cu(void)
 
 bool Twostop;		/* Use two stop bits */
 
-struct termios oldtty, tty;
+static struct termios oldtty, tty;
 
 /*
  * mode(n)
@@ -176,22 +176,14 @@ io_mode(int fd, int n)
 
 		tty.c_oflag = 0;	/* Transparent output */
 
-		tty.c_cflag &= ~PARENB;	/* Disable parity */
+		tty.c_cflag &= ~ (unsigned int) PARENB;	/* Disable parity */
 		tty.c_cflag |= CS8;	/* Set character size = 8 */
 		if (Twostop)
 			tty.c_cflag |= CSTOPB;	/* Set two stop bits */
 
 		tty.c_lflag = protocol==ZM_ZMODEM ? 0 : ISIG;
-		tty.c_cc[VINTR] = protocol==ZM_ZMODEM ? -1 : CAN;	/* Interrupt char */
-#ifdef _POSIX_VDISABLE
-		if (((int) _POSIX_VDISABLE)!=(-1)) {
-			tty.c_cc[VQUIT] = _POSIX_VDISABLE;		/* Quit char */
-		} else {
-			tty.c_cc[VQUIT] = -1;			/* Quit char */
-		}
-#else
-		tty.c_cc[VQUIT] = -1;			/* Quit char */
-#endif
+		tty.c_cc[VINTR] = protocol==ZM_ZMODEM ? _POSIX_VDISABLE : CAN;	/* Interrupt char */
+                tty.c_cc[VQUIT] = _POSIX_VDISABLE;		/* Quit char */
 		tty.c_cc[VMIN] = 1; /* 1 char satisfied reads */
 		tty.c_cc[VTIME] = 1; /* or in this many tenths of seconds */
 
@@ -218,12 +210,12 @@ io_mode(int fd, int n)
 		 * no signal generating chars, and no extended chars (^V, 
 		 * ^O, ^R, ^W).
 		 */
-		tty.c_lflag &= ~(ECHO | ICANON | ISIG | IEXTEN);
+		tty.c_lflag &= ~(unsigned int) (ECHO | ICANON | ISIG | IEXTEN);
 		tty.c_oflag = 0;	/* Transparent output */
 
-		tty.c_cflag &= ~(PARENB);	/* Same baud rate, disable parity */
+		tty.c_cflag &= ~((unsigned int) PARENB);	/* Same baud rate, disable parity */
 		/* Set character size = 8 */
-		tty.c_cflag &= ~(CSIZE);
+		tty.c_cflag &= ~((unsigned int) CSIZE);
 		tty.c_cflag |= CS8;	
 		if (Twostop)
 			tty.c_cflag |= CSTOPB;	/* Set two stop bits */

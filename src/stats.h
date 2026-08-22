@@ -2,11 +2,8 @@
 #define LRZSZ_STATS_H
 
 struct lrzsz_stat {
-    unsigned int n_files;
     char *filename;
-    char direction; /* 'r' = receive (lrz), 's' = send (lsz) */
     double start_time;
-
 
     /* a message is a sector/subframe/packet, something which an own checksum. */
     unsigned long valid_messages;
@@ -31,6 +28,8 @@ struct lrzsz_stat {
     unsigned long net_read_ops;
     unsigned long long net_bytes_out;
     unsigned long net_write_ops;
+    unsigned int n_files;
+    char direction; /* 'r' = receive (lrz), 's' = send (lsz) */
 };
 extern struct lrzsz_stat stat_for_file;
 extern struct lrzsz_stat stat_for_all;
