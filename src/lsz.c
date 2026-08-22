@@ -456,13 +456,13 @@ main(int argc, char **argv)
 
 				hh = strtoul (optarg, &nex, 10);
 				if (hh>23)
-					usage(2,_("hour to large (0..23)"));
+					usage(2,_("hour too large (0..23)"));
 				if (*nex!=':')
 					usage(2, _("unparsable stop time\n"));
 			nex++;
 			mm = strtoul (nex, &nex, 10);
 			if (mm>59)
-				usage(2,_("minute to large (0..59)"));
+				usage(2,_("minute too large (0..59)"));
 
 			t=time(NULL);
 			tm=localtime(&t);
