@@ -292,7 +292,7 @@ void zsda32 (const char *buf, size_t length, int frameend);
 int zrdata (char *buf, int length, size_t *received);
 int zgethdr (unsigned char *hdr, int eflag, size_t *);
 void stohdr (size_t pos);
-unsigned long rclhdr (unsigned char *hdr);
+unsigned long rclhdr (const unsigned char *hdr);
 
 const char * protname (void);
 LRZSZ_FORMAT_PRINTF(2,3) void lsyslog (int, const char *,...);
