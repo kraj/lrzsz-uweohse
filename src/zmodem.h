@@ -121,25 +121,10 @@
 #define ZTCRYPT	2	/* Encryption */
 #define ZTRLE	3	/* Run Length encoding */
 /* Extended options for ZF3, bit encoded */
-#define ZXSPARS	64	/* Encoding for sparse file operations */
+#define ZXSPARS	0x40	/* Encoding for sparse file operations */
 
 /* Parameters for ZCOMMAND frame ZF0 (otherwise 0) */
 #define ZCACK1	1	/* Acknowledge, then do command */
-
-/* Globals used by ZMODEM functions */
-#if 0
-extern int Rxframeind;	/* ZBIN ZBIN32, or ZHEX type of frame received */
-extern int Rxtype;		/* Type of header received */
-extern unsigned int Zrwindow;	/* RX window size (controls garbage count) */
-extern char Rxhdr[4];	/* Received header */
-extern char Txhdr[4];	/* Transmitted header */
-extern long Txpos;	/* Transmitted file position */
-extern int Txfcs32;		/* TURE means send binary frames with 32 bit FCS */
-extern int Crc32t;		/* Display flag indicating 32 bit CRC being sent */
-extern int Crc32;		/* Display flag indicating 32 bit CRC being received */
-extern int Znulls;		/* Number of nulls to send at beginning of ZDATA hdr */
-extern char Attn[ZATTNLEN+1];	/* Attention string rx sends to tx on err */
-#endif
 
 /* End of ZMODEM.H */
 #endif
