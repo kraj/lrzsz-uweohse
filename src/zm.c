@@ -30,8 +30,8 @@ unsigned int Rxtimeout = 100;		/* Tenths of seconds to wait for something */
 /* Globals used by ZMODEM functions */
 int Rxframeind;		/* ZBIN ZBIN32, or ZHEX type of frame received */
 int Rxtype;		/* Type of header received */
-char Rxhdr[4];		/* Received header */
-char Txhdr[4];		/* Transmitted header */
+unsigned char Rxhdr[4];		/* Received header */
+unsigned char Txhdr[4];		/* Transmitted header */
 long Txpos;		/* Transmitted file position */
 int Txfcs32;		/* true means send binary frames with 32 bit FCS */
 int Crc32t;		/* Display flag indicating 32 bit CRC being sent */
@@ -89,12 +89,12 @@ static int zdlread2 (int);
 static inline int zgeth1 (void);
 static void zputhex (int c, unsigned char *pos);
 static inline int zgethex (void);
-static int zrbhdr (char *hdr);
-static int zrbhdr32 (char *hdr);
-static int zrhhdr (char *hdr);
+static int zrbhdr (unsigned char *hdr);
+static int zrbhdr32 (unsigned char *hdr);
+static int zrhhdr (unsigned char *hdr);
 static unsigned char zsendline_tab[256];
 static int zrdat32 (char *buf, int length, size_t *);
-static void zsbh32 (char *hdr, int type);
+static void zsbh32 (unsigned char *hdr, int type);
 static inline void zsendline_s (const char *s, size_t count);
 
 /*
@@ -322,7 +322,7 @@ zsendline_s(const char *s, size_t count)
 
 /* Send ZMODEM binary header hdr of type type */
 void 
-zsbhdr(int type, char *hdr)
+zsbhdr(int type, unsigned char *hdr)
 {
 	int n;
 	unsigned short crc;
@@ -355,7 +355,7 @@ zsbhdr(int type, char *hdr)
 
 /* Send ZMODEM binary header hdr of type type */
 static void
-zsbh32(char *hdr, int type)
+zsbh32(unsigned char *hdr, int type)
 {
 	int n;
 	unsigned long crc;
@@ -376,7 +376,7 @@ zsbh32(char *hdr, int type)
 
 /* Send ZMODEM HEX header hdr of type type */
 void 
-zshhdr(int type, char *hdr)
+zshhdr(int type, unsigned char *hdr)
 {
 	int n;
 	unsigned short crc;
@@ -683,7 +683,7 @@ crcfoo:
  *   Return ERROR instantly if ZCRCW sequence, for fast error recovery.
  */
 int
-zgethdr(char *hdr, int eflag, size_t *Rxpos)
+zgethdr(unsigned char *hdr, int eflag, size_t *Rxpos)
 {
 	int c, cancount;
 	unsigned int max_garbage; /* Max bytes before start of frame */
@@ -844,7 +844,7 @@ fifi:
 
 /* Receive a binary style header (type and position) */
 static int 
-zrbhdr(char *hdr)
+zrbhdr(unsigned char *hdr)
 {
 	int c, n;
 	unsigned short crc;
@@ -877,7 +877,7 @@ zrbhdr(char *hdr)
 
 /* Receive a binary style header (type and position) with 32 bit FCS */
 static int
-zrbhdr32(char *hdr)
+zrbhdr32(unsigned char *hdr)
 {
 	int c, n;
 	unsigned long crc;
@@ -910,7 +910,7 @@ zrbhdr32(char *hdr)
 
 /* Receive a hex style header (type and position) */
 static int 
-zrhhdr(char *hdr)
+zrhhdr(unsigned char *hdr)
 {
 	int c;
 	unsigned short crc;
@@ -1020,7 +1020,7 @@ stohdr(size_t pos)
 
 /* Recover a long integer from a header */
 unsigned long
-rclhdr(char *hdr)
+rclhdr(unsigned char *hdr)
 {
 	unsigned long l;
 

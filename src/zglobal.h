@@ -275,8 +275,8 @@ extern int Rxframeind;     /* ZBIN ZBIN32, or ZHEX type of frame received */
 extern int Rxtype;     /* Type of header received */
 extern unsigned int Zrwindow;       /* RX window size (controls garbage count) */
 /* extern int Rxcount; */       /* Count of data bytes received */
-extern char Rxhdr[4];      /* Received header */
-extern char Txhdr[4];      /* Transmitted header */
+extern unsigned char Rxhdr[4];      /* Received header */
+extern unsigned char Txhdr[4];      /* Transmitted header */
 extern long Txpos;     /* Transmitted file position */
 extern int Txfcs32;        /* TURE means send binary frames with 32 bit FCS */
 extern int Crc32t;     /* Display flag indicating 32 bit CRC being sent */
@@ -285,14 +285,14 @@ extern int Znulls;     /* Number of nulls to send at beginning of ZDATA hdr */
 extern char Attn[ZATTNLEN+1];  /* Attention string rx sends to tx on err */
 
 extern void zsendline_init (void);
-void zsbhdr (int type, char *hdr);
-void zshhdr (int type, char *hdr);
+void zsbhdr (int type, unsigned char *hdr);
+void zshhdr (int type, unsigned char *hdr);
 void zsdata (const char *buf, size_t length, int frameend);
 void zsda32 (const char *buf, size_t length, int frameend);
 int zrdata (char *buf, int length, size_t *received);
-int zgethdr (char *hdr, int eflag, size_t *);
+int zgethdr (unsigned char *hdr, int eflag, size_t *);
 void stohdr (size_t pos);
-unsigned long rclhdr (char *hdr);
+unsigned long rclhdr (unsigned char *hdr);
 
 const char * protname (void);
 LRZSZ_FORMAT_PRINTF(2,3) void lsyslog (int, const char *,...);
