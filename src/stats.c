@@ -11,8 +11,8 @@ struct lrzsz_stat stat_for_all;
 
 static FILE *journal_fp = NULL;
 
-#define OUT(X,Y) if (st->X) fprintf(out, " %s=%lu",Y,(unsigned long) (st->X))
-#define OUTLL(X,Y) if (st->X) fprintf(out, " %s=%llu",Y,(unsigned long long) (st->X))
+#define OUT(X,Y)   do { if (st->X) fprintf(out, " %s=%lu",Y,(unsigned long) (st->X)); } while(0)
+#define OUTLL(X,Y) do { if (st->X) fprintf(out, " %s=%llu",Y,(unsigned long long) (st->X)); } while(0)
 
 static void
 fprintf_sanitized(FILE *out, const char *s)
