@@ -405,7 +405,7 @@ main(int argc, char *argv[])
 				if (stop_time<t)
 					stop_time+=86400L; /* one day more */
 				if (stop_time - t <10)
-					usage(2,_("stop time to small"));
+					usage(2,_("stop time too small"));
 			} else {
 			        stop_time = (time(0)) + (time_t) lrzsz_strtoul( _("-s / --stop-at"), optarg, NULL, 1, LONG_MAX);
 			}
