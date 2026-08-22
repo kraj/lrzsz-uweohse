@@ -100,7 +100,6 @@ static void usage (int exitcode, const char *what);
 static int closeit (struct zm_fileinfo *);
 static void ackbibi (void);
 static void zmputs (const char *s);
-static size_t getfree (void);
 static int install_signal_handler (int sig);
 static FILE *safe_open (const char *path, const char *mode);
 
@@ -1678,7 +1677,7 @@ again:
 			zshhdr(ZNAK, Txhdr);
 			goto again;
 		case ZFREECNT:
-			stohdr(getfree());
+			stohdr(0);
 			zshhdr(ZACK, Txhdr);
 			goto again;
 		case ZCOMMAND:
@@ -2109,14 +2108,5 @@ ackbibi(void)
 	}
 }
 
-/*
- * Routine to calculate the free bytes on the current file system
- *  ~0 means many free bytes (unknown)
- */
-static size_t 
-getfree(void)
-{
-	return((size_t) (~0L));	/* many free bytes ... */
-}
 
 /* End of lrz.c */
