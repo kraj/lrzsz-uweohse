@@ -1407,13 +1407,6 @@ getzrxinit(void)
 				Rxbuflen = DEFAULT_RXBUFLEN;
 			vfile("Rxbuflen=%u", Rxbuflen);
 
-#if 0
-			/* If using a pipe for testing set lower buf len */
-			fstat(0, &f);
-			if (! (S_ISCHR(f.st_mode))) {
-				Rxbuflen = 8192;
-			}
-#endif
 			/*
 			 * If input is not a regular file, force ACK's to
 			 *  prevent running beyond the buffer limits
