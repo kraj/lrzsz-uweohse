@@ -26,27 +26,12 @@
 #include "config.h"
 #include <sys/types.h>
 
-#ifdef __GNUC__
-# define alloca __builtin_alloca
-# define HAVE_ALLOCA 1
-#else
-# if defined HAVE_ALLOCA_H || defined _LIBC
-#  include <alloca.h>
-# else
-#  ifdef _AIX
-#pragma alloca
-#  else
-#   ifndef alloca
-#    ifndef __GLIBC__
-char *alloca ();
-#    endif
-#   endif
-#  endif
-# endif
-#endif
-
 #include <stdarg.h>
 #include <stdbool.h>
+
+#ifndef HAVE_BOOL
+#define bool int
+#endif
 
 #  include <sys/time.h>
 #  include <time.h>

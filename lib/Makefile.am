@@ -6,8 +6,8 @@ EXTRA_DIST = alloca.c \
 	stpcpy.c
 
 libzmodem_a_SOURCES = long-options.c 
-libzmodem_a_LIBADD  = @LIBOBJS@ @ALLOCA@
-libzmodem_a_DEPENDENCIES  = @ALLOCA@ @LIBOBJS@
+libzmodem_a_LIBADD  = @LIBOBJS@
+libzmodem_a_DEPENDENCIES  = @LIBOBJS@
 
 noinst_HEADERS = long-options.h 
 

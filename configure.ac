@@ -93,6 +93,8 @@ fi
 
 AX_APPEND_COMPILE_FLAGS([ -fforce-addr -falign-loops=2 -falign-jumps=2 -falign-functions=2 -g3], [LRZSZ_CFLAGS])
 AX_APPEND_COMPILE_FLAGS([ -Wunused-result -Wpendantic -Wcast-qual -Wmissing-braces -Wcomments -Wformat], [WARN_CFLAGS])
+dnl that one does not take #ifdefs into account:
+AX_APPEND_COMPILE_FLAGS([ -Wno-pre-c23-compat], [WARN_CFLAGS])
 
 if test "$want_coverage" != "no" ; then
     AX_APPEND_COMPILE_FLAGS([ --coverage ], [LRZSZ_CFLAGS])
@@ -135,6 +137,7 @@ AC_TYPE_SIZE_T
 AC_TYPE_MODE_T
 AC_TYPE_OFF_T
 LRZSZ_TYPE_SPEED_T
+AC_CHECK_TYPES([bool],[], [], [[#include <stdbool.h>]])
 
 AC_CHECK_HEADERS_ONCE([sys/time.h])
 
@@ -142,10 +145,6 @@ UO_TYPE_SOCKLEN_T
 lrzsz_HEADER_SYS_SELECT
 AC_STRUCT_TM
 
-dnl suggested by autoscan, but not really needed.
-dnl AC_FUNC_UTIME_NULL
-AC_FUNC_MMAP
-AC_FUNC_ALLOCA
 AC_CHECK_TYPES([struct utimbuf], [], [], [[#include <utime.h>]])
 
 AC_CHECK_FUNCS(gettimeofday sigaction nogetopt_long fseeko)
