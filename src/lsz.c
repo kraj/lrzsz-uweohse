@@ -37,6 +37,10 @@
 #  define R_OK 4
 #endif
 
+#ifndef HAVE_GETOPT_LONG
+#define getopt_long(argc,argv,str,longopts,longind) getopt(argc,argv,str)
+#endif
+
 #if defined(HAVE_SYS_MMAN_H) && defined(HAVE_MMAP)
 #  include <sys/mman.h>
 static size_t mm_size;
@@ -354,9 +358,6 @@ main(int argc, char **argv)
 
 	Rxtimeout = 600;
 
-#ifndef HAVE_GETOPT_LONG
-#define getopt_long(argc,argv,str,longopts,longind) getopt(argc,argv,str)
-#endif
 	while ((c = getopt_long (argc, argv,
 		"2+4589aA:bB:C:c:dfeEghHi:J:kL:l:m:M:NnOopRrqsSt:TUuvVw:XYyZ",
 		long_options, (int *) 0))!=EOF)

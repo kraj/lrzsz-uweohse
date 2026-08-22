@@ -36,6 +36,10 @@
 #include <utime.h>
 #endif
 
+#ifndef HAVE_GETOPT_LONG
+#define getopt_long(argc,argv,str,longopts,longind) getopt(argc,argv,str)
+#endif
+
 #include "timing.h"
 #include "long-options.h"
 
@@ -336,9 +340,6 @@ main(int argc, char *argv[])
         setlocale (LC_TIME, "C"); /* do not translate just the timestamp of a syslog message. uh. */
 	bindtextdomain (PACKAGE, LOCALEDIR);
 	textdomain (PACKAGE);
-#ifndef HAVE_GETOPT_LONG
-#define getopt_long(argc,argv,str,longopts,longind) getopt(argc,argv,str)
-#endif
 	while ((c = getopt_long (argc, argv, 
 		"A:a+bB:cCDeEghHJ:m:M:nNOprRqs:St:uUvVw:XZy",
 		long_options, (int *) 0)) != EOF)
