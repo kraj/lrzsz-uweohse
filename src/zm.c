@@ -476,61 +476,6 @@ zsda32(const char *buf, size_t length, int frameend)
 	}
 }
 
-#if __GNUC__ < 2 || (__GNUC__ == 2 && __GNUC_MINOR__ <= 4)
-#  undef DEBUG_BLOCKSIZE
-#endif
-
-#ifdef DEBUG_BLOCKSIZE
-struct debug_blocksize {
-	int size;
-	long count;
-};
-struct debug_blocksize blocksizes[]={
-	{32,0},
-	{64,0},
-	{128,0},
-	{256,0},
-	{512,0},
-	{1024,0},
-	{2048,0},
-	{4096,0},
-	{8192,0},
-	{0,0}
-};
-static inline void
-count_blk(int size)
-{
-	int i;
-	for (i=0;blocksizes[i].size;i++) {
-		if (blocksizes[i].size==size) {
-			blocksizes[i].count++;
-			return;
-		}
-	}
-	blocksizes[i].count++;
-}
-
-static void printout_blocksizes(void) __attribute__((__destructor__));
-static void 
-printout_blocksizes(void) 
-{
-	int i;
-	for (i=0;blocksizes[i].size;i++) {
-		if (blocksizes[i].count) {
-			lsyslog(LOG_DEBUG,"%4d byte: %ld blocks\n",
-				   blocksizes[i].size,blocksizes[i].count);
-		}
-	}
-	if (blocksizes[i].count) {
-		lsyslog(LOG_DEBUG,"unk. byte: %ld blocks",
-			   blocksizes[i].count);
-	}
-}
-#define COUNT_BLK(x) count_blk(x)
-#else
-#define COUNT_BLK(x)
-#endif
-
 /*
  * Receive array buf of max length with ending ZDLE sequence
  *  and CRC.  Returns the ending character or error code.
@@ -576,7 +521,6 @@ crcfoo:
 					}
                                         stat_for_file.valid_messages++;
 					*bytes_received = length - (end - buf);
-					COUNT_BLK(*bytes_received);
 					VPRINTF(3,("zrdata: %lu  %s", (unsigned long) (*bytes_received), 
 							Zendnames[(d-GOTCRCE)&3]));
 					return d;
@@ -644,7 +588,6 @@ crcfoo:
 				}
                                 stat_for_file.valid_messages++;
 				*bytes_received = length - (end - buf);
-				COUNT_BLK(*bytes_received);
 				VPRINTF(3,("zrdat32: %lu %s", (unsigned long) *bytes_received, 
 					Zendnames[(d-GOTCRCE)&3]));
 				return d;
