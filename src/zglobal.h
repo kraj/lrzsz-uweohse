@@ -280,5 +280,8 @@ LRZSZ_FORMAT_PRINTF(2,3) void lsyslog (int, const char *,...);
 
 unsigned getspeed(speed_t code);
 
+const char * frameend_to_string(unsigned int type);
+const char * frametype_to_string(unsigned int type);
+
 
 #endif
