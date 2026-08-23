@@ -69,7 +69,7 @@ static const char *frametypes[] = {
 #define FTOFFSET 3
 #define FRMAX (sizeof(frametypes) / sizeof(frametypes[0]))
 
-static const char *
+const char *
 frametype_to_string(unsigned int type)
 {
 	static char unknown[32];
@@ -420,6 +420,17 @@ zshhdr(int type, unsigned char *hdr)
  * Send binary array buf of length length, with ending ZDLE sequence frameend
  */
 static const char *Zendnames[] = { "ZCRCE", "ZCRCG", "ZCRCQ", "ZCRCW"};
+const char *
+frameend_to_string(unsigned int type)
+{
+        switch(type) {
+        case ZCRCE: return "ZCRCE";
+        case ZCRCG: return "ZCRCG";
+        case ZCRCQ: return "ZCRCQ";
+        case ZCRCW: return "ZCRCW";
+        default: return "unknown";
+        }
+}
 void 
 zsdata(const char *buf, size_t length, int frameend)
 {
