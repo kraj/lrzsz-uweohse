@@ -1914,7 +1914,8 @@ zsendfdata (struct zm_fileinfo *zi)
 			}
 		}
 
-		if (Txwindow) {
+                /* the window might be full, but ZCRCE might have been sent because of EOF. Do not try to eat the ACK */
+		if (Txwindow && e != ZCRCE && e != ZCRCG) {
 			size_t tcount = 0;
 			int stuck_acks = 0;
 			size_t prev_lrxpos = Lrxpos;
