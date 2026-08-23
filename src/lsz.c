@@ -336,7 +336,10 @@ main(int argc, char **argv)
 	from_cu();
 	chkinvok(argv[0]);
 
-        journal_filename=getenv("journal_filename");
+        journal_filename=getenv("LSZ_JOURNAL");
+        if (!journal_filename || !*journal_filename) {
+            journal_filename=getenv("LRZSZ_JOURNAL");
+        }
         if (journal_filename && *journal_filename) {
             stats_journal_open(journal_filename);
         }
@@ -568,6 +571,17 @@ main(int argc, char **argv)
 	}
 	vfile("%s %s\n", lrzsz_progname, VERSION);
 
+        {
+            struct timespec start_timespec;
+            int ret;
+            ret=clock_gettime(CLOCK_MONOTONIC, &start_timespec);
+            if (ret) {
+                stat_for_all.start_time=0;
+            } else {
+                stat_for_all.start_time=start_timespec.tv_sec+((double)start_timespec.tv_nsec/1e9);
+            }
+        }
+
 	stat_for_all.direction = 's';
 	stat_for_file.direction = 's';
 
@@ -672,6 +686,7 @@ main(int argc, char **argv)
 		else
 			fputs(_("Transfer complete\n"),stderr);
 	}
+        stats_log(&stat_for_all,false);
 	stats_journal_close();
 	exit(dm);
 	/*NOTREACHED*/
@@ -688,8 +703,11 @@ wcsend (int argc, char *argp[])
 
 	for (n = 0; n < argc; ++n) {
 		Totsecs = 0;
-		if (wcs (argp[n],NULL) == ERROR)
+		if (wcs (argp[n],NULL) == ERROR) {
+                        stats_account_one();
 			return ERROR;
+                }
+                stats_account_one();
 	}
 	Totsecs = 0;
 	if (Filcnt == 0) {			/* bitch if we couldn't open ANY files */
@@ -775,6 +793,7 @@ wcs(const char *oname, const char *remotename)
 		int e=errno;
 		lrzsz_warning(e, _("cannot open %s"),oname);
 		++errcnt;
+                stat_for_file.local_errors++;
 		return OK;	/* pass over it, there may be others */
 	} else {
 		name=xstrdup(oname);
@@ -823,6 +842,7 @@ wcs(const char *oname, const char *remotename)
 #endif
 		lrzsz_warning(0, _("is not a file: %s"),name);
 		fclose(input_f);
+                stat_for_file.local_errors++;
 		return OK;
 	}
 
@@ -848,6 +868,7 @@ wcs(const char *oname, const char *remotename)
 	zi.bytes_skipped=0;
 	zi.eof_seen=0;
 	timing_reset();
+	stats_set_filename(shortname);
 
 	if (!Quiet && zi.bytes_total > 0x7FFFFFFFUL)
 		lrzsz_warning(0, _("file %s is larger than 2 GiB; "
@@ -859,9 +880,11 @@ wcs(const char *oname, const char *remotename)
 	case ERROR:
 		if (enable_syslog)
 			lsyslog(LOG_INFO, _("%s/%s: error occured"),protname(),shortname);
+                stat_for_file.files_err++;
 		return ERROR;
 	case ZSKIP:
 		lrzsz_warning(0, _("skipped: %s"),name);
+                stat_for_file.skipped++;
 		if (enable_syslog)
 			lsyslog(LOG_INFO, _("%s/%s: skipped"),protname(),shortname);
 		return OK;
@@ -872,6 +895,7 @@ wcs(const char *oname, const char *remotename)
 	{
 		if (enable_syslog)
 			lsyslog(LOG_INFO, _("%s/%s: error occured"),protname(),shortname);
+                stat_for_file.files_err++;
 		return ERROR;
 	}
 	if (Unlinkafter)
@@ -892,9 +916,13 @@ wcs(const char *oname, const char *remotename)
 			lsyslog(LOG_INFO, "%s/%s: %ld Bytes, %ld BPS",shortname,
 				protname(), (long) zi.bytes_sent,bps);
 	}
+        stat_for_file.files_ok++;
 	return 0;
 
 violation:
+        stat_for_file.policy_rejects++;
+        stats_account_one();
+        stats_log(&stat_for_all, false);
 	canit(STDOUT_FILENO);
 	vchar('\r');
 	fatal_error(1,0,
@@ -1003,6 +1031,7 @@ getnak(void)
 			Ascii = 0;	/* Receiver does the conversion */
 			return false;
 		case TIMEOUT:
+                        stat_for_file.timeouts++;
 			/* 30 seconds are enough */
 			if (tries==3) {
 				zperr(_("Timeout on pathname"));
@@ -1082,6 +1111,7 @@ wctx(struct zm_fileinfo *zi)
 	} while (READLINE_PF(Rxtimeout) != ACK && attempts < RETRYMAX);
 	if (attempts == RETRYMAX) {
 		zperr(_("No ACK on EOT"));
+                stat_for_file.too_many_errors++;
 		return ERROR;
 	}
 	else
@@ -1118,6 +1148,7 @@ wcputsec(char *buf, int sectnum, size_t cseclen)
 			oldcrc=updcrc((0xff& *cp), oldcrc);
 			checksum += *cp++;
 		}
+                stat_for_file.total_message_bytes+=cseclen;
 		if (Crcflg) {
 			oldcrc=updcrc(0,updcrc(0,oldcrc));
 			sendline((int)oldcrc>>8);
@@ -1136,20 +1167,24 @@ gotnak:
 		case CAN:
 			if(Lastrx == CAN) {
 cancan:
+                                stat_for_file.cancels++;
 				zperr(_("Cancelled"));  return ERROR;
 			}
 			break;
 		case TIMEOUT:
+                        stat_for_file.timeouts++;
 			zperr(_("Timeout on sector ACK")); continue;
 		case WANTCRC:
 			if (firstsec)
 				Crcflg = true;
                         continue;
 		case NAK:
+                        stat_for_file.invalid_messages++;
 			zperr(_("NAK on sector")); continue;
 		case ACK:
 			firstsec=false;
 			Totsecs += (cseclen>>7);
+                        stat_for_file.valid_messages++;
 			return OK;
 		case ERROR:
 			zperr(_("Got burst for sector ACK")); break;
@@ -1162,11 +1197,13 @@ cancan:
 				break;
 			if (firstch == NAK || firstch == WANTCRC)
 				goto gotnak;
-			if (firstch == CAN && Lastrx == CAN)
+			if (firstch == CAN && Lastrx == CAN) {
 				goto cancan;
+                        }
 		}
 	}
 	zperr(_("Retry Count Exceeded"));
+        stat_for_file.too_many_errors++;
 	return ERROR;
 }
 
@@ -1182,6 +1219,7 @@ filbuf(char *buf, size_t count)
 		if (r < 0) {
 			int er = errno;
 			lrzsz_warning(0, _("read error: %s"), strerror(er));
+                        stat_for_file.local_errors++;
 			return 0;
 		}
 		if (r == 0)
@@ -1206,6 +1244,11 @@ filbuf(char *buf, size_t count)
 		if (--m == 0)
 			break;
 	}
+        if (ferror(input_f)) {
+            lrzsz_warning(0, _("read error: %s"), strerror(errno));
+            stat_for_file.local_errors++;
+            return 0;
+        }
 	if (m==count)
 		return 0;
 	else
@@ -1953,6 +1996,7 @@ calc_blklen(long total_sent)
 	long best_size=0;
 	long this_bytes_per_error;
 	long d;
+        static unsigned original_rxbuflen=0;
 	unsigned int i;
 	if (total_bytes==0)
 	{
@@ -1983,16 +2027,21 @@ calc_blklen(long total_sent)
          */
         if (error_count) {
             if (!Rxbuflen) {
-                Rxbuflen=32768;
+                original_rxbuflen=Rxbuflen=32768;
             }
+            if (!original_rxbuflen) {
+                original_rxbuflen=Rxbuflen;
+            }
+//            Rxbuflen=original_rxbuflen;
             if (last_bytes_per_error <=    512000 && Rxbuflen>32768) Rxbuflen=32768;
             if (last_bytes_per_error <=    256000 && Rxbuflen>16384) Rxbuflen=16384;
             if (last_bytes_per_error <=    128000 && Rxbuflen> 8192) Rxbuflen= 8192;
             if (last_bytes_per_error <=     64000 && Rxbuflen> 4096) Rxbuflen= 4096;
-            if (last_bytes_per_error <=     32000 && Rxbuflen> 2096) Rxbuflen= 2096;
+            if (last_bytes_per_error <=     32000 && Rxbuflen> 2048) Rxbuflen= 2048;
             Txwindow=(Rxbuflen)/2;
             Txwindow = (Rxbuflen/2/64) * 64;
             Txwspac = Txwindow/4;
+// fprintf(stderr,"LBPE %lu => RXB %lu Txwindow %lu\n",last_bytes_per_error, Rxbuflen, Txwindow);
         }
 
 	/* it's not good to calc blklen too early */
@@ -2110,6 +2159,9 @@ getinsync(struct zm_fileinfo *zi, int flag)
 		case ZABORT:
 		case ZFIN:
 		case TIMEOUT:
+			return ERROR;
+		case ZABORT:
+			stat_for_file.cancels++;
 			return ERROR;
 		case ZRPOS:
 			/*  If sending to a buffered modem, you
