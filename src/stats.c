@@ -41,6 +41,9 @@ write_stats_line(FILE *out, struct lrzsz_stat *st, bool forone)
     double dur=-1;
     int ret;
     const char *dir;
+    if (!out) {
+        return;
+    }
 
     ret=clock_gettime(CLOCK_MONOTONIC, &end_timespec);
     if (!ret) {
@@ -131,7 +134,6 @@ void
 stats_log(struct lrzsz_stat *st, bool forone)
 {
     setlocale(LC_NUMERIC,"C");
-
     write_stats_line(journal_fp, st, forone);
 
     setlocale(LC_NUMERIC,"");
@@ -158,8 +160,7 @@ stats_account_one(void)
 #endif
 
     stats_log(&stat_for_file,true);
-   
-    TRANSFER(n_files); 
+
     if (stat_for_file.filename) {
         free(stat_for_file.filename);
         stat_for_file.filename=NULL;
