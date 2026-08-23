@@ -1,134 +1,122 @@
 Version 0.13.0 -  August 2026, Uwe Ohse
 
-This is a security release. Two of the changes warrant an
-immediate update if you use lrz to receive files from 
-not perfectly trustworthy senders.
+This is a security release. Two of the changes warrant an immediate update
+if you use lrz to receive files from not perfectly trustworthy senders.
 
-* if PUBDIR support was NOT compiled in, the restricted mode
-  path check of lrz did allow uploads to any directory the
-  user has write access to.
+* if PUBDIR support was NOT compiled in, the restricted mode path check of 
+  lrz did allow uploads to any directory the user has write access to.
 
-  This was a security bug found by TristanInSec with an email
-  domain gmail under the com tld.
+  This was a security bug found by TristanInSec with an email domain gmail 
+  under the com tld.
 
-  Likewise lsz did not correctly check paths in the restricted
-  mode if PUBDIR support was not compiled in.
+  Likewise lsz did not correctly check paths in the restricted mode if 
+  PUBDIR support was not compiled in.
 
-* a buffer overflow was fixed in lrz, in which the attacker
-  could quite easily cause an overflow in a malloc()ed buffer.
+* a buffer overflow was fixed in lrz, in which the attacker could quite 
+  easily cause an overflow in a malloc()ed buffer.
 
-  This was a security bug found by TristanInSec with an email
-  domain gmail under the com tld.
+  This was a security bug found by TristanInSec with an email domain 
+  gmail under the com tld.
 
-  Note: this stems from the original public domain rzsz
-  suite (80s).
+  Note: this stems from the original public domain rzsz suite (80s).
 
 * the lrz pipe execution feature was removed.
-  feature: invoked as 'lrztar' lrz would have called tar 
-  through the shell with the (attacker controlled) filename as 
-  argument, with escaping it, allowing arbitrary command
-  execution.
-  This feature/insecurity was only accessible if the installer
-  appended some string to the lrz (or rz) commands name.
+  feature: invoked as 'lrztar' lrz would have called tar through the shell 
+  with the (attacker controlled) filename as argument, with escaping it, 
+  allowing arbitrary command execution.
+  This feature/insecurity was only accessible if the installer appended 
+  some string to the lrz (or rz) commands name.
   
   This was a security bug found by TristanInSec with an email
   domain gmail under the com tld.
 
-  Note: this stems from the original public domain rzsz
-  suite (80s).
+  Note: this stems from the original public domain rzsz suite (80s).
 
-* CVE-2018-10195 fixed, in which lsz could leak information
-  to the receiving attacker if that turned off crc32.
+* CVE-2018-10195 fixed, in which lsz could leak information to the 
+  receiving attacker if that turned off crc32.
   Impact: low to medium.
 
-* Overlong pathnames (> 960 + X bytes, with X depending on 
-  metadata) might have caused a buffer overflow in the sending 
-  programs (Y- and ZMODEM), which could have leaked information
-  to the receiver.
+* Overlong pathnames (> 960 + X bytes, with X depending on metadata) might 
+  have caused a buffer overflow in the sending programs (Y- and ZMODEM), 
+  which could have leaked information to the receiver.
 
-  Note: this stems from the original public domain rzsz
-  suite (80s).
-
-* autotools updated.
-
-* the TCP mode was removed (no authentication, no encryption).
+  Note: this stems from the original public domain rzsz suite (80s).
 
 * the lrz remote command execution feature was removed.
-  feature: `lsz -c any command` would have caused lrz to execute
-  that command through the shell.
-  This was feature of the original public domain zmodem, and
-  by default disabled in lrzsz since sometime in the 90s, by
-  hiding it behind the -C or --allow-remote-commands options.
+  feature: `lsz -c any command` would have caused lrz to execute that 
+  command through the shell.
+  This was feature of the original public domain zmodem, and by default 
+  disabled in lrzsz since sometime in the 90s, by hiding it behind the 
+  -C or --allow-remote-commands options.
 
 * the PUBDIR feature was removed from lsz and lrz.
-  this feature of the restricted mode allowed uploads not
-  only from the current directory, but from the compiled in
-  PUBDIR (/usr/spool/uucppublic, typically), and it allowed
-  uploads into that, too.
-  If you really need something like this, you can add a 
-  symlink to the current directory.
+  this feature of the restricted mode allowed uploads not only from the 
+  current directory, but from the compiled in PUBDIR
+  (/usr/spool/uucppublic, typically), and it allowed uploads into that, too.
+  If you really need something like this, you can add a symlink to the 
+  current directory.
 
-* an attacker could have created a setuid/setgid/sticky
-  file through when restricted mode was not used.
+* an attacker could have created a setuid/setgid/sticky file when 
+  restricted mode was not used.
 
-  Note: this stems from the original public domain rzsz
-  suite (80s).
+  Note: this stems from the original public domain rzsz suite (80s).
 
-* the lrz path name check would have allowed to create 
-  a filename `..`, which may or may not be a security
-  problem with pre-created symlinks for `..`.
+* the lrz path name check would have allowed to create a filename `..`, 
+  which may or may not be a security problem with pre-created symlinks 
+  for `..`.
 
-  Note: this stems from the original public domain rzsz
-  suite (80s).
+  Note: this stems from the original public domain rzsz suite (80s).
 
-* lrz in very restricted mode now disallows invisible
-  leading directories, too (`dir/.subdir/filename` was allowed
-  before).
+* lrz in very restricted mode now disallows invisible leading 
+  directories, too (`dir/.subdir/filename` was allowed before).
 
   Note: that this was possible stems from the original public 
   domain rzsz suite (80s).
 
-* when the lrz -B / --bufsize "auto" option was used, an attacker
-  could have wasted up to 2 GB of memory while keeping the
-  connection option. This was a possible remotely triggered denial
-  of service attack (in a rare configuration).
+* when the lrz -B / --bufsize "auto" option was used, an attacker could 
+  have wasted up to 2 GB of memory while keeping the connection open. 
+  This was a remotely triggered denial of service attack (in a rare 
+  configuration).
 
 * the lrz file CRC check could have run into an endless loop.
   This was a possible remotely triggered denial of service attack.
 
-* the timesync protocol support was removed. No other zmodem
-  suite still in use implemented it, and the function to set
-  the receivers time needed root rights - which, given the 
-  facts listed above, lrz should not have.
+* autotools updated. GNU automake 1.17, GNU Autoconf 2.72.
+
+* the TCP mode was removed (no authentication, no encryption).
+
+* the timesync protocol support was removed. No other zmodem suite still 
+  in use implemented it, and the function to set the receivers time 
+  needed root rights - which, given the facts listed above, lrz should 
+  not have.
 
 * the `-d / --dot-to-slash` option (DOS 8.3 filename transformation)
   was removed (it collided with the now extended pathname checking).
 
-* on 32bit systems the programs are now able to transfer files with 
-  sizes in the range 2GB to just under 4GB (64bit systems did not
-  have that limit).
+* on 32bit systems the programs are now able to transfer files with sizes 
+  in the range 2GB to just under 4GB (64bit systems did not have that 
+  limit).
 
   Note: that lrzsz was limited to 31 bit file sizes stems from the 
   original public domain rzsz suite (80s). The same limit existed
   in later published omen technology sources, and at least one 
   independent implementation.
 
-  Expect interoperability problems when files of that size. 
+  Expect interoperability problems when transferring files of that size. 
 
-* lrz has a new option -A --segmentsize NNN. This turns on 
-  `Segmented Streaming' if the sender supports it. This ZMODEM
-  feature was originally intended to allow transfers to machines
-  unable to do overlapping serial and disk I/O. Today it is useful
-  to limit the damage caused by line errors when the sender streams
-  without asking for an ACK.
-  lsz, the original public domain zmodem sz and crzsz csz always 
-  enforced segmented streaming - which is why lrzsz and other zmodem
-  implementations stemming from the same source usually behave much 
-  better on faulty lines than other implementations optimized for 
-  the perfect world.
+* lrz has a new option -A --segmentsize NNN. This turns on `Segmented 
+  Streaming' if the sender supports it. This ZMODEM feature was originally 
+  intended to allow transfers to machines unable to do overlapping serial 
+  and disk I/O. Today it is useful to limit the damage caused by line 
+  errors when the sender streams without asking for an ACK.
+  lsz, the original public domain zmodem sz and crzsz csz always enforced 
+  segmented streaming - which is why lrzsz and other zmodem 
+  implementations stemming from the same source usually behave much better 
+  on faulty lines than other implementations optimized for the perfect 
+  world.
 
-* syslog support is now always compiled in. In earlier releases
-  there we configure options to deselect it.
+* syslog support is now always compiled in. Earlier releases had 
+  configure options to deselect it.
 
 * a number of possible security problems have been fixed:
   - double fclose in lrz.
@@ -136,7 +124,41 @@ not perfectly trustworthy senders.
   - a use of uninitialized memory in lsz (80s).
   - a misbehaving receiver could cause an endless loop 
     when the sender used a transmit window (80s).
+
+* support for many old systems has been removed. The new support policy is 
+  this:
+  - i aim for POSIX standards of the last 20 years.
+  - i aim for the next older C standard.
+  Currently: POSIX.1-2008, C99.
+
+* the german translation was removed, because it was seriously out of date.
+  Translations are welcome, just my own ill-maintained one wasn't.
  
+  I'm willing to work with translators, not only to include translations,
+  but also to make your job easier - but i am not going to burden me
+  with doing translations.
+
+* the dejagnu testsuite was removed. An update broke it, and i decided to
+  work on the older internal check script, because i found it easier to
+  extend for the tracing i need.
+
+* speaking about tracing: included in the sources is zmodemsnif.c, a ZMODEM
+  protocol sniffer / tracer. Documentation is in doc/zmodemsnif.txt.
+
+* compatibility tests were done against sexyz-3.3, lrzsz-0.12.21rc, 
+  crzsz-1.13, rzsz-3.73 and zmtx-zmrx-1.02.
+
+* compile tested on debian linux, alpine linux and openbsd.
+* compile tested with gcc and clang.
+
+Version 0.12.21rc - August 1999, Uwe Ohse
+
+* IEXTEN disabled ("Enable implementation-defined input processing.").
+
+* the tcp inband option (--tcp) was removed.
+
+* lsz crashed when trying to transfer 0 byte small files with ZMODEM.
+
 Version 0.12.20 - December 1998, Uwe Ohse
 
 * works on BeOS and stone-aged SCO (sco-3.2v4.2)
