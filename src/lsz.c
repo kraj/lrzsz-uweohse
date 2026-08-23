@@ -821,11 +821,7 @@ wcs(const char *oname, const char *remotename)
 				last_length=buffersize;
 			/* buffer whole pages */
 			last_length=(last_length+4095)&0xfffff000;
-			s=malloc(last_length);
-			if (!s) {
-				zpfatal(_("out of memory"));
-				exit(1);
-			}
+			s=xmalloc(last_length);
 		}
 		if (s) {
 			setvbuf(input_f,s,_IOFBF,last_length);
@@ -1035,7 +1031,7 @@ getnak(void)
 			/* 30 seconds are enough */
 			if (tries==3) {
 				zperr(_("Timeout on pathname"));
-				return true;
+				return ERROR;
 			}
 			/* don't send a second ZRQINIT _directly_ after the
 			 * first one. Never send more then 4 ZRQINIT, because
@@ -1062,7 +1058,7 @@ getnak(void)
 			return false;
 		case CAN:
 			if ((firstch = READLINE_PF(20)) == CAN && Lastrx == CAN)
-				return true;
+				return ERROR;
 		default:
 			break;
 		}
@@ -1687,7 +1683,7 @@ zsendfdata (struct zm_fileinfo *zi)
 	static long total_sent = 0;
 	static time_t low_bps=0;
         int newcnt;
-        int need_wait = 1;
+        static int need_wait = 1;
 
 	if (use_mmap && !mm_addr)
 	{
@@ -1717,11 +1713,11 @@ zsendfdata (struct zm_fileinfo *zi)
 	not_printed = 0;
   somemore:
 	if (setjmp (intrjmp)) {
-	  if (play_with_sigint)
-		  signal (SIGINT, onintr);
-	  waitack:
-		junkcount = 0;
-		c = getinsync (zi, 0);
+	    if (play_with_sigint)
+                signal (SIGINT, onintr);
+  waitack:
+            junkcount = 0;
+            c = getinsync (zi, 0);
 	  gotack:
 		switch (c) {
 		default:
@@ -1783,7 +1779,7 @@ zsendfdata (struct zm_fileinfo *zi)
 
 	do {
 		size_t n;
-		int e;
+		int e=0;
 		unsigned old = blklen;
 		blklen = calc_blklen (total_sent);
 		total_sent += blklen + OVERHEAD;
@@ -1927,8 +1923,9 @@ zsendfdata (struct zm_fileinfo *zi)
 				vfile ("%zu (%ld,%ld) window >= %u", tcount,
 					(long) zi->bytes_sent, (long) Lrxpos,
 					Txwindow);
-				if (e != ZCRCQ)
+				if (e != ZCRCQ) {
 					ZSDATA (txbuf, 0, e = ZCRCQ);
+                                }
 				c = getinsync (zi, 1);
 				if (c != ZACK) {
 					ZSDATA (txbuf, 0, ZCRCE);
@@ -2156,7 +2153,6 @@ getinsync(struct zm_fileinfo *zi, int flag)
 		gotblock = zgethdr(Rxhdr, 0, &rxpos);
 		switch (gotblock) {
 		case ZCAN:
-		case ZABORT:
 		case ZFIN:
 		case TIMEOUT:
 			return ERROR;
