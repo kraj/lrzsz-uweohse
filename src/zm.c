@@ -440,6 +440,8 @@ zsdata(const char *buf, size_t length, int frameend)
 		Zendnames[(frameend-ZCRCE)&3]));
 	crc = 0;
 
+        stat_for_file.total_message_bytes += length;
+        stat_for_file.valid_messages++;
 	for( ; length; length--) {
 	  zsendline(*buf); crc = updcrc((0xff & *buf), crc);
 	  buf++;
@@ -464,6 +466,8 @@ zsda32(const char *buf, size_t length, int frameend)
 	VPRINTF(3,("zsdat32: %lu %s", length, Zendnames[(frameend-ZCRCE)&3]));
 
 	crc = 0xFFFFFFFFL;
+        stat_for_file.total_message_bytes += length;
+        stat_for_file.valid_messages++;
 	zsendline_s(buf,length);
 	for (; length; length--) {
 		c = *buf & 0xff;
