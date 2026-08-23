@@ -84,6 +84,27 @@ static const struct {
 #ifdef B460800
     {460800,  B460800},
 #endif
+#ifdef B500000
+    {500000,  B500000},
+#endif
+#ifdef B576000
+    {576000,  B576000},
+#endif
+#ifdef B921600
+    {921600,  B921600},
+#endif
+#ifdef B1000000
+    {1000000,  B1000000},
+#endif
+#ifdef B1000000
+    {1152000,  B1152000},
+#endif
+#ifdef B1500000
+    {1500000,  B1500000},
+#endif
+#ifdef B2000000
+    {2000000,  B2000000},
+#endif
 
 #ifdef EXTA
 	{19200,	EXTA},
