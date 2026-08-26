@@ -48,6 +48,9 @@
 static size_t mm_size;
 static void *mm_addr=NULL;
 
+#define DEBUG_WINDOWHANDLING 1
+static int debugmode=0;
+
 
 unsigned int Baudrate=2400;	/* Default, should be set by first mode() call */
 static unsigned int Txwindow;	/* Control the size of the transmitted window */
@@ -137,10 +140,11 @@ static int Optiong;		/* Let it rip no wait for sector ACK's */
 static int Totsecs;		/* total number of sectors this file */
 static int Filcnt=0;		/* count of number of files opened */
 static int Lfseen=0;
+#define SAFETY_RXBUFLEN (128*1024) /* will be set one first error */
 #define DEFAULT_RXBUFLEN (16*1024)
-static unsigned Rxbuflen = DEFAULT_RXBUFLEN;	/* Receiver's max buffer length */
-static unsigned Tframlen = 0;	/* Override for tx frame length */
-static unsigned blkopt=0;		/* Override value for zmodem blklen */
+static unsigned int Rxbuflen = DEFAULT_RXBUFLEN;	/* Receiver's max buffer length */
+static unsigned int Tframlen = 0;	/* Override for tx frame length */
+static unsigned int blkopt=0;		/* Override value for zmodem blklen */
 static int Rxflags = 0;
 static size_t bytcnt;
 static int Wantfcs32 = true;	/* want to send 32 bit FCS */
@@ -686,6 +690,7 @@ main(int argc, char **argv)
 		else
 			fputs(_("Transfer complete\n"),stderr);
 	}
+        stats_account_finalize_file();
         stats_log(&stat_for_all,false);
 	stats_journal_close();
 	exit(dm);
@@ -865,6 +870,7 @@ wcs(const char *oname, const char *remotename)
 	zi.eof_seen=0;
 	timing_reset();
 	stats_set_filename(shortname);
+	stats_start_one();
 
 	if (!Quiet && zi.bytes_total > 0x7FFFFFFFUL)
 		lrzsz_warning(0, _("file %s is larger than 2 GiB; "
@@ -1426,8 +1432,6 @@ getzrxinit(void)
 			/* Override to force shorter frame length */
 			if (Tframlen && Rxbuflen > Tframlen)
 				Rxbuflen = Tframlen;
-			if ( !Rxbuflen)
-				Rxbuflen = DEFAULT_RXBUFLEN;
 			vfile("Rxbuflen=%u", Rxbuflen);
 
 			/*
@@ -1466,6 +1470,9 @@ getzrxinit(void)
 			vfile("Rxbuflen=%u blklen=%lu", Rxbuflen, blklen);
 			vfile("Txwindow = %u Txwspac = %u", Txwindow, Txwspac);
 			Rxtimeout=old_timeout;
+                        if (debugmode & DEBUG_WINDOWHANDLING) {
+                            fprintf(stderr,"after ZRINIT: Rxbuflen=%u,Txwindow=%u,Txwspac=%u\n",Rxbuflen,Txwindow,Txwspac);
+                        }
 			return (sendzsinit());
 		case ZCAN:
 		case TIMEOUT:
@@ -1983,7 +1990,7 @@ zsendfdata (struct zm_fileinfo *zi)
 }
 
 static int
-calc_blklen(long total_sent)
+calc_blklen_worker(long total_sent)
 {
 	static long total_bytes=0;
 	static int calcs_done=0;
@@ -2025,17 +2032,17 @@ calc_blklen(long total_sent)
          */
         if (error_count) {
             if (!Rxbuflen) {
-                original_rxbuflen=Rxbuflen=32768;
+                Rxbuflen=SAFETY_RXBUFLEN;
             }
             if (!original_rxbuflen) {
                 original_rxbuflen=Rxbuflen;
             }
-//            Rxbuflen=original_rxbuflen;
-            if (last_bytes_per_error <=    512000 && Rxbuflen>32768) Rxbuflen=32768;
-            if (last_bytes_per_error <=    256000 && Rxbuflen>16384) Rxbuflen=16384;
-            if (last_bytes_per_error <=    128000 && Rxbuflen> 8192) Rxbuflen= 8192;
-            if (last_bytes_per_error <=     64000 && Rxbuflen> 4096) Rxbuflen= 4096;
-            if (last_bytes_per_error <=     32000 && Rxbuflen> 2048) Rxbuflen= 2048;
+            Rxbuflen=original_rxbuflen;
+            if (last_bytes_per_error <=    512000 && Rxbuflen>65536) Rxbuflen=65536;
+            if (last_bytes_per_error <=    256000 && Rxbuflen>32678) Rxbuflen=32678;
+            if (last_bytes_per_error <=    128000 && Rxbuflen>16384) Rxbuflen=16384;
+            if (last_bytes_per_error <=     64000 && Rxbuflen> 8192) Rxbuflen= 8192;
+            if (last_bytes_per_error <=     32000 && Rxbuflen> 4096) Rxbuflen= 4096;
             Txwindow=(Rxbuflen)/2;
             Txwindow = (Rxbuflen/2/64) * 64;
             Txwspac = Txwindow/4;
@@ -2139,6 +2146,27 @@ calcit:
 		vstringf(_("calc_blklen: returned %d as best\n"),
 			last_blklen);
 	return last_blklen;
+}
+
+static int
+calc_blklen(long total_sent) {
+    unsigned int old_Rxbuflen=Rxbuflen;
+    unsigned int old_Txwindow=Txwindow;
+    static int last_blklen;
+    int ret=calc_blklen_worker(total_sent);
+    if (debugmode && DEBUG_WINDOWHANDLING) {
+        if (old_Rxbuflen!=Rxbuflen) {
+            fprintf(stderr,"calc_blklen changed Rxbuflen from %u to %u\n",old_Rxbuflen,Rxbuflen);
+        }
+        if (old_Txwindow!=Txwindow) {
+            fprintf(stderr,"calc_blklen changed Txwindow from %u to %u\n",old_Txwindow,Txwindow);
+        }
+        if (ret!=last_blklen && last_blklen) {
+            fprintf(stderr,"calc_blklen changed blklen from %u to %u\n",last_blklen,ret);
+        }
+    }
+    last_blklen=ret;
+    return ret;
 }
 
 /*
