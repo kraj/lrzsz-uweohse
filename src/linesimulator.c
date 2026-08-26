@@ -25,7 +25,7 @@
 #include <sys/wait.h>
 #include <getopt.h>
 
-#define BUFSZ 128
+#define BUFSZ 16384
 #define MAX_RANGES 32
 
 /* ------------------------------------------------------------------ */
@@ -160,11 +160,13 @@ struct rate_limit {
     size_t block_accum;  /* bytes accumulated in current block */
     struct timespec block_deadline; /* when current block can be sent */
     int block_has_deadline;
+    /* bit-rate mode latency */
+    long latency_ms;     /* per-message latency (RL_BITRATE) */
 };
 
 static void
 rl_init(struct rate_limit *rl, enum rl_mode mode, long bps,
-        size_t block_size, long delay_ms)
+        size_t block_size, long delay_ms, long latency_ms)
 {
     memset(rl, 0, sizeof(*rl));
     rl->mode = mode;
@@ -172,6 +174,7 @@ rl_init(struct rate_limit *rl, enum rl_mode mode, long bps,
     rl->tokens = 0; /* start empty: rate limit applies from the first byte */
     rl->block_size = block_size;
     rl->delay_ms = delay_ms;
+    rl->latency_ms = latency_ms;
     clock_gettime(CLOCK_MONOTONIC, &rl->last_refill);
 }
 
@@ -191,7 +194,13 @@ static int
 rl_timeout(struct rate_limit *rl)
 {
     if (rl->mode == RL_BITRATE) {
+        int lat_ms = 0;
         long ms, need;
+        if (rl->block_has_deadline) {
+            lat_ms = (int)ms_remaining(&rl->block_deadline);
+            if (lat_ms > 0)
+                return lat_ms;
+        }
         if (rl->tokens >= 8)
             return 0;
         /* time to get at least 8 bits (1 byte) */
@@ -235,6 +244,11 @@ rl_allow(struct rate_limit *rl, size_t want)
     if (rl->mode == RL_NONE)
         return want;
     if (rl->mode == RL_BITRATE) {
+        if (rl->block_has_deadline) {
+            if (ms_remaining(&rl->block_deadline) > 0)
+                return 0;
+            rl->block_has_deadline = 0;
+        }
         rl_refill(rl);
         avail = (size_t)(rl->tokens / 8);
         return avail < want ? avail : want;
@@ -271,6 +285,21 @@ rl_consumed(struct rate_limit *rl, size_t n)
     }
 }
 
+/* Set latency deadline for a newly arrived message (RL_BITRATE mode). */
+static void
+rl_arrived(struct rate_limit *rl)
+{
+    struct timespec now;
+    if (rl->mode == RL_BITRATE && rl->latency_ms > 0) {
+        clock_gettime(CLOCK_MONOTONIC, &now);
+        rl->block_deadline.tv_sec = now.tv_sec
+            + (now.tv_nsec + rl->latency_ms * 1000000L) / 1000000000L;
+        rl->block_deadline.tv_nsec = (now.tv_nsec
+            + rl->latency_ms * 1000000L) % 1000000000L;
+        rl->block_has_deadline = 1;
+    }
+}
+
 /* ------------------------------------------------------------------ */
 /* Error injection                                                    */
 /* ------------------------------------------------------------------ */
@@ -291,6 +320,7 @@ struct error_state {
     int strip_bit8;     /* clear bit 7 of every byte */
     int strip_ctrl;     /* remove control chars */
     size_t error_freq;  /* nominal bytes between error events */
+    int deterministic;  /* if true, errors at exact error_freq intervals */
     size_t byte_count;  /* bytes processed since last check */
     size_t next_error[NERR]; /* jittered threshold per error type */
     struct range_list ranges; /* byte ranges where errors are active */
@@ -315,9 +345,13 @@ es_seed(struct error_state *es, unsigned long seed)
 static void
 es_schedule(struct error_state *es, enum err_type t)
 {
-    unsigned long r = xorshift64(&es->rng);
-    es->next_error[t] = es->byte_count + 1
-        + (size_t)(r % (2 * es->error_freq));
+    if (es->deterministic) {
+        es->next_error[t] = es->byte_count + es->error_freq;
+    } else {
+        unsigned long r = xorshift64(&es->rng);
+        es->next_error[t] = es->byte_count + 1
+            + (size_t)(r % (2 * es->error_freq));
+    }
 }
 
 static void
@@ -354,6 +388,8 @@ do_flip(struct error_state *es, unsigned char *buf, size_t buflen,
     for (int i = 0; i < n; i++) {
         unsigned long r2 = xorshift64(&es->rng);
         size_t byte_off = r2 % 8; /* spread within 8 bytes */
+        if (byte_off >= buflen - pos)
+            byte_off = 0; /* clamp to current position if near end */
         if (pos + byte_off < buflen) {
             unsigned char bit = 1 << (xorshift64(&es->rng) % 8);
             buf[pos + byte_off] ^= bit;
@@ -451,7 +487,7 @@ dir_init(struct direction *d)
 {
     memset(d, 0, sizeof(*d));
     memset(d, 0, sizeof(*d));
-    rl_init(&d->rl, RL_NONE, 0, 0, 0);
+    rl_init(&d->rl, RL_NONE, 0, 0, 0, 0);
     es_init(&d->es);
 }
 
@@ -477,6 +513,7 @@ usage(FILE *out)
 "  -r BPS       bits per second, both directions\n"
 "  -R BPS       bits per second, stdin->SUB only\n"
 "  -T BPS       bits per second, SUB->stdout only\n"
+"  -L MS        per-message latency in ms (both directions)\n"
 "\n"
 "Rate limiting (block mode):\n"
 "  -b SIZE      block size in bytes\n"
@@ -491,6 +528,7 @@ usage(FILE *out)
 "  -g N         garble up to N bytes (flip all bits) per error event\n"
 "  -f N         error frequency: ~1 event per N bytes (jittered 0..2N)\n"
 "               (default: 1024)\n"
+"  -F N         error frequency: exactly 1 event per N bytes (no jitter)\n"
 "  -w RANGES    only inject errors within byte ranges, e.g.\n"
 "               -w 128k-256k,768k-1m  (default: all bytes)\n"
 "  -s SEED      random seed (default: random, printed to stderr)\n"
@@ -514,6 +552,7 @@ main(int argc, char **argv)
     long bps_both = 0;
     size_t block_size = 0;
     long block_delay_ms = 0;
+    long latency_ms = 0;
     int blocks_per_sec = 0;
 
     int strip_bit8 = 0;
@@ -521,6 +560,7 @@ main(int argc, char **argv)
     int flip_bits = 0;
     int drop_bytes = 0;
     int garble_bytes = 0;
+    int deterministic = 0;
     size_t error_freq = 1024;
     long seed = -1;          /* -1 = random */
     int err_dir = 3;         /* 1=tx only, 2=rx only, 3=both */
@@ -542,7 +582,7 @@ main(int argc, char **argv)
 
     memset(&err_ranges, 0, sizeof(err_ranges));
 
-    while ((c = getopt(argc, argv, "r:R:T:b:p:d:7ce:x:g:f:w:s:12h")) != -1) {
+    while ((c = getopt(argc, argv, "r:R:T:b:p:d:L:7ce:x:g:f:F:w:s:12h")) != -1) {
         switch (c) {
         case 'r': bps_both = (long)parse_size(optarg, NULL); break;
         case 'R': bps_tx = (long)parse_size(optarg, NULL); break;
@@ -550,12 +590,14 @@ main(int argc, char **argv)
         case 'b': block_size = parse_size(optarg, NULL); break;
         case 'p': blocks_per_sec = atoi(optarg); break;
         case 'd': block_delay_ms = atol(optarg); break;
+        case 'L': latency_ms = atol(optarg); break;
         case '7': strip_bit8 = 1; break;
         case 'c': strip_ctrl = 1; break;
         case 'e': flip_bits = atoi(optarg); break;
         case 'x': drop_bytes = atoi(optarg); break;
         case 'g': garble_bytes = atoi(optarg); break;
         case 'f': error_freq = (size_t)atol(optarg); break;
+        case 'F': error_freq = (size_t)atol(optarg); deterministic = 1; break;
         case 'w':
             if (parse_ranges(optarg, &err_ranges) < 0)
                 return 1;
@@ -620,12 +662,12 @@ main(int argc, char **argv)
         tx_bps = bps_tx > 0 ? bps_tx : rl_bps;
         rx_bps = bps_rx > 0 ? bps_rx : rl_bps;
         if (tx_bps > 0)
-            rl_init(&dir[0].rl, RL_BITRATE, tx_bps, 0, 0);
+            rl_init(&dir[0].rl, RL_BITRATE, tx_bps, 0, 0, latency_ms);
         if (rx_bps > 0)
-            rl_init(&dir[1].rl, RL_BITRATE, rx_bps, 0, 0);
+            rl_init(&dir[1].rl, RL_BITRATE, rx_bps, 0, 0, latency_ms);
     } else if (mode == RL_BLOCK) {
-        rl_init(&dir[0].rl, RL_BLOCK, 0, block_size, block_delay_ms);
-        rl_init(&dir[1].rl, RL_BLOCK, 0, block_size, block_delay_ms);
+        rl_init(&dir[0].rl, RL_BLOCK, 0, block_size, block_delay_ms, 0);
+        rl_init(&dir[1].rl, RL_BLOCK, 0, block_size, block_delay_ms, 0);
     }
 
     /* Configure error injection */
@@ -641,6 +683,7 @@ main(int argc, char **argv)
                 dir[d].es.drop_bytes = drop_bytes;
                 dir[d].es.garble_bytes = garble_bytes;
                 dir[d].es.error_freq = error_freq;
+                dir[d].es.deterministic = deterministic;
                 dir[d].es.ranges = err_ranges;
                 es_seed(&dir[d].es, actual_seed + (unsigned long)d);
                 es_setup(&dir[d].es);
@@ -747,6 +790,8 @@ main(int argc, char **argv)
                 if (dir[0].has_error)
                     n = (ssize_t)apply_transform(&dir[0].es, tmp, (size_t)n);
                 if (n > 0) {
+                    if (dir[0].to_buf.len == 0)
+                        rl_arrived(&dir[0].rl);
                     memcpy(dir[0].to_buf.data + dir[0].to_buf.len,
                            tmp, (size_t)n);
                     dir[0].to_buf.len += (size_t)n;
@@ -793,6 +838,8 @@ main(int argc, char **argv)
                 if (dir[1].has_error)
                     n = (ssize_t)apply_transform(&dir[1].es, tmp, (size_t)n);
                 if (n > 0) {
+                    if (dir[1].to_buf.len == 0)
+                        rl_arrived(&dir[1].rl);
                     memcpy(dir[1].to_buf.data + dir[1].to_buf.len,
                            tmp, (size_t)n);
                     dir[1].to_buf.len += (size_t)n;
