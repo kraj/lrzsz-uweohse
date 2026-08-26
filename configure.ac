@@ -1,5 +1,5 @@
 dnl Process this file with autoconf to produce a configure script.
-AC_INIT([lrzsz],[0.13.0-alpha])
+AC_INIT([lrzsz],[0.13.0-beta])
 AC_CONFIG_SRCDIR([src/crctab.c])
 AM_INIT_AUTOMAKE(foreign)
 AC_CONFIG_HEADERS(config.h)
