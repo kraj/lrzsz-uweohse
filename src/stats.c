@@ -112,7 +112,6 @@ write_stats_line(FILE *out, struct lrzsz_stat *st, bool forone)
     if (dur>0) {
         fprintf(out," dur=%.3f",dur);
         fprintf(out," bps=%.3f",(8.0*st->total_message_bytes)/dur);
-        fprintf(out," brutto-bps=%.3f",(8.0*st->net_bytes_in)/dur);
     }
 
     if (0==tcgetattr(0,&tty)) {
@@ -191,6 +190,31 @@ stats_account_one(void)
     for (i = 0; i < sizeof(stat_for_all); ++i) fprintf(stderr,"%02X ", todump[i]);
     fprintf(stderr,"\n");
 #endif
+}
+
+void
+stats_account_finalize_file(void)
+{
+    TRANSFER(valid_messages);
+    TRANSFER(invalid_messages);
+    TRANSFER(out_of_sync_messages);
+    TRANSFER(format_errors);
+
+    TRANSFER(cancels);
+    TRANSFER(timeouts);
+    TRANSFER(too_many_errors);
+
+    TRANSFER(files_ok);
+    TRANSFER(files_err);
+    TRANSFER(local_errors);
+    TRANSFER(policy_rejects);
+    TRANSFER(skipped);
+
+    TRANSFER(total_message_bytes);
+    TRANSFER(net_read_ops);
+    TRANSFER(net_bytes_in);
+    TRANSFER(net_write_ops);
+    TRANSFER(net_bytes_out);
 }
 
 void
