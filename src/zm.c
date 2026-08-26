@@ -82,12 +82,12 @@ frametype_to_string(unsigned int type)
 
 #define badcrc _("Bad CRC")
 /* static char *badcrc = "Bad CRC"; */
-static inline int noxrd7 (void);
-static inline int zdlread (void);
+static inline LRZSZ_ALWAYS_INLINE int noxrd7 (void);
+static inline LRZSZ_ALWAYS_INLINE int zdlread (void);
 static int zdlread2 (int);
-static inline int zgeth1 (void);
+static inline LRZSZ_ALWAYS_INLINE int zgeth1 (void);
 static void zputhex (unsigned int c, unsigned char *pos);
-static inline int zgethex (void);
+static int zgethex (void);
 static int zrbhdr (unsigned char *hdr);
 static int zrbhdr32 (unsigned char *hdr);
 static int zrhhdr (unsigned char *hdr);
@@ -148,7 +148,7 @@ zgeth1(void)
 }
 
 /* Decode two lower case hex digits into an 8 bit byte value */
-static inline int
+static int
 zgethex(void)
 {
 	int c;
@@ -413,6 +413,7 @@ zshhdr(int type, unsigned char *hdr)
 		s[len++]=XON;
 	}
 	fwrite(s, 1, len, stdout);
+	stat_for_file.net_bytes_out += len;
 	flushmo();
 }
 
