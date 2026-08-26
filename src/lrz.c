@@ -533,6 +533,7 @@ main(int argc, char *argv[])
 		else
 			fputs(_("Transfer complete\n"),stderr);
 	}
+        stats_account_finalize_file();
         stats_log(&stat_for_all,false);
         stats_journal_close();
 	exit(exitcode);
