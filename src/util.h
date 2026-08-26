@@ -19,6 +19,12 @@
 #  define LRZSZ_FORMAT_PRINTF(fmt, arg)
 #endif
 
+#if defined(__GNUC__) || defined(__clang__)
+#  define LRZSZ_ALWAYS_INLINE __attribute__((always_inline))
+#else
+#  define LRZSZ_ALWAYS_INLINE
+#endif
+
 extern const char * lrzsz_progname;
 void lrzsz_set_progname (const char * str, const char *who);
 
