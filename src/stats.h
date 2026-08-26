@@ -37,6 +37,7 @@ extern struct lrzsz_stat stat_for_file;
 extern struct lrzsz_stat stat_for_all;
 
 void stats_account_one(void);
+void stats_account_finalize_file(void);
 void stats_start_one(void);
 void stats_log(struct lrzsz_stat *st, bool forone);
 void stats_set_filename(const char *);
