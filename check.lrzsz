@@ -1497,6 +1497,13 @@ zmanage() {
     cp $all_256_file $testdir/$key/
     doit "$key" "lsz sending to lrz (received initialized)" "$SZ -q" "$RZ -q -E" "$testdir/$key/all256.bin.0" $all_256_file
 
+    # -E with two pre-existing collision names: must escalate to .1
+    key="zmodem-lsz-lrz-MGMT-ZMCHNG-escalate"
+    mkdir "$testdir/$key"
+    cp $all_256_file $testdir/$key/all256.bin
+    cp $all_256_file $testdir/$key/all256.bin.0
+    doit "$key" "lsz -E sending to lrz picks all256.bin.1 when .0 is taken" "$SZ -q -E" "$RZ -q" "$testdir/$key/all256.bin.1" $all_256_file
+
     # there also is this:
     # define ZF1_ZMSKNOLOC   0x80 /* Skip file if not present at rx */ (alternatively written as ZF1ZMSKNOLOC)
     # lrzsz sets this if lsz is given the -Y (overwrite or skip) option.

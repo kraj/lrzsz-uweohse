@@ -1018,17 +1018,16 @@ do_crc_check(FILE *f, size_t remote_bytes, size_t check_bytes)
  *
  * @return FILE *|NULL
  */
-static FILE *
-safe_open(const char *path, const char *mode, enum safe_mkdir mkdir_ok)
+/*
+ * Map fopen-style mode strings to open() flags.
+ */
+static int
+fopen_mode_to_flags(const char *mode)
 {
     int flags = 0;
-    int dirfd;
-    int fd;
-    int saved_errno;
-    FILE *fp;
-    const char *p = mode;
+    const char *p;
 
-    for (; *p; p++) {
+    for (p = mode; *p; p++) {
         switch (*p) {
             case 'r':
                 flags |= O_RDONLY;
@@ -1047,14 +1046,37 @@ safe_open(const char *path, const char *mode, enum safe_mkdir mkdir_ok)
                 break;
         }
     }
-    flags |= O_NOFOLLOW;
+    return flags;
+}
+
+/*
+ * Open path (relative to the CWD) without following symlinks.
+ * Walks intermediate components with openat(); the final component
+ * is opened with extra_flags ored in (caller supplies O_CREAT etc.).
+ * Returns an fd, or -1 with errno set.
+ * - O_NOFOLLOW prevents the final path component from being a symlink;
+ * - every intermediate directory component is opened with O_DIRECTORY|O_NOFOLLOW,
+ *   so a symlinked directory component fails instead of being followed
+ * - with mkdir_ok, missing intermediate directories are created via mkdirat().
+ * This is complicated, but race free.
+ *
+ * @return fd, -1 on error
+ */
+static int
+safe_open_fd(const char *path, int open_flags, enum safe_mkdir mkdir_ok)
+{
+    int dirfd;
+    int fd;
+    int saved_errno;
+
+    open_flags |= O_NOFOLLOW;
 
     if (path[0] == '/')
-        return NULL; /* absolute paths are rejected by checkpath() */
+        return -1; /* absolute paths are rejected by checkpath() */
 
     dirfd = open(".", O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
     if (dirfd < 0)
-        return NULL;
+        return -1;
 
     {
         /* walk intermediate components with openat(), creating them if asked */
@@ -1078,7 +1100,7 @@ safe_open(const char *path, const char *mode, enum safe_mkdir mkdir_ok)
             if (fd < 0) {
                 close(dirfd);
                 free(tmp);
-                return NULL; /* ELOOP: symlinked component; ENOENT; ... */
+                return -1; /* ELOOP: symlinked component; ENOENT; ... */
             }
             close(dirfd);
             dirfd = fd;
@@ -1089,27 +1111,83 @@ safe_open(const char *path, const char *mode, enum safe_mkdir mkdir_ok)
             close(dirfd);
             free(tmp);
             errno = EISDIR;
-            return NULL;
+            return -1;
         }
         if (last[0] == '.' && (last[1] == '\0' ||
                                (last[1] == '.' && last[2] == '\0'))) {
             close(dirfd);
             free(tmp);
             errno = EACCES;
-            return NULL;
+            return -1;
         }
-        fd = openat(dirfd, last, flags, 0666);
+        fd = openat(dirfd, last, open_flags, 0666);
         saved_errno = errno;
         close(dirfd);
         free(tmp);
         errno = saved_errno;
-        if (fd < 0)
-            return NULL;
+        return fd;
     }
+}
 
+static FILE *
+safe_open(const char *path, const char *mode, enum safe_mkdir mkdir_ok)
+{
+    int fd;
+    FILE *fp;
+
+    fd = safe_open_fd(path, fopen_mode_to_flags(mode), mkdir_ok);
+    if (fd < 0)
+        return NULL;
     fp = fdopen(fd, mode);
     if (!fp)
         close(fd);
+    return fp;
+}
+
+/*
+ * Atomically claim a free "name.N" (N = 0..999) for ZMCHNG rename,
+ * creating it with O_CREAT|O_EXCL (race free: no stat-then-use).
+ * Returns a FILE* open for writing, and the claimed name in *claimed
+ * (xmalloc'ed). On failure returns NULL: errno==EEXIST means all 1000
+ * names are taken (policy reject), anything else is a local error.
+ */
+static FILE *
+claim_rename_target(const char *name, char **claimed)
+{
+    size_t newnamelen = strlen(name) + 5;
+    char *tmpname = xmalloc(newnamelen);
+    int i;
+    int fd = -1;
+    FILE *fp;
+
+    for (i = 0; i < 1000; i++) {
+        snprintf(tmpname, newnamelen, "%s.%d", name, i);
+        fd = safe_open_fd(tmpname, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, MKDIR_NO);
+        if (fd >= 0)
+            break;
+        if (errno != EEXIST)
+            break; /* EACCES, ELOOP (symlink game), ...: give up */
+        /* name.N taken, try the next suffix */
+    }
+    if (i == 1000) {
+        errno = EEXIST; /* exhausted all suffixes */
+        free(tmpname);
+        return NULL;
+    }
+    if (fd < 0) { /* non-EEXIST error, errno preserved */
+        free(tmpname);
+        return NULL;
+    }
+    fp = fdopen(fd, "w");
+    if (!fp) {
+        int saved_errno = errno;
+        close(fd);
+        unlink(tmpname);
+        errno = saved_errno;
+        free(tmpname);
+        return NULL;
+    }
+    *claimed = tmpname;
     return fp;
 }
 
@@ -1191,12 +1269,11 @@ procheader(char *name, struct zm_fileinfo *zi)
     }
 
     /* Check for existing file */
-    if (zconv != ZCRESUM && !Rxclob && (zmanag&ZF1_ZMMASK) != ZF1_ZMCLOB 
+    if (zconv != ZCRESUM && !Rxclob && (zmanag&ZF1_ZMMASK) != ZF1_ZMCLOB
             && (zmanag&ZF1_ZMMASK) != ZF1_ZMAPND
             && (fout=safe_open(name, "r", MKDIR_NO))) {
         struct stat sta;
         char *tmpname;
-        int i;
         if (zmanag == ZF1_ZMNEW || zmanag==ZF1_ZMNEWL) {
             if (-1==fstat(fileno(fout),&sta)) {
                 int e=errno;
@@ -1246,7 +1323,6 @@ procheader(char *name, struct zm_fileinfo *zi)
             fclose(fout);
             fout = NULL;
         } else {
-            size_t newnamelen;
             fclose(fout);
             fout = NULL;
             if ((zmanag & ZF1_ZMMASK)!=ZF1_ZMCHNG) {
@@ -1255,21 +1331,18 @@ procheader(char *name, struct zm_fileinfo *zi)
                     vstringf(_("file exists, skipped: %s\n"),name);
                 return ERROR;
             }
-            /* try to rename */
-            newnamelen=strlen(name)+5;
-            tmpname = xmalloc(newnamelen);
-            i=0;
-            do {
-                snprintf(tmpname,newnamelen, "%s.%d",name,i++);
-            } while (i<1000 && stat(tmpname,&sta)==0);
-            if (i==1000) {
-                stat_for_file.policy_rejects+=1;
-                return ERROR;
-            }
-            if (errno != ENOENT) {
-                stat_for_file.local_errors+=1;
-                if (Verbose)
-                    vstringf(_("cannot check %s: %s\n"),tmpname,strerror(errno));
+            /* try to rename: atomically claim "name.N" via O_CREAT|O_EXCL
+             * (no stat-then-use race), keeping the claimed file open */
+            fout = claim_rename_target(name, &tmpname);
+            if (!fout) {
+                if (errno == EEXIST) {
+                    /* all 1000 names taken */
+                    stat_for_file.policy_rejects+=1;
+                } else {
+                    stat_for_file.local_errors+=1;
+                    if (Verbose)
+                        vstringf(_("cannot claim %s.N: %s\n"),name,strerror(errno));
+                }
                 return ERROR;
             }
             free(name_static);
@@ -1278,6 +1351,9 @@ procheader(char *name, struct zm_fileinfo *zi)
         }
     }
 
+    /* if a rename target was claimed, the final name is already fixed;
+     * don't run the CP/M and lower-case transformations on it */
+    if (!fout) {
     if (!*nameend) {		/* File coming from CP/M system */
         for (p=name_static; *p; ++p)		/* change / to _ */
             if ( *p == '/')
@@ -1290,6 +1366,7 @@ procheader(char *name, struct zm_fileinfo *zi)
     if (!zmodem_requested && MakeLCPathname && !IsAnyLower(name_static)
             && !(zi->mode&UNIXFILE))
         uncaps(name_static);
+    }
 
     if (protocol==ZM_XMODEM)
         /* we don't have the filename yet */
@@ -1307,12 +1384,17 @@ procheader(char *name, struct zm_fileinfo *zi)
     checkpath(name_static);
         if (Nflag)
         {
-                /* cast because we might not have a prototyp for strdup :-/ */
+                /* write to /dev/null instead; if a rename target was claimed
+                 * already, discard it */
+                if (fout) {
+                        fclose(fout);
+                        fout=NULL;
+                }
                 free(name_static);
                 name_static=xstrdup("/dev/null");
         }
 
-        if (Thisbinary && zconv==ZCRESUM) {
+        if (!fout && Thisbinary && zconv==ZCRESUM) {
                 struct stat st;
                 fout = safe_open(name_static, "r+", MKDIR_NO);
                 if (fout && 0==fstat(fileno(fout),&st))
@@ -1352,12 +1434,15 @@ procheader(char *name, struct zm_fileinfo *zi)
                         fout=NULL;
                 }
         }
+        /* fout can already be open here: claim_rename_target() claimed
+         * and created "name.N" atomically; reuse that file. */
 #ifdef ENABLE_MKDIR
-        if (Restricted < 2)
+        if (!fout && Restricted < 2)
                 fout = safe_open(name_static, openmode, MKDIR_OK);
         else
 #endif
-        fout = safe_open(name_static, openmode, MKDIR_NO);
+        if (!fout)
+                fout = safe_open(name_static, openmode, MKDIR_NO);
         if ( !fout)
         {
                 int e=errno;
