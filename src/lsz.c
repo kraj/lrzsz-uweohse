@@ -1083,10 +1083,15 @@ wctx(struct zm_fileinfo *zi)
 	vfile("wctx:file length=%ld", (long) zi->bytes_total);
 
 	while ((firstch=READLINE_PF(Rxtimeout))!=NAK && firstch != WANTCRC
-	  && firstch != WANTG && firstch!=TIMEOUT && firstch!=CAN)
+	  && firstch != WANTG && firstch!=TIMEOUT && firstch!=CAN
+	  && firstch!=ERROR && firstch!=RCDO)
 		;
 	if (firstch==CAN) {
 		zperr(_("Receiver Cancelled"));
+		return ERROR;
+	}
+	if (firstch==ERROR || firstch==RCDO) {
+		zperr(_("Line dropped"));
 		return ERROR;
 	}
 	if (firstch==WANTCRC)
@@ -1105,19 +1110,24 @@ wctx(struct zm_fileinfo *zi)
 	}
 	fclose(input_f);
 	attempts=0;
-	do {
+	for (;;) {
 		purgeline(io_mode_fd);
 		sendline(EOT);
 		flushmo();
 		++attempts;
-	} while (READLINE_PF(Rxtimeout) != ACK && attempts < RETRYMAX);
-	if (attempts == RETRYMAX) {
-		zperr(_("No ACK on EOT"));
-                stat_for_file.too_many_errors++;
-		return ERROR;
+		firstch = READLINE_PF(Rxtimeout);
+		if (firstch == ACK)
+			return OK;
+		if (firstch == ERROR || firstch == RCDO) {
+			zperr(_("Line dropped"));
+			return ERROR;
+		}
+		if (attempts >= RETRYMAX)
+			break;
 	}
-	else
-		return OK;
+	zperr(_("No ACK on EOT"));
+	stat_for_file.too_many_errors++;
+	return ERROR;
 }
 
 static int
@@ -1197,6 +1207,10 @@ cancan:
 			Lastrx = firstch;
 			if ((firstch = READLINE_PF(Rxtimeout)) == TIMEOUT)
 				break;
+			if (firstch == ERROR || firstch == RCDO) {
+				zperr(_("Line dropped"));
+				return ERROR;
+			}
 			if (firstch == NAK || firstch == WANTCRC)
 				goto gotnak;
 			if (firstch == CAN && Lastrx == CAN) {
@@ -1760,10 +1774,10 @@ zsendfdata (struct zm_fileinfo *zi)
 
 		while (fd_readable (io_mode_fd)) {
                         c=READLINE_PF(1);
-                        if (TIMEOUT == c) {
+                        if (TIMEOUT == c || ERROR == c || RCDO == c) {
                             goto gotack; /* does error handling */
                         }
-                
+
 			switch (c) {
 			case CAN:
 			case ZPAD:
@@ -1900,7 +1914,7 @@ zsendfdata (struct zm_fileinfo *zi)
 		fflush (stdout);
 		while (fd_readable (io_mode_fd)) {
                         c=READLINE_PF(1);
-                        if (TIMEOUT == c) {
+                        if (TIMEOUT == c || ERROR == c || RCDO == c) {
                             goto gotack; /* does error handling */
                         }
 			switch (c) {

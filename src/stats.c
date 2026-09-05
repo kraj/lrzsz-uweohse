@@ -115,6 +115,7 @@ write_stats_line(FILE *out, struct lrzsz_stat *st, bool forone)
     OUT(net_read_ops,"net_read_ops");
     OUTLL(net_bytes_out,"net_bytes_out");
     OUT(net_write_ops,"net_write_ops");
+    OUT(net_errors,"net_errors");
     if (dur>0) {
         fprintf(out," dur=%.3f",dur);
         fprintf(out," bps=%.3f",(8.0*st->total_message_bytes)/dur);
@@ -190,6 +191,7 @@ stats_account_one(void)
     TRANSFER(net_bytes_in); 
     TRANSFER(net_write_ops); 
     TRANSFER(net_bytes_out); 
+    TRANSFER(net_errors); 
 
 #if debug_stats
     fprintf(stderr,"all1: ");
@@ -221,6 +223,7 @@ stats_account_finalize_file(void)
     TRANSFER(net_bytes_in);
     TRANSFER(net_write_ops);
     TRANSFER(net_bytes_out);
+    TRANSFER(net_errors);
 }
 
 void

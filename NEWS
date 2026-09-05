@@ -104,6 +104,8 @@ if you use lrz to receive files from not perfectly trustworthy senders.
 
   Expect interoperability problems when transferring files of that size. 
 
+* both main programs now can write a journal.
+
 * lrz has a new option -A --segmentsize NNN. This turns on `Segmented 
   Streaming' if the sender supports it. This ZMODEM feature was originally 
   intended to allow transfers to machines unable to do overlapping serial 

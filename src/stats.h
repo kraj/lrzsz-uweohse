@@ -21,7 +21,7 @@ struct lrzsz_stat {
     unsigned long cancels; /* a transfer was cancelled after one side began to send data. */
 
     /* general error handling */
-    unsigned long timeouts; /* timeout, read error */
+    unsigned long timeouts; /* timeout */
     unsigned long too_many_errors; /* some operation failed because of that */
 
     /* counters */
@@ -30,6 +30,7 @@ struct lrzsz_stat {
     unsigned long net_read_ops;
     unsigned long long net_bytes_out;
     unsigned long net_write_ops;
+    unsigned long net_errors; /* read errors and hangups on the transfer line */
 
     char direction; /* 'r' = receive (lrz), 's' = send (lsz) */
 };

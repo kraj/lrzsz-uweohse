@@ -830,7 +830,7 @@ wcrx(struct zm_fileinfo *zi)
 static int
 wcgetsec(size_t *Blklen, char *rxbuf, unsigned int maxtime)
 {
-    int checksum, wcj, firstch;
+    int checksum, wcj, firstch, c;
     unsigned short oldcrc;
     char *p;
     int sectcurr;
@@ -888,7 +888,8 @@ fprintf(stderr,"sector number garbled %d+%d=%d\n",sectcurr,oldcrc, sectcurr+oldc
             }
         }
         /* make sure eot really is eot and not just mixmash */
-        else if (firstch==EOT && READLINE_PF(1)==TIMEOUT)
+        else if (firstch==EOT
+                 && ((c = READLINE_PF(1)) == TIMEOUT || c == RCDO))
             return WCEOT;
         else if (firstch==CAN) {
             if (Lastrx==CAN) {
@@ -914,7 +915,9 @@ humbug:
         Lastrx=0;
         {
             int cnt=1000;
-            while(cnt-- && READLINE_PF(1)!=TIMEOUT)
+            int dc;
+            /* drain garbage, but give up immediately if the line is gone */
+            while(cnt-- && (dc=READLINE_PF(1))!=TIMEOUT && dc!=ERROR && dc!=RCDO)
                 ;
         }
         if (Firstsec) {
