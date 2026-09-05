@@ -1533,27 +1533,64 @@ zmanage() {
     doit "$key" "lsz sending 0777 file to lrz keeps group/other bits off" "$SZ -q" "$RZ -q" mode_cmp $testdir/mode777.bin x
 
     #
-    # sender's pathnames must never escape the receiving directory. lrz's checkpath() shall reject such names; safe_open() confines
-    # to the CWD. The canaries live outside $key (the receiving directory); nothing may be written there, and nothing in $key either.
+    # A sender's pathnames must never escape the receiving directory:
+    # checkpath() rejects traversing names, safe_open() confines resolution
+    # to the CWD. The canaries live outside $key (the receiving directory);
+    # a pristine copy makes "canary modified" detectable even if the attacker
+    # (a buggy lrz) merely rewrites the file with the same size.
     #
+    # Note: the sender runs with cwd=$testdir, the receiver with cwd=$key.
+    # To make lsz transmit a name that lrz would have to resolve upwards,
+    # the sender is wrapped so its cwd is $key, too — the source then is
+    # "../escape-target.bin" (= the canary) and -f makes lsz transmit that
+    # literal name.
     key="zmodem-lsz-lrz-MGMT-traversal-dotdot"
     mkdir "$testdir/$key"
-    touch $testdir/escape-target.bin # the victim outside the receiver dir
-    doit "$key" "lsz sending ../escape-target.bin to lrz must fail" "$SZ -q" "$RZ -q" missing ../escape-target.bin
-    if test -s "$testdir/escape-target.bin" ; then
+    cp $all_256_file $testdir/escape-target.bin   # canary == sender's source
+    cp $all_256_file $testdir/escape-target.pristine
+    # sender with cwd=$key: lsz must open ../escape-target.bin and, with -f,
+    # transmits that literal name. doit() expands $sz unquoted, so we cannot
+    # nest shell quotes here; generate a small wrapper script instead.
+    cat > $testdir/run-traversal-sender.sh <<SEOF
+#! /bin/sh
+cd '$testdir/$key' || exit 1
+# ignore any arguments doit() appends; the payload name must be ../escape-target.bin
+exec $SZ -q -f ../escape-target.bin
+SEOF
+    chmod +x $testdir/run-traversal-sender.sh
+    # files arg: relative to $testdir (the harness's cwd), so doit()'s
+    # transfer-size bookkeeping can stat it; the receiver-side "missing"
+    # check below uses its basename inside $key, as always.
+    doit "$key" "lsz sending ../escape-target.bin to lrz must fail" \
+        "$testdir/run-traversal-sender.sh" \
+        "$RZ -q" missing escape-target.bin
+    if cmp -s $testdir/escape-target.bin $testdir/escape-target.pristine ; then
+        :
+    else
         echo "$key: canary outside the receiving directory was modified"
         echo "summary: $key FAILED (canary modified)" >>$testdir/failures.log
         any_failure="$any_failure $key"
     fi
-    key="zmodem-lsz-lrz-MGMT-traversal-subdir"
+    rm -f $testdir/escape-target.pristine
+
+    # A symlinked directory inside the receiving directory must not redirect
+    # file creation out of the CWD (safe_open()'s openat walk: ELOOP).
+    key="zmodem-lsz-lrz-MGMT-traversal-symlink"
     mkdir "$testdir/$key"
-    touch $testdir/outside.bin
-    doit "$key" "lsz sending sub/../../outside.bin to lrz must fail" "$SZ -q" "$RZ -q" missing sub/../../outside.bin
-    if test -s "$testdir/outside.bin" ; then
+    mkdir "$testdir/sub"
+    cp $all_256_file $testdir/sub/escape-target.bin
+    cp $all_256_file $testdir/escape-target.pristine
+    ln -s .. $testdir/$key/sub
+    doit "$key" "lsz sending sub/escape-target.bin through a symlinked dir must fail" \
+        "$SZ -q -f sub/escape-target.bin" "$RZ -q" missing sub/escape-target.bin
+    if cmp -s $testdir/sub/escape-target.bin $testdir/escape-target.pristine ; then
+        :
+    else
         echo "$key: canary outside the receiving directory was modified"
         echo "summary: $key FAILED (canary modified)" >>$testdir/failures.log
         any_failure="$any_failure $key"
     fi
+    rm -f $testdir/escape-target.pristine
 }
 
 
