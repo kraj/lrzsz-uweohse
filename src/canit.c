@@ -29,24 +29,38 @@
 #include <errno.h>
 
 /* send cancel string to get the other end to shut up */
+static void
+write_all(int fd, const char *buf, size_t len)
+{
+	size_t off;
+
+	off = 0;
+	while (off < len) {
+		ssize_t n = write(fd, buf + off, len - off);
+		if (n < 0) {
+			if (errno == EINTR)
+				continue;
+			/* no much we can do: ignore and hope, or exit
+			 * in any other program i'd opt for exit, but serials
+			 * ports play strange games.
+			 */
+			return;
+		}
+		off += (size_t) n; /* n > 0: short writes are completed */
+	}
+}
+
 void
 canit (int fd)
 {
-	static char canistr[] =
+	static const char canistr[] =
 	{
-		24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 0
+		24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8
 	};
 	purgeline(fd);
-	if (write(fd,canistr,strlen(canistr))<0) {
-                /* no much we can do: ignore and hope, or exit
-                 * in any other program i'd opt for exit, but serials 
-                 * ports play strange games.
-                 */
-        }
+	write_all(fd, canistr, sizeof canistr);
 	if (fd==0) {
-		if (write(1,canistr,strlen(canistr))<0) {
-                        /* no much we can do: ignore and hope, or exit */
-                }
+		write_all(1, canistr, sizeof canistr);
         }
 }
 
