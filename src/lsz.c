@@ -393,7 +393,7 @@ main(int argc, char **argv)
 			if (0==strcmp(optarg,"auto"))
 				buffersize= (size_t) -1;
 			else
-				buffersize=strtol(optarg,NULL,10);
+				buffersize=(size_t) lrzsz_strtoul( "-B / --bufsize", optarg, "km", 0, 0);
 			use_mmap=0;
 			break;
 		case 'C':
