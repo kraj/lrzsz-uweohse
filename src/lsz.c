@@ -1722,7 +1722,11 @@ zsendfdata (struct zm_fileinfo *zi)
 	static long total_sent = 0;
 	static time_t low_bps=0;
         int newcnt;
-        static int need_wait = 1;
+	/* the first data subpacket after a ZRPOS must be ZCRCW
+	 * (zmodem-current.txt §5, sender-side error recovery). Without this
+	 * reset only the FIRST file of a batch started with ZCRCW (need_wait
+	 * was static and consumed by file 1); later files started with ZCRCG. */
+        int need_wait = 1;
 
 	if (use_mmap && !mm_addr)
 	{
@@ -1750,6 +1754,7 @@ zsendfdata (struct zm_fileinfo *zi)
 	last_txpos = 0;
 	low_bps = 0;
 	not_printed = 0;
+
   somemore:
 	if (setjmp (intrjmp)) {
 	    if (play_with_sigint)
