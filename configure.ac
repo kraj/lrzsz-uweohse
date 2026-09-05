@@ -137,7 +137,6 @@ AC_TYPE_SIZE_T
 AC_TYPE_MODE_T
 AC_TYPE_OFF_T
 LRZSZ_TYPE_SPEED_T
-AC_CHECK_TYPES([bool],[], [], [[#include <stdbool.h>]])
 
 AC_CHECK_HEADERS_ONCE([sys/time.h])
 

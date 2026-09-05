@@ -29,10 +29,6 @@
 #include <stdarg.h>
 #include <stdbool.h>
 
-#ifndef HAVE_BOOL
-#define bool int
-#endif
-
 #  include <sys/time.h>
 #  include <time.h>
 #  define INCLUDED_SYS_TIME
