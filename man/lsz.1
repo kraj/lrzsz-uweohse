@@ -188,6 +188,11 @@ Start with 4KB blocksize. Like --try-4k.
 Convert NL characters in the transmitted file to CR/LF.
 This is done by the sender for XMODEM and YMODEM, by the receiver
 for ZMODEM.
+
+Deprecated: for ZMODEM this requests the historic ZCNL conversion,
+which current ZMODEM documentation marks as deprecated. It is kept
+for compatibility with old peers; new setups should use binary
+transfer.
 .TP
 .B "-b, --binary"
 (ZMODEM) Binary override: transfer file without any translation.

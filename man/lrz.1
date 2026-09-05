@@ -151,6 +151,12 @@ Convert files to
 .SM Unix
 conventions by stripping carriage returns and all characters
 beginning with the first Control Z (CP/M end of file).
+
+Deprecated: this uses the ZCNL file conversion option, which current
+ZMODEM documentation marks as historic and recommends against. ASCII
+conversion also makes a transfer impossible to resume. It is kept for
+compatibility with 40 year old peers, but new setups should transfer
+in binary mode and convert locally if needed.
 .TP
 .B "-A, --segmentsize NNNN"
 Tell the sender to turn on `Segmented Streaming' with a buffer / window

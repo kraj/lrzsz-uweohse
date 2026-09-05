@@ -386,7 +386,9 @@ main(int argc, char **argv)
 			start_blklen=4096;
 			max_blklen=4096;
 			break;
-		case 'a': Lzconv = ZCNL; Ascii = true; break;
+		case 'a': /* deprecated: ZCNL is marked historic by the current
+			   * ZMODEM documentation; kept for old peers */
+			Lzconv = ZCNL; Ascii = true; break;
 		case 'b': Lzconv = ZCBIN; break;
 		case 'B':
 			if (0==strcmp(optarg,"auto"))

@@ -1248,6 +1248,10 @@ procheader(char *name, struct zm_fileinfo *zi)
     /*
      *  Process ZMODEM remote file management requests
      */
+    /* NOTE: zconv == ZCNL (2) is honored below for compatibility with
+     * 40 year old peers, although the current ZMODEM documentation says
+     * a receiver MUST assume ZCBIN for anything but ZCBIN/ZCRESUM.
+     * See man page -a/--ascii: deprecated. */
     if (!Rxbinary && zconv == ZCNL)	/* Remote ASCII override */
         Thisbinary = 0;
     if (zconv == ZCBIN)	/* Remote Binary override */

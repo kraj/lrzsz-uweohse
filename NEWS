@@ -117,6 +117,12 @@ if you use lrz to receive files from not perfectly trustworthy senders.
   in XMODEM mode, as they always were. The -D / --null option now also
   works in XMODEM mode.
 
+* the ASCII conversion option (-a / --ascii, ZMODEM ZCNL conversion) is
+  deprecated. The current ZMODEM documentation marks ZCNL as historic
+  and says a receiver must assume binary transfer for it, and a transfer
+  using it cannot be resumed. lrzsz keeps the feature for compatibility
+  with old peers; it will likely be removed in a future release.
+
 * lrz has a new option -A --segmentsize NNN. This turns on `Segmented 
   Streaming' if the sender supports it. This ZMODEM feature was originally 
   intended to allow transfers to machines unable to do overlapping serial 
