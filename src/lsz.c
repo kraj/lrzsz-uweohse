@@ -1726,7 +1726,9 @@ zsendfdata (struct zm_fileinfo *zi)
 	 * (zmodem-current.txt §5, sender-side error recovery). Without this
 	 * reset only the FIRST file of a batch started with ZCRCW (need_wait
 	 * was static and consumed by file 1); later files started with ZCRCG. */
-        int need_wait = 1;
+	/* volatile: modified and read across the setjmp(intrjmp)/longjmp pair;
+	 * without it gcc -Wclobbered is right to complain. */
+        volatile int need_wait = 1;
 
 	if (use_mmap && !mm_addr)
 	{
