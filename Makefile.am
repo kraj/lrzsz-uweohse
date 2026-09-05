@@ -17,7 +17,7 @@ QUICKCHECKS=xmodem-lsz-lrz-16k-binary xmodem-lsz-lrz-large-binary-1k-crc zmodem-
 SUPPORTED_C_STANDARDS=@SUPPORTED_C_STDS@
 SUPPORTED_COMPILERS=gcc clang
 buildcheck:
-	for cc in $(SUPPORTED_COMPILERS) ; do if type -p "$$cc" >/dev/null ; then \
+	for cc in $(SUPPORTED_COMPILERS) ; do if command -v "$$cc" >/dev/null ; then \
 		for std in $(SUPPORTED_C_STANDARDS) ; do \
 			echo "running clean/configure/make with CC=$$cc --enable-std=$$std"; \
 			make -s V=0 clean >/dev/null ; \
@@ -27,7 +27,7 @@ buildcheck:
 	fi ; done ; \
         make -s V=0 clean >/dev/null
 buildcheck+:
-	for cc in $(SUPPORTED_COMPILERS) ; do if type -p "$$cc" >/dev/null ; then \
+	for cc in $(SUPPORTED_COMPILERS) ; do if command -v "$$cc" >/dev/null ; then \
 		for std in $(SUPPORTED_C_STANDARDS) ; do \
 			echo "running clean/configure/make/vcheck with CC=$$cc --enable-std=$$std"; \
 			make -s V=0 clean >/dev/null ; \
@@ -85,7 +85,7 @@ SANITIZERS = asan msan ubsan
 $(SANITIZERS): CC_LIST = clang gcc
 msan: CC_LIST = clang
 $(SANITIZERS): %: src/*.c src/*.h
-	for i in $(CC_LIST) ; do if type -p "$$i" >/dev/null ; then \
+	for i in $(CC_LIST) ; do if command -v "$$i" >/dev/null ; then \
 		echo "running clean/configure/vcheck with $$i --enable-$@"; \
 		make -s V=0 clean >/dev/null ; \
 		./configure CC="$$i" -q --enable-$@ || exit 1 ; \
@@ -100,7 +100,7 @@ coverage/coverage.html: src/*.c src/*.h
 	./configure --enable-coverage -q
 	make -s V=0 -j 4
 	make -s V=0 vcheck
-	type -p "gcovr" && gcovr --html-details --output coverage/coverage.html src/
+	if command -v "gcovr" >/dev/null; then gcovr --html-details --output coverage/coverage.html src/; else echo "gcovr not found, no coverage report"; fi
 	./configure -q
 	make -s V=0 clean
 	make -s V=0 -j 4
