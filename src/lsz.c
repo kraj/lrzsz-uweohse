@@ -1960,9 +1960,11 @@ zsendfdata (struct zm_fileinfo *zi)
 		signal (SIGINT, SIG_IGN);
 
 	for (;;) {
+		int got;
 		stohdr (zi->bytes_sent);
 		zsbhdr (ZEOF, Txhdr);
-		switch (getinsync (zi, 0)) {
+		got = getinsync (zi, 0);
+		switch (got) {
 		case ZACK:
 			continue;
 		case ZRPOS:
@@ -1976,14 +1978,14 @@ zsendfdata (struct zm_fileinfo *zi)
 			}
 			DO_SYSLOG((LOG_INFO, "%s/%s: got ZSKIP",
 					   shortname, protname()));
-			return c;
+			return ZSKIP;
 		default:
 			if (input_f) {
 				fclose (input_f);
 				input_f=NULL;
 			}
 			DO_SYSLOG((LOG_INFO, "%s/%s: got %d",
-					   shortname, protname(), c));
+					   shortname, protname(), got));
 			return ERROR;
 		}
 	}
