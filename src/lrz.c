@@ -1724,12 +1724,12 @@ again:
 			 * - sender receives TESCCTL and uses "|=..."
 			 * so: sz escapes, but rz doesn't unescape ... not good.
 			 */
-			Zctlesc |= TESCCTL & Rxhdr[ZF0];
-			if (zrdata(Attn, ZATTNLEN,&bytes_in_block) == GOTCRCW) {
-				stohdr(1L);
-				zshhdr(ZACK, Txhdr);
-				goto again;
-			}
+ 			Zctlesc |= TESCCTL & Rxhdr[ZF0];
+ 			if (zrdata(Attn, ZATTNLEN,&bytes_in_block) == GOTCRCW) {
+ 				stohdr(0L); /* ZACK to a ZSINIT must carry 0 (see zmodem-current.txt §4) */
+ 				zshhdr(ZACK, Txhdr);
+ 				goto again;
+ 			}
 			zshhdr(ZNAK, Txhdr);
 			goto again;
 		case ZFREECNT:
