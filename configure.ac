@@ -87,7 +87,7 @@ if test "$have_std" != "no" ; then
     AX_APPEND_COMPILE_FLAGS(-std=$have_std, [LRZSZ_CFLAGS])
 fi
 
-AX_APPEND_COMPILE_FLAGS([ -fforce-addr -falign-loops=2 -falign-jumps=2 -falign-functions=2 -g3], [LRZSZ_CFLAGS])
+AX_APPEND_COMPILE_FLAGS([ -g3], [LRZSZ_CFLAGS])
 AX_APPEND_COMPILE_FLAGS([ -Wunused-result -Wpedantic -Wcast-qual -Wmissing-braces -Wcomments -Wformat], [WARN_CFLAGS])
 dnl that one does not take #ifdefs into account:
 AX_APPEND_COMPILE_FLAGS([ -Wno-pre-c23-compat], [WARN_CFLAGS])
