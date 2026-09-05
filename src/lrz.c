@@ -888,7 +888,6 @@ get2:
             }
             else {
                 stat_for_file.format_errors+=1;
-fprintf(stderr,"sector number garbled %d+%d=%d\n",sectcurr,oldcrc, sectcurr+oldcrc);
                 zperr(_("Sector number garbled"));
             }
         }
