@@ -148,7 +148,6 @@ AC_STRUCT_TM
 AC_CHECK_TYPES([struct utimbuf], [], [], [[#include <utime.h>]])
 
 AC_CHECK_FUNCS(gettimeofday sigaction getopt_long fseeko)
-AC_REPLACE_FUNCS(stpcpy)
 
 dnl O_NOFOLLOW is POSIX.1-2008; this is to provide fallback for ancient systems.
 AH_TEMPLATE([HAVE_O_NOFOLLOW],
@@ -173,8 +172,7 @@ AM_GNU_GETTEXT_REQUIRE_VERSION([0.23])
 
 dnl AC_DEFINE_UNQUOTED(LOCALEDIR,"$prefix/$DATADIRNAME","Description… autoheader wants this")
 
-AC_CONFIG_FILES([Makefile lib/Makefile \
-man/Makefile po/Makefile.in src/Makefile Specfile])
+AC_CONFIG_FILES([Makefile man/Makefile po/Makefile.in src/Makefile Specfile])
 AC_CONFIG_COMMANDS([default],[
 test -z "$CONFIG_HEADERS" || echo timestamp > stamp-h],[])
 AC_OUTPUT

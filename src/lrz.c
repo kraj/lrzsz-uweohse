@@ -41,7 +41,6 @@
 #endif
 
 #include "timing.h"
-#include "long-options.h"
 
 #ifndef HAVE_O_NOFOLLOW
 #define O_NOFOLLOW 0

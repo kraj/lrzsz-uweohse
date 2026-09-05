@@ -35,7 +35,6 @@
 #include <sys/mman.h>
 
 #include "timing.h"
-#include "long-options.h"
 
 #ifndef R_OK
 #  define R_OK 4

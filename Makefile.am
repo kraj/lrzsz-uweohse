@@ -1,4 +1,4 @@
-SUBDIRS = lib src po man
+SUBDIRS = src po man
 EXTRA_DIST = m4/ChangeLog check.lrzsz COMPATABILITY README.cvs README.isdn4linux \
 	README.tests \
 	doc/README doc/zmodem-forsberg.txt doc/zmodem-zmtx-zmrx.txt doc/zmodem-current.txt doc/zmodemsnif.txt
