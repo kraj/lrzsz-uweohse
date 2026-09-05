@@ -29,7 +29,13 @@ fprintf_sanitized(FILE *out, const char *s)
 void
 stats_set_filename(const char *fn)
 {
-    stat_for_file.filename=strdup(fn);
+    /* free a previous name, if any: the caller may set a new name without
+     * accounting (stats_account_one frees it, but is not always called) */
+    if (stat_for_file.filename) {
+        free(stat_for_file.filename);
+        stat_for_file.filename=NULL;
+    }
+    stat_for_file.filename=xstrdup(fn);
 }
 
 static void
