@@ -2205,6 +2205,11 @@ getinsync(struct zm_fileinfo *zi, int flag)
 			/*  If sending to a buffered modem, you
 			 *   might send a break at this point to
 			 *   dump the modem's buffer.		 */
+			/* purge pending output: bytes already written but not
+			 * yet transmitted would only be stale data the receiver
+			 * must discard (zmodem-current.txt §5, sender-side
+			 * error recovery). No-op on pipes/ptys. */
+			tcflush(io_mode_fd, TCOFLUSH);
 			if (input_f)
 				clearerr(input_f);	/* In case file EOF seen */
 
