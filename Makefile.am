@@ -9,7 +9,7 @@ CLEAN_FILES=fastcheck.done
 ACLOCAL_AMFLAGS = -I m4
 QUICKCHECKS=xmodem-lsz-lrz-16k-binary xmodem-lsz-lrz-large-binary-1k-crc zmodem-lsz-lrz-MGMT-default-nonexisting zmodem-lsz-lrz-MGMT-ZMCRC-r \
 	zmodem-lsz-lrz-multiple zmodem-lsz-lrz-4k zmodem-lsz-lrz-8k-turbo zmodem-lsz-lrz-MGMT-mode-0666 \
-	zmodem-lsz-lrz-MGMT-traversal-dotdot
+	zmodem-lsz-lrz-MGMT-traversal-dotdot zmodem-lsz-lrz-RESUME-shrink
 
 # Note: the inofficial target is to compile on systems of up to 20 years of age.
 # We support one C standard older than that.

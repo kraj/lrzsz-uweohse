@@ -1591,6 +1591,20 @@ SEOF
         any_failure="$any_failure $key"
     fi
     rm -f $testdir/escape-target.pristine
+
+    #
+    # resume with a local file LONGER than the source: resume is impossible, the receiver must 
+    # retransmit from 0 and TRUNCATE. Without truncation the received file keeps a stale tail
+    # (which was a bug in lrzsz<0.13).
+    #
+    key="zmodem-lsz-lrz-RESUME-shrink"
+    mkdir "$testdir/$key"
+    dd if=$srcdir/src/lsz.c of=$testdir/lsz-shrunk.bin bs=256 count=5 2>&5  # 1280 bytes
+    cp $testdir/lsz-shrunk.bin $testdir/$key/lsz-shrunk.bin
+    dd if=$srcdir/src/lsz.c bs=1 skip=3000 count=200 >>$testdir/$key/lsz-shrunk.bin 2>&5 # longer!
+    doit "$key" "resuming with a shorter source must truncate the stale tail" \
+        "$SZ -rq" "$RZ -q" cmp $testdir/lsz-shrunk.bin
+    rm -f $testdir/lsz-shrunk.bin
 }
 
 

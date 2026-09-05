@@ -1423,10 +1423,18 @@ procheader(char *name, struct zm_fileinfo *zi)
                                         fout=NULL;
                                         return ERROR;
                                 }
+                                goto buffer_it;
                         }
-                        else
-                                zi->bytes_skipped=0; /* resume impossible, file has changed */
-                        goto buffer_it;
+                        else {
+                                /* resume impossible, file has changed:
+                                 * fall through to the normal open below, which
+                                 * truncates (openmode "w" -> O_TRUNC).
+                                 * Overwriting the "r+" handle without
+                                 * truncation would leave a stale tail of
+                                 * the old file if the new one is shorter. */
+                                fclose(fout);
+                                fout=NULL;
+                        }
                 }
                 zi->bytes_skipped=0;
                 if (fout) {
