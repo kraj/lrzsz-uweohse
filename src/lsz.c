@@ -623,10 +623,6 @@ main(int argc, char **argv)
 	install_signal_handler(SIGHUP);
 
 	if ( protocol!=ZM_XMODEM) {
-		if (protocol==ZM_ZMODEM) {
-			printf("rz\r");
-			fflush(stdout);
-		}
 		countem(npats, patts);
 		if (protocol == ZM_ZMODEM) {
 			/* throw away any input already received. This doesn't harm

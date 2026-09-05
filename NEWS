@@ -49,6 +49,12 @@ if you use lrz to receive files from not perfectly trustworthy senders.
   disabled in lrzsz since sometime in the 90s, by hiding it behind the 
   -C or --allow-remote-commands options.
 
+* lsz no longer sends the "rz\r" auto-download trigger. The original 
+  zmodem software sent this to make the receiving side start its rz; 
+  modern practice is to watch the data stream for a ZRQINIT frame
+  instead. This also stops lsz from writing protocol-unrelated bytes
+  to the transfer line.
+
 * the PUBDIR feature was removed from lsz and lrz.
   this feature of the restricted mode allowed uploads not only from the 
   current directory, but from the compiled in PUBDIR
