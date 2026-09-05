@@ -60,6 +60,7 @@ canit (int fd)
 	purgeline(fd);
 	write_all(fd, canistr, sizeof canistr);
 	if (fd==0) {
+		purgeline(1);
 		write_all(1, canistr, sizeof canistr);
         }
 }
