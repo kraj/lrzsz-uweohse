@@ -2251,6 +2251,17 @@ getinsync(struct zm_fileinfo *zi, int flag)
 				return ZACK;
 			continue;
 		case ZRINIT:
+			/* The receiver got the file and is ready for the next.
+                         * return ZRINIT, not ZSKIP, for correct accounting.
+                         */
+			if (input_f) {
+				fclose (input_f);
+				input_f=NULL;
+			} else if (mm_addr) {
+				munmap(mm_addr,mm_size);
+				mm_addr=NULL;
+			}
+			return ZRINIT;
 		case ZSKIP:
 			if (input_f) {
 				fclose (input_f);
