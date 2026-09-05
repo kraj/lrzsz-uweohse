@@ -427,10 +427,10 @@ main(int argc, char **argv)
                         Tframlen = (unsigned int) lrzsz_strtoul( "-l / --framelen", optarg, "ck", 32, LRZSZ_MAX_SUBPACKET_LEN);
 			break;
                 case 'm':
-                        min_bps = (unsigned int) lrzsz_strtoul( "-m / --min-pbs", optarg, "km", 0, 0);
+                        min_bps = (unsigned int) lrzsz_strtoul( "-m / --min-bps", optarg, "km", 0, 0);
 			break;
                 case 'M':
-                        min_bps_time = (unsigned int) lrzsz_strtoul( "-m / --min-pbs", optarg, "km", 1, 0);
+                        min_bps_time = (unsigned int) lrzsz_strtoul( "-M / --min-bps-time", optarg, "k", 1, 0);
 			break;
 		case 'N': Lzmanag = ZF1_ZMNEWL;  break;
 		case 'n': Lzmanag = ZF1_ZMNEW;  break;

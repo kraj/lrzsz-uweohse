@@ -323,7 +323,7 @@ main(int argc, char *argv[])
 			min_bps = lrzsz_strtoul( _("-m / --min-bps"), optarg, "km", 0, 0);
 			break;
 		case 'M':
-			min_bps_time = lrzsz_strtoul( _("-M / --min-bps-time"), optarg, "km", 1, LONG_MAX);
+ 			min_bps_time = lrzsz_strtoul( _("-M / --min-bps-time"), optarg, "k", 1, LONG_MAX);
 			break;
 		case 'N': Lzmanag = ZF1_ZMNEWL;  break;
 		case 'n': Lzmanag = ZF1_ZMNEW;  break;
