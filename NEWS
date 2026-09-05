@@ -106,6 +106,11 @@ if you use lrz to receive files from not perfectly trustworthy senders.
 
 * both main programs now can write a journal.
 
+* documented the scope of the file management options (-+, -E, -H, -n, 
+  -N, -p, -y): they apply to ZMODEM (partially to YMODEM) and are ignored 
+  in XMODEM mode, as they always were. The -D / --null option now also
+  works in XMODEM mode.
+
 * lrz has a new option -A --segmentsize NNN. This turns on `Segmented 
   Streaming' if the sender supports it. This ZMODEM feature was originally 
   intended to allow transfers to machines unable to do overlapping serial 

@@ -197,12 +197,14 @@ normally XON, XOFF, DLE, CR-@-CR, and Ctrl-X are escaped.
 .B "-E, --rename"
 Rename incoming file if target filename already exists. The new file
 name will have a dot and a number (0..999) appended.
+(ZMODEM and YMODEM only)
 .TP
 .B "-h, --help"
 give help screen.
 .TP
 .B "-H, --crc-check"
-(ZMODEM) Accept and transfer files if the file lengths and/or the CRCs
+(ZMODEM only; not usable with YMODEM, which lacks the required protocol
+exchange) Accept and transfer files if the file lengths and/or the CRCs
 differ.
 .TP
 .B "-J FILE, --journal FILE"
@@ -225,12 +227,12 @@ The timeout is per file: a slow transfer of one file does not count
 toward the next file's timeout.
 .TP
 .B "-n, --newer"
-(ZMODEM) Accept file if the destination file does not exist.
+(ZMODEM and YMODEM) Accept file if the destination file does not exist.
 Otherwise, accept the file, overwriting the destination, if the
 source file is newer than the destination file.
 .TP
 .B "-N, --newer-or-longer"
-(ZMODEM) Accept file if the destination file does not exist.
+(ZMODEM and YMODEM) Accept file if the destination file does not exist.
 Otherwise, accept the file, overwriting the destination, if the
 source file is newer or longer than the destination file.
 .TP
@@ -319,6 +321,7 @@ use XMODEM protocol.
 .TP
 .B "-y, --overwrite"
 Yes, clobber any existing files with the same name.
+(Ignored in XMODEM mode, where lrz always writes to the given pathname.)
 .TP
 .B "--ymodem"
 use YMODEM protocol.
@@ -405,6 +408,10 @@ and they often don't get that quite right.
 Pathnames are restricted to 127 characters.
 In XMODEM single file mode, the pathname given on the command line
 is still processed as described above.
+The file management options (\-+, \-E, \-H, \-n, \-N, \-p, \-y)
+are ZMODEM features (with partial YMODEM support); they are ignored
+in XMODEM mode. XMODEM always writes to the pathname given on the
+command line \- the restricted mode checks still apply.
 
 The ASCII option\'s CR/LF to NL translation merely deletes CR\'s.
 .SH "ZMODEM CAPABILITIES"

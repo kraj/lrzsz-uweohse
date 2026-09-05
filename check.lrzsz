@@ -1607,6 +1607,14 @@ SEOF
     rm -f $testdir/lsz-shrunk.bin
 
     #
+    # -D / --null in XMODEM mode: the received data goes to /dev/null,
+    # no file with the given pathname may be created.
+    #
+    key="xmodem-lrz-null"
+    doit "$key" "xmodem lrz -D does not create the file" \
+        "$SZ -q -X" "$RZ -q -b -X -D" "missing" $all_256_file
+
+    #
     # very restricted mode: an existing non-hidden file must not be overwritten, neither with 
     # ZMODEM_RESTRICTED set nor with -R on top of it. (The old code clamped neither, so when 
     # both were set, it resulted in level 3, which skipped the overwrite check). The overwrite 

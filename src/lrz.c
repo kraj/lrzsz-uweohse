@@ -653,6 +653,12 @@ wcreceive(int argc, char **argp)
 		Pathname=xstrdup(*argp);
 
                 checkpath(Pathname);
+                if (Nflag) {
+                        /* -D: write to /dev/null instead (as procheader()
+                         * does for ZMODEM/YMODEM) */
+                        free(Pathname);
+                        Pathname=xstrdup("/dev/null");
+                }
                 stats_set_filename(Pathname);
                 shortname=strrchr(*argp,'/');
                 if (shortname)
