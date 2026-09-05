@@ -302,7 +302,7 @@ main(int argc, char *argv[])
 		case '+': Lzmanag = ZF1_ZMAPND; break;
 		case 'a': Rxascii=true;  break;
                 case 'A':
-                        Segmentsize = (unsigned int) lrzsz_strtoul( "-A / --segmentsize-tries", optarg, NULL, 0, 65536);
+                        Segmentsize = (unsigned int) lrzsz_strtoul( "-A / --segmentsize", optarg, NULL, 0, 65535);
                         break;
 		case 'b': Rxbinary=true; break;
 		case 'B': 

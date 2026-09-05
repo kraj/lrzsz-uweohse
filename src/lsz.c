@@ -2041,7 +2041,7 @@ calc_blklen_worker(long total_sent)
             }
             Rxbuflen=original_rxbuflen;
             if (last_bytes_per_error <=    512000 && Rxbuflen>65536) Rxbuflen=65536;
-            if (last_bytes_per_error <=    256000 && Rxbuflen>32678) Rxbuflen=32678;
+            if (last_bytes_per_error <=    256000 && Rxbuflen>32768) Rxbuflen=32768;
             if (last_bytes_per_error <=    128000 && Rxbuflen>16384) Rxbuflen=16384;
             if (last_bytes_per_error <=     64000 && Rxbuflen> 8192) Rxbuflen= 8192;
             if (last_bytes_per_error <=     32000 && Rxbuflen> 4096) Rxbuflen= 4096;
