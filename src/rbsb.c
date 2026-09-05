@@ -272,11 +272,7 @@ void
 purgeline(int fd)
 {
 	readline_purge();
-#ifdef TCFLSH
-	ioctl(fd, TCFLSH, 0);
-#else
-	lseek(fd, 0L, 2);
-#endif
+	tcflush(fd, TCIFLUSH);
 }
 
 /* End of rbsb.c */
