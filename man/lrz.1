@@ -261,10 +261,16 @@ Quiet suppresses verbosity.
 Crash recovery mode. lrz tries to resume interrupted file transfers.
 .TP
 .B "-R, --restricted"
-Enter more restricted mode. lrz will not create directories or files
-with a leading dot if this option is given twice.
+Enter the very restricted mode. lrz will not create directories or files
+with a leading dot, and will not overwrite any existing file.
+This option always enables the very restricted mode, even if it was
+turned off or downgraded before (e.g. by
+.BR "\-U" ,
+or by combining it with the
+.B ZMODEM_RESTRICTED
+environment variable).
 
-See 
+See
 .B SECURITY
 for mode information about restricted mode.
 .TP
@@ -333,11 +339,15 @@ To use a more restricted mode set the environment variable
 or give the
 .B R
 option. This disables creation of subdirectories and invisible
-files.
+files, and overwriting existing files.
 
 Restricted mode may be turned off with the
 .B U 
 option, unless lrz runs under a restricted shell.
+The
+.B R
+option always turns the very restricted mode on, regardless of
+the order in which the options are given.
 
 .SH ENVIRONMENT
 lrz uses the following environment variables:
@@ -351,6 +361,9 @@ or
 .TP
 .B ZMODEM_RESTRICTED
 lrz enters the more restricted mode if the variable is set.
+Giving the
+.B R
+option additionally always enables the very restricted mode.
 
 .SH NOTES
 Sending serial data to timesharing minicomputers

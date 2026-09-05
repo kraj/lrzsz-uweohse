@@ -1605,6 +1605,23 @@ SEOF
     doit "$key" "resuming with a shorter source must truncate the stale tail" \
         "$SZ -rq" "$RZ -q" cmp $testdir/lsz-shrunk.bin
     rm -f $testdir/lsz-shrunk.bin
+
+    #
+    # very restricted mode: an existing non-hidden file must not be overwritten, neither with 
+    # ZMODEM_RESTRICTED set nor with -R on top of it. (The old code clamped neither, so when 
+    # both were set, it resulted in level 3, which skipped the overwrite check). The overwrite 
+    # would actually happen only with -y (ZMCLOB) — very restricted mode must refuse it, where 
+    # plain restricted mode politely skips. The victim has distinctive content, so a buggy 
+    # overwrite is detectable via cmp.
+    #
+    key="zmodem-lsz-lrz-MGMT-veryrestricted"
+    mkdir "$testdir/$key"
+    dd if=$srcdir/src/lsz.c of=$testdir/newfile.bin bs=256 count=3 2>&5
+    cp $testdir/newfile.bin $testdir/$key/newfile.bin    # the victim
+    doit "$key" "ZMODEM_RESTRICTED + -R + -y refuses to overwrite existing file" \
+        "$SZ -q -y" "env ZMODEM_RESTRICTED=1 $RZ -q -R -y" cmp $testdir/newfile.bin
+    doit "$key" "ZMODEM_RESTRICTED + -y refuses to overwrite existing file" \
+        "$SZ -q -y" "env ZMODEM_RESTRICTED=1 $RZ -q -y" cmp $testdir/newfile.bin
 }
 
 

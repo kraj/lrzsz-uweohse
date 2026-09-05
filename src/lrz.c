@@ -368,7 +368,10 @@ main(int argc, char *argv[])
 			else
 				try_resume=true;  
 			break;
-		case 'R': Restricted++;  break;
+		case 'R':
+			if (Restricted < 2)
+				Restricted=2;
+			break;
 		case 'C':
 		case 'S':
 			fprintf(stderr,
