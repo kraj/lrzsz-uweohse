@@ -1498,11 +1498,11 @@ getzrxinit(void)
 		case ZRQINIT:
 			if (Rxhdr[ZF0] == ZCOMMAND)
 				continue;
-                        stohdr(gotblock); /* debug hack */
+                        stohdr(0);
 			zshhdr(ZNAK, Txhdr);
 			continue;
 		default:
-                        stohdr(gotblock); /* debug hack */
+                        stohdr(0);
 			zshhdr(ZNAK, Txhdr);
 			continue;
 		}
@@ -2281,7 +2281,7 @@ getinsync(struct zm_fileinfo *zi, int flag)
 		case ERROR:
 		default:
 			error_count++;
-                        stohdr(gotblock); /* debug hack */
+                        stohdr(0);
 			zsbhdr(ZNAK, Txhdr);
 			continue;
 		}
