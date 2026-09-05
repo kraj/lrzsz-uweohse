@@ -50,13 +50,6 @@ SNIF="$objdir/src/zmodemsnif"
 SIMU="$objdir/src/linesimulator"
 TIMESTAMP="$objdir/src/timestamp"
 
-
-
-# generate list of testfiles 
-rm -f $objdir/null1 $objdir/null2
-touch $objdir/null1 $objdir/null2
-
-
 runlog=$testdir/run.log
 LRZSZ_JOURNAL=$testdir/journal.log
 export LRZSZ_JOURNAL
@@ -295,6 +288,33 @@ resume_cmp() {
     fi
     echo "-- sender resumed, but files differ. This is really bad."
     return 1
+}
+# check content and the security relevant part of the mode of a received file:
+# group and other permissions must not be set (lrz forces umask 0077 for
+# creation, and closeit() must not widen the file again via chmod()).
+# optional $3: "x" = owner execute bit must have survived (sender had it).
+mode_cmp() {
+    if cmp "$1" "$2" >&5 ; then
+        :
+    else
+        echo "-- files differ"
+        return 1
+    fi
+    case $(ls -l "$2" | cut -c5-10) in
+    ------) ;;
+    *)
+        echo "-- received file has group/other permission bits set: $(ls -l "$2" | cut -c1-10)"
+        return 1 ;;
+    esac
+    if test "$3" = x ; then
+        case $(ls -l "$2" | cut -c4) in
+        x) return 0 ;;
+        *)
+            echo "-- received file: owner lost the execute bit: $(ls -l "$2" | cut -c1-10)"
+            return 1 ;;
+        esac
+    fi
+    return 0
 }
 FAULTS="not slightly moderately noticeably significantly very extremely"
 fault2num() {
@@ -1487,6 +1507,23 @@ zmanage() {
     mkdir "$testdir/$key"
     touch $testdir/$key/all256.bin
     doit "$key" "lsz sending to lrz does update file if it does exist" "$SZ -q -Y" "$RZ -q" "$all_256_file" $all_256_file
+
+    #
+    # file modes sent by the sender must not widen the received file's
+    # permissions: lrz forces umask 0077 at creation time, and closeit()
+    # must not undo that with chmod().
+    #
+    key="zmodem-lsz-lrz-MGMT-mode-0666"
+    mkdir "$testdir/$key"
+    cp $all_256_file $testdir/mode666.bin
+    chmod 666 $testdir/mode666.bin
+    doit "$key" "lsz sending 0666 file to lrz keeps group/other bits off" "$SZ -q" "$RZ -q" mode_cmp $testdir/mode666.bin
+
+    key="zmodem-lsz-lrz-MGMT-mode-0777"
+    mkdir "$testdir/$key"
+    cp $all_256_file $testdir/mode777.bin
+    chmod 777 $testdir/mode777.bin
+    doit "$key" "lsz sending 0777 file to lrz keeps group/other bits off" "$SZ -q" "$RZ -q" mode_cmp $testdir/mode777.bin x
 }
 
 

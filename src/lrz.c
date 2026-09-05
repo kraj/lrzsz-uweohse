@@ -104,6 +104,7 @@ static void ackbibi (void);
 static void zmputs (const char *s);
 static int install_signal_handler (int sig);
 static FILE *safe_open (const char *path, const char *mode);
+static mode_t lrz_umask = 0077;
 
 static int
 path_within_cwd(const char *path)
@@ -318,8 +319,8 @@ main(int argc, char *argv[])
 	if ((getenv("ZMODEM_RESTRICTED"))!=NULL)
 		Restricted=2;
 
-	/* make temporary and unfinished files */
-	umask(0077);
+	/* rights for temporary and unfinished files  */
+	umask(lrz_umask);
 
 	from_cu();
 	chkinvok(argv[0]);	/* if called as [-]rzCOMMAND set flag */
@@ -2072,9 +2073,9 @@ closeit(struct zm_fileinfo *zi)
 		 * unrestricted shell.
 		 */
 		if (under_rsh)
-			chmod(Pathname, (0666 & zi->mode));
+			chmod(Pathname, (0666 & zi->mode) & ~lrz_umask);
 		else
-			chmod(Pathname, (0777 & zi->mode));
+			chmod(Pathname, (0777 & zi->mode) & ~lrz_umask);
 	}
 	return OK;
 }
