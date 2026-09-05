@@ -117,8 +117,9 @@ path_within_cwd(const char *path)
 
     if (!cwd) {
         cwd = realpath(".", NULL);
-        if (!cwd)
-            return 1; /* can't verify — allow */
+        if (!cwd) {
+            fatal_error(1, errno, _("realpath() failed"));
+	}
     }
     cwd_len = strlen(cwd);
 
