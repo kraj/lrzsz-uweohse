@@ -96,7 +96,7 @@ static const struct {
 #ifdef B1000000
     {1000000,  B1000000},
 #endif
-#ifdef B1000000
+#ifdef B1152000
     {1152000,  B1152000},
 #endif
 #ifdef B1500000
