@@ -467,7 +467,8 @@ main(int argc, char *argv[])
         stat_for_all.direction = 'r';
         stat_for_file.direction = 'r';
 
-	io_mode(0,1);
+	if (io_mode(0,1))
+		lrzsz_warning(0, _("cannot set transfer line mode; continuing"));
 	readline_setup(0, LRZSZ_MAX_SUBPACKET_LEN, LRZSZ_MAX_SUBPACKET_LEN*2);
 	install_signal_handler(SIGINT);
 	install_signal_handler(SIGTERM);

@@ -615,7 +615,8 @@ main(int argc, char **argv)
 	} else if (stdin_files==1) {
 		io_mode_fd=1;
 	}
-	io_mode(io_mode_fd,1);
+	if (io_mode(io_mode_fd,1))
+		lrzsz_warning(0, _("cannot set transfer line mode; continuing"));
 	readline_setup(io_mode_fd, 128, 256);
 
 	if (install_signal_handler(SIGINT))

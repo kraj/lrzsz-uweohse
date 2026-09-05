@@ -177,20 +177,35 @@ static struct termios oldtty, tty;
 int 
 io_mode(int fd, int n)
 {
-	static int did0 = false;
+	static int did0 = 0;
 	static int have_oldtty = false;
 
 	vfile("mode:%d", n);
 
+	if(!did0) {
+		did0 = 1;
+		if (tcgetattr(fd,&oldtty) == 0)
+			have_oldtty = true;
+		else if (errno == ENOTTY) {
+			/* not a terminal (pipe, pty master...): tcgetattr can
+			 * never succeed on this fd. Don't retry it forever. */
+			did0 = 2;
+			vfile("tcgetattr failed: not a tty");
+		} else {
+			/* transient failure (e.g. EINTR): don't latch did0 and
+			 * don't change the line now, so the next call can still
+			 * capture the UNMODIFIED state. (Setting a mode here
+			 * would make the later tcgetattr save the changed
+			 * settings, and the exit would "restore" those.) */
+			did0 = 0;
+			return ERROR;
+		}
+	}
+
 	switch(n) {
 	case 2:		/* Un-raw mode used by sz, sb when -g detected */
-		if(!did0) {
-			did0 = true;
-			if (tcgetattr(fd,&oldtty) == 0)
-				have_oldtty = true;
-			else
-				vfile("tcgetattr failed: %s", strerror(errno));
-		}
+		if (!have_oldtty)
+			return OK; /* not a tty: nothing to set */
 		tty = oldtty;
 
 		tty.c_iflag = BRKINT|IXON;
@@ -214,12 +229,13 @@ io_mode(int fd, int n)
 		return OK;
 	case 1:
 	case 3:
-		if(!did0) {
-			did0 = true;
-			if (tcgetattr(fd,&oldtty) == 0)
-				have_oldtty = true;
-			else
-				vfile("tcgetattr failed: %s", strerror(errno));
+		if (!have_oldtty) {
+			/* not a terminal (pipe etc.): there is nothing to set,
+			 * and cfgetospeed() on a zeroed struct would just hit
+			 * getspeed()'s fallback. Preserve that fallback's value
+			 * so pipe-based setups keep their block-size behavior. */
+			Baudrate = 38400;
+			return OK;
 		}
 		tty = oldtty;
 

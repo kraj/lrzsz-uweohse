@@ -236,6 +236,10 @@ LRZSZ_FORMAT_PRINTF(1,2) void vstringf (const char *format, ...);
 /* rbsb.c */
 int from_cu (void);
 int rdchk (int fd);
+/* io_mode returns OK or ERROR. ERROR means the line mode could not be
+ * determined/changed; the next io_mode call with n != 0 retries. The
+ * return value is advisory: most callers are best-effort cleanups, the
+ * startup call sites warn on ERROR and continue. */
 int io_mode (int fd, int n);
 void sendbrk (int fd);
 void purgeline (int fd);
