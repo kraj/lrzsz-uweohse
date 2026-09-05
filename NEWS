@@ -123,6 +123,15 @@ if you use lrz to receive files from not perfectly trustworthy senders.
   using it cannot be resumed. lrzsz keeps the feature for compatibility
   with old peers; it will likely be removed in a future release.
 
+* likewise deprecated: acting on the historical full st_mode in the file
+  metadata. A sender transmitting file type bits (e.g. 0100644 instead
+  of 0644) still makes lrz force binary transfer for that file (which
+  overrides -a) and skip the lower-casing of the file name. The current
+  ZMODEM documentation says this should not be sent nor acted upon;
+  lrzsz keeps it for old peers and will likely remove it in a future
+  release. The received mode is filtered as before (type bits stripped,
+  setuid bits never set, umask applied).
+
 * lrz has a new option -A --segmentsize NNN. This turns on `Segmented 
   Streaming' if the sender supports it. This ZMODEM feature was originally 
   intended to allow transfers to machines unable to do overlapping serial 

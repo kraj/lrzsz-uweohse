@@ -157,6 +157,14 @@ ZMODEM documentation marks as historic and recommends against. ASCII
 conversion also makes a transfer impossible to resume. It is kept for
 compatibility with 40 year old peers, but new setups should transfer
 in binary mode and convert locally if needed.
+
+Note: for compatibility with old senders, a file mode sent with the
+file metadata that includes file type bits (the historical full
+.BR st_mode )
+silently forces binary transfer for that file, overriding this
+option, and disables the lower-casing of received file names.
+This legacy behavior is deprecated as well and will likely be removed
+in a future release.
 .TP
 .B "-A, --segmentsize NNNN"
 Tell the sender to turn on `Segmented Streaming' with a buffer / window

@@ -1277,6 +1277,10 @@ procheader(char *name, struct zm_fileinfo *zi)
             zi->modtime = (time_t) modtime;
             zi->bytes_total = (size_t) bytes_total;
             zi->mode = (mode_t) mode;
+            /* NOTE: acting on the historical full-st_mode marker below is
+             * a SHOULD NOT per doc/zmodem-current.txt §4 ("file access
+             * rights"), kept for compatibility with old peers. See also
+             * the mode checks in closeit()/S1. */
             if (zi->mode & UNIXFILE)
                 ++Thisbinary;
         }
@@ -1377,6 +1381,9 @@ procheader(char *name, struct zm_fileinfo *zi)
             *p = 0;
     }
 
+    /* NOTE: the UNIXFILE check is the same legacy marker as above (V4):
+     * a full st_mode from an old sender means "Unix peer, keep case".
+     * Deprecated per doc/zmodem-current.txt §4, kept for old peers. */
     if (!zmodem_requested && MakeLCPathname && !IsAnyLower(name_static)
             && !(zi->mode&UNIXFILE))
         uncaps(name_static);
