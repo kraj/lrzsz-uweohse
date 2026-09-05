@@ -60,3 +60,12 @@ timing_elapsed(time_t *nowp)
   return yet - starttime;
 }
 
+long
+timing_bps(double bytes)
+{
+  double d = timing_elapsed(NULL);
+  if (d == 0) /* can happen if timing uses time() */
+    d = 0.5;
+  return (long) (bytes / d);
+}
+

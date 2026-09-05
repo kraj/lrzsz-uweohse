@@ -3,5 +3,6 @@
 
 void timing_reset(void);
 double timing_elapsed(time_t *now);
+long timing_bps(double bytes);
 
 #endif

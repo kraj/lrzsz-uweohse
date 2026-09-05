@@ -618,23 +618,9 @@ wcreceive(int argc, char **argp)
 				if (wcrx(&zi)==ERROR)
 					goto fubar;
 
-				if (Verbose > 1 || enable_syslog) {
-					double d;
-					long bps;
-					d=timing_elapsed(NULL);
-					if (d==0)
-						d=0.5; /* can happen if timing uses time() */
-					bps=(long) ((zi.bytes_received-zi.bytes_skipped)/d);
-
-					if (Verbose>1) {
-						vstringf(
-							_("\rBytes received: %7ld/%7ld   BPS:%-6ld                \r\n"),
-							(long) zi.bytes_received, (long) zi.bytes_total, bps);
-					}
-					if (enable_syslog)
-						lsyslog(LOG_INFO,"%s/%s: %zu Bytes, %ld BPS",
-							shortname,protname(),zi.bytes_received, bps);
-				}
+				report_transfer_result(0, shortname, zi.fname,
+					(long) zi.bytes_received, (long) zi.bytes_total,
+					(long) zi.bytes_skipped);
                                 stat_for_file.files_ok++;
                                 stats_account_one();
 			}
@@ -682,22 +668,9 @@ wcreceive(int argc, char **argp)
                 }
                 /*  stat_for_file.files_ok++; done by wcrx. */
                 stats_account_one();
-                if (Verbose > 1 || enable_syslog) {
-                    double d;
-                    long bps;
-                    d=timing_elapsed(NULL);
-                    if (d==0)
-                        d=0.5; /* can happen if timing uses time() */
-                    bps=(long) ((zi.bytes_received-zi.bytes_skipped)/d);
-                    if (Verbose) {
-                        vstringf(
-                                _("\rBytes received: %7zu   BPS:%-6ld                \r\n"),
-                                zi.bytes_received, bps);
-                    }
-                    if (enable_syslog)
-                        lsyslog(LOG_INFO,"%s/%s: %zu Bytes, %ld BPS",
-                                shortname,protname(),zi.bytes_received, bps);
-                }
+                report_transfer_result(0, shortname, zi.fname,
+                    (long) zi.bytes_received, (long) zi.bytes_total,
+                    (long) zi.bytes_skipped);
         }
         return OK;
 fubar:
@@ -1798,21 +1771,9 @@ rzfiles(struct zm_fileinfo *zi)
 		c = rzfile(zi);
 		switch (c) {
 		case ZEOF:
-			if (Verbose > 1 || enable_syslog) {
-				double d;
-				long bps;
-				d=timing_elapsed(NULL);
-				if (d==0)
-					d=0.5; /* can happen if timing uses time() */
-				bps=(long)((zi->bytes_received-zi->bytes_skipped)/d);
-				if (Verbose > 1) {
-					vstringf(
-						_("\rBytes received: %7ld/%7ld   BPS:%-6ld                \r\n"),
-						(long) zi->bytes_received, (long) zi->bytes_total, bps);
-				}
-				DO_SYSLOG_FNAME((LOG_INFO, "%s/%s: %ld Bytes, %ld BPS",shortname,
-						   protname(), (long) zi->bytes_total,bps));
-			}
+			report_transfer_result(0, NULL, zi->fname,
+				(long) zi->bytes_received, (long) zi->bytes_total,
+				(long) zi->bytes_skipped);
                         stat_for_file.files_ok++;
                         stats_account_one();
 			break;

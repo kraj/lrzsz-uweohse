@@ -901,21 +901,8 @@ wcs(const char *oname, const char *remotename)
 	if (Unlinkafter)
 		unlink(oname);
 
-	if (Verbose > 1 || enable_syslog) {
-		long bps;
-		double d=timing_elapsed(NULL);
-		if (d==0) /* can happen if timing_elapsed() uses time() */
-			d=0.5;
-		bps=(long) (zi.bytes_sent/d);
-                if (Verbose)
-                    vchar('\r');
-		if (Verbose > 1)
-			vstringf(_("Bytes Sent:%7ld   BPS:%-8ld                        \n"),
-				(long) zi.bytes_sent,bps);
-		if (enable_syslog)
-			lsyslog(LOG_INFO, "%s/%s: %ld Bytes, %ld BPS",shortname,
-				protname(), (long) zi.bytes_sent,bps);
-	}
+	report_transfer_result(1, shortname, zi.fname,
+		(long) zi.bytes_sent, 0, 0);
         stat_for_file.files_ok++;
 	return 0;
 

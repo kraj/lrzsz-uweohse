@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <sys/select.h>
 #include "zglobal.h"
+#include "timing.h"
 
 #ifndef _
 # define _(String) String
@@ -86,6 +87,39 @@ fatal_error (int status, int errnum, const char *message, ...)
     lrzsz_vwarning(errnum, message, args);
     va_end(args);
     exit(status);
+}
+
+/* End-of-transfer BPS summary shared by lrz and lsz. BYTES is the number
+ * of bytes actually transferred; SKIPPED bytes (resume) are excluded
+ * from the bps and syslog byte count. TOTAL is only printed for
+ * receives (pass 0 when sending). */
+void
+report_transfer_result (int sending, const char *shortname,
+    const char *fname, long bytes, long total, long skipped)
+{
+    long bps;
+
+    if (!(Verbose > 1 || enable_syslog))
+        return;
+    bps = timing_bps(sending ? bytes : bytes - skipped);
+    if (Verbose) {
+        if (sending)
+            vchar('\r');
+        if (Verbose > 1) {
+            if (sending)
+                vstringf(_("Bytes Sent:%7ld   BPS:%-8ld                        \n"),
+                    bytes, bps);
+            else
+                vstringf(_("\rBytes received: %7ld/%7ld   BPS:%-6ld                \r\n"),
+                    bytes, total, bps);
+        }
+    }
+    if (enable_syslog) {
+        const char *s = fname ? strrchr(fname, '/') : NULL;
+        s = s ? s + 1 : (fname ? fname : shortname);
+        lsyslog(LOG_INFO, "%s/%s: %ld Bytes, %ld BPS", s, protname(),
+            sending ? bytes : bytes - skipped, bps);
+    }
 }
 
 unsigned long
