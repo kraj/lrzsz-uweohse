@@ -1615,6 +1615,35 @@ SEOF
         "$SZ -q -X" "$RZ -q -b -X -D" "missing" $all_256_file
 
     #
+    # long ZFILE subpacket (V10): a filename near the 960-byte name limit
+    # must produce a ZFILE data subpacket that still stays within the
+    # 1024-byte limit after the metadata suffix is appended, and must be
+    # receivable by lrz (whose buffer is 8192, so this tests the sender
+    # side budget only — a truncated metadata suffix is acceptable).
+    #
+    key="zmodem-lsz-lrz-ZFILE-longname"
+    mkdir "$testdir/$key"
+    # A ZFILE name near the 960-byte wire limit: single components are limited
+    # to 255 bytes by the filesystem, so build a deep path instead (each
+    # component 80 chars, ~900 bytes total). With -f, lsz transmits the whole
+    # relative path as the file name; lrz must accept it and create the
+    # directory levels via its mkdirat walk. The subpacket total (name +
+    # metadata suffix) must stay within the 1024-byte limit (V10).
+    deepname=$key
+    for i in 1 2 3 4 5 6 7 8 9 10 11; do
+        deepname=$deepname/$(printf 'd%.0s' $(seq 1 79))$i
+    done
+    deepname=$deepname/payload.bin
+    mkdir -p "$testdir/$(dirname "$deepname")"
+    cp $all_256_file "$testdir/$deepname"
+    longname_cmp() {
+        # $1 = relative source path (ignored), $2 = received file
+        cmp "$testdir/$deepname" "$testdir/$key/$deepname"
+    }
+    doit "$key" "lsz sends a ~900-char deep path as filename" \
+        "$SZ -q -f" "$RZ -q" longname_cmp "$deepname"
+
+    #
     # very restricted mode: an existing non-hidden file must not be overwritten, neither with 
     # ZMODEM_RESTRICTED set nor with -R on top of it. (The old code clamped neither, so when 
     # both were set, it resulted in level 3, which skipped the overwrite check). The overwrite 

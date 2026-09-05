@@ -989,12 +989,17 @@ wctxpn(struct zm_fileinfo *zi)
 	/* note that we may lose some information here in case mode_t is wider than an
 	 * int. But i believe sending %lo instead of %o _could_ break compatability
 	 */
-	if (!Ascii && (input_f!=stdin) && *zi->fname && fstat(fileno(input_f), &f)!= -1)
-		snprintf(p, (size_t)(txbuf + LRZSZ_MAX_SUBPACKET_LEN - p), "%lu %llo %o 0 %d %ld",
+	if (!Ascii && (input_f!=stdin) && *zi->fname && fstat(fileno(input_f), &f)!= -1) {
+		/* cap the ZFILE data subpacket at 1024 bytes (zmodem-current.txt
+		 * §4). snprintf truncates cleanly; a truncated metadata suffix
+		 * only loses trailing batch-estimate fields. */
+		size_t metasize = (size_t)(txbuf + 1024 - 1 - p);
+		snprintf(p, metasize, "%lu %llo %o 0 %d %ld",
               (unsigned long) f.st_size,
               (unsigned long long) f.st_mtime,
               (unsigned int)((no_unixmode) ? 0 : f.st_mode),
               Filesleft, Totalleft);
+	}
 	if (Verbose)
 		vstringf(_("Sending: %s\n"),txbuf);
 	Totalleft -= f.st_size;
@@ -1543,6 +1548,7 @@ zsendfile(struct zm_fileinfo *zi, const char *buf, size_t blen)
 	unsigned long crc;
 	size_t rxpos;
         int zack_count=0;
+	int bad_acks = 0;
 
 	/* we are going to send a ZFILE. There cannot be much useful
 	 * stuff in the line right now (*except* ZCAN?).
@@ -1571,7 +1577,18 @@ again:
 					goto again;
 				}
 			/* **** FALL THRU TO **** */
+			/* FALLTHROUGH */
 		default:
+			/* e.g. ZNAK from a receiver that cannot cope with the
+			 * ZFILE subpacket. Resending identically a few times is
+			 * fine, but don't loop forever (zmodem-current.txt §4:
+			 * the sender must be able to fall back — our subpacket
+			 * never exceeds 1024 bytes, so a receiver that keeps
+			 * ZNAKing won't be satisfied by resending). */
+			if (++bad_acks > 3) {
+				zperr(_("receiver keeps rejecting the file header"));
+				return ERROR;
+			}
 			continue;
 		case ZACK:
                         /* zmrx does this. it answers the ZCRCW for the ZFILE (filename etc). But this was never done by omen, which used the ZRPOS as ACK. */
