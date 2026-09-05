@@ -76,10 +76,6 @@ if test "x$CFLAGS" = x ; then old_cflags_empty=1; fi
 
 dnl Checks for programs.
 AC_PROG_CC
-AC_PROG_CC_C_O
-AC_PROG_CPP
-AC_PROG_RANLIB
-AC_SEARCH_LIBS([strerror],[cposix])
 AC_C_CONST
 AC_C_INLINE
 AX_COMPILER_FLAGS_CFLAGS()
