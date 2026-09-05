@@ -55,7 +55,7 @@ readline_internal(unsigned int timeout)
 	int rc;
 
 	if (Verbose > 5)
-		vstringf("Calling read: timeout=%u/10s  Readnum=%lu ",
+		vstringf("Calling read: timeout=%u/10s  readnum=%lu ",
 		  timeout, readline_readnum);
 
 	if (no_timeout) {

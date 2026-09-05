@@ -57,7 +57,6 @@ static int Crcflg;
 static int Firstsec;
 int errors;
 static int Restricted=1;	/* restricted; no /.. or ../ in filenames */
-static int Readnum = LRZSZ_MAX_SUBPACKET_LEN;	/* Number of bytes to ask for in read() from modem */
 static int skip_if_not_found;
 static unsigned int Segmentsize = 0;
 
@@ -2135,7 +2134,6 @@ ackbibi(void)
 	int n;
 
 	vfile("ackbibi:");
-	Readnum = 1;
 	stohdr(0L);
 	for (n=3; --n>=0; ) {
 		purgeline(0);
