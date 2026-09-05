@@ -1521,11 +1521,15 @@ sendzsinit(void)
 	errors = 0;
 	for (;;) {
 		stohdr(0L);
-		if (Zctlesc) {
-			Txhdr[ZF0] |= TESCCTL; zshhdr(ZSINIT, Txhdr);
-		}
-		else
-			zsbhdr(ZSINIT, Txhdr);
+		/* send ZSINIT as a BINARY header, because it carries a data subpacket
+		 * (the attention string), and data subpackets after a hex header would 
+                 * use a 16-bit CRC, which the current ZMODEM * documentation forbids 
+                 * (zmodem-current.txt §2.2). zsbhdr sets Crc32t per negotiation, so 
+                 * the subpacket goes out with the negotiated CRC (normally CRC-32).
+		 */
+		if (Zctlesc)
+			Txhdr[ZF0] |= TESCCTL;
+		zsbhdr(ZSINIT, Txhdr);
 		ZSDATA(Myattn, 1+strlen(Myattn), ZCRCW);
 		c = zgethdr(Rxhdr, 1,NULL);
 		switch (c) {
