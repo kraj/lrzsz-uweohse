@@ -1680,12 +1680,15 @@ tryz(void)
 		    Txhdr[ZP0] = Segmentsize & 0xff;
 		    Txhdr[ZP1] = (Segmentsize / 256) & 0xff;
                 }
-#ifdef CANBREAK
-		Txhdr[ZF0] = CANFC32|CANFDX|CANOVIO|CANBRK;
-#else
-		Txhdr[ZF0] = CANFC32|CANFDX|CANOVIO;
-#endif
-	if (Zctlesc)
+		/* advertise CANBRK only if the transfer line is a terminal:
+		 * a break is a termios concept, unavailable on pipes/sockets
+		 * (doc/zmodem-current.txt §10.6: "if you have tcsendbreak and
+		 * send via a terminal, set this") */
+		if (isatty(0))
+			Txhdr[ZF0] = CANFC32|CANFDX|CANOVIO|CANBRK;
+		else
+			Txhdr[ZF0] = CANFC32|CANFDX|CANOVIO;
+		if (Zctlesc)
 			Txhdr[ZF0] |= TESCCTL; /* TESCCTL == ESCCTL */
 		zshhdr(tryzhdrtype, Txhdr);
 

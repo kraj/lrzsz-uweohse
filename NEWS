@@ -137,6 +137,11 @@ if you use lrz to receive files from not perfectly trustworthy senders.
   so a buffered modem or serial driver does not keep delivering stale
   data the receiver must discard. This is a no-op on pipes and ptys.
 
+* lrz advertises the CANBRK capability in ZRINIT only when the transfer
+  line is a terminal, as the current ZMODEM documentation recommends.
+  Formerly it was advertised unconditionally. Attempts to send a break
+  on a line that cannot do it (e.g. a pipe) are detected and skipped.
+
 * lrz has a new option -A --segmentsize NNN. This turns on `Segmented 
   Streaming' if the sender supports it. This ZMODEM feature was originally 
   intended to allow transfers to machines unable to do overlapping serial 

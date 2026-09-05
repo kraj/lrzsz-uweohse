@@ -80,9 +80,6 @@ struct termios;
 # endif
 #endif
 
-#define CANBREAK
-
-
 
 /* Take care of NLS matters.  */
 #if HAVE_LOCALE_H

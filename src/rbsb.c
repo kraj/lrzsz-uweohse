@@ -265,7 +265,16 @@ io_mode(int fd, int n)
 void
 sendbrk(int fd)
 {
-	tcsendbreak(fd,0);
+	/* remember that the fd cannot do breaks (e.g. ENOTTY on a pipe);
+	 * don't retry forever on a line that lies about it either */
+	static int nobreak;
+
+	if (nobreak)
+		return;
+	if (tcsendbreak(fd,0) < 0) {
+		if (errno == ENOTTY)
+			nobreak = 1;
+	}
 }
 
 void
