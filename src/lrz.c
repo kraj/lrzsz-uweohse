@@ -91,7 +91,8 @@ static void report (int sct);
 static void uncaps (char *s);
 static int IsAnyLower (const char *s);
 static int putsec (struct zm_fileinfo *zi, char *buf, size_t n);
-static int make_dirs (char *pathname);
+enum safe_mkdir { MKDIR_NO, MKDIR_OK };
+static FILE *safe_open (const char *path, const char *mode, enum safe_mkdir mkdir_ok);
 static int procheader (char *name, struct zm_fileinfo *);
 static int wcgetsec (size_t *Blklen, char *rxbuf, unsigned int maxtime);
 static int wcrx (struct zm_fileinfo *);
@@ -103,57 +104,7 @@ static int closeit (struct zm_fileinfo *);
 static void ackbibi (void);
 static void zmputs (const char *s);
 static int install_signal_handler (int sig);
-static FILE *safe_open (const char *path, const char *mode);
 static mode_t lrz_umask = 0077;
-
-static int
-path_within_cwd(const char *path)
-{
-    char *dir;
-    char *slash;
-    char *real_dir;
-    static char *cwd = NULL;
-    size_t cwd_len;
-
-    if (!cwd) {
-        cwd = realpath(".", NULL);
-        if (!cwd) {
-            fatal_error(1, errno, _("realpath() failed"));
-	}
-    }
-    cwd_len = strlen(cwd);
-
-    dir = xstrdup(path); /* even if we handled that gracefully something would fail later */
-
-    slash = strrchr(dir, '/');
-    if (slash == dir) {
-        /* parent is root: "/foo" — absolute path, checkpath already rejects */
-        free(dir);
-        return 0;
-    }
-    if (slash) {
-        *slash = '\0'; /* dir is now the parent directory */
-    } else {
-        /* no slash — parent is "." */
-        free(dir);
-        return 1; /* same directory as CWD, no symlink traversal possible */
-    }
-
-    real_dir = realpath(dir[0] ? dir : ".", NULL);
-    free(dir);
-    if (!real_dir)
-        return 0; /* parent doesn't exist or is unreadable — reject */
-
-    /* Check that real_dir is CWD itself or a subdirectory of CWD */
-    if (strncmp(real_dir, cwd, cwd_len) != 0 ||
-        (real_dir[cwd_len] != '\0' && real_dir[cwd_len] != '/')) {
-        free(real_dir);
-        return 0; /* parent resolved outside CWD — reject */
-    }
-
-    free(real_dir);
-    return 1;
-}
 
 static long buffersize=32768;
 static unsigned long min_bps=0;
@@ -712,7 +663,7 @@ wcreceive(int argc, char **argp)
                     vstring("\r\n");
                 }
 
-                if ((fout=safe_open(Pathname, "w")) == NULL) {
+                if ((fout=safe_open(Pathname, "w", MKDIR_NO)) == NULL) {
                     if (enable_syslog)
                         lsyslog(LOG_ERR,"%s/%s: cannot open: %s",
                                 shortname,protname(), strerror(errno));
@@ -1057,19 +1008,23 @@ do_crc_check(FILE *f, size_t remote_bytes, size_t check_bytes)
 }
 
 /*
- * Open a file w/o following symlinks.
+ * Open a file w/o following symlinks, resolving relative to the CWD.
  * - O_NOFOLLOW prevents the final path component from being a symlink;
- * - path_within_cwd() checks that the intermediate directory components 
- *   do not redirect outside CWD via symlinks.
+ * - every intermediate directory component is opened with O_DIRECTORY|O_NOFOLLOW,
+ *   so a symlinked directory component fails instead of being followed
+ * - with mkdir_ok, missing intermediate directories are created via mkdirat().
  * Maps fopen-style mode strings to open() flags.
+ * This is complicated, but race free.
  *
  * @return FILE *|NULL
  */
 static FILE *
-safe_open(const char *path, const char *mode)
+safe_open(const char *path, const char *mode, enum safe_mkdir mkdir_ok)
 {
     int flags = 0;
+    int dirfd;
     int fd;
+    int saved_errno;
     FILE *fp;
     const char *p = mode;
 
@@ -1094,14 +1049,64 @@ safe_open(const char *path, const char *mode)
     }
     flags |= O_NOFOLLOW;
 
-    if (!path_within_cwd(path)) {
-        errno = EACCES;
+    if (path[0] == '/')
+        return NULL; /* absolute paths are rejected by checkpath() */
+
+    dirfd = open(".", O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+    if (dirfd < 0)
         return NULL;
+
+    {
+        /* walk intermediate components with openat(), creating them if asked */
+        char *tmp = xstrdup(path);
+        char *start = tmp;
+        char *end = tmp + strlen(tmp);
+        char *slash;
+        const char *last;
+
+        while ((slash = memchr(start, '/', (size_t) (end - start))) != NULL) {
+            if (slash == start) { /* leading or doubled '/' */
+                start = slash + 1;
+                continue;
+            }
+            *slash = '\0';
+            fd = openat(dirfd, start, O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+            if (fd < 0 && errno == ENOENT && mkdir_ok == MKDIR_OK) {
+                if (mkdirat(dirfd, start, 0700) == 0 || errno == EEXIST)
+                    fd = openat(dirfd, start, O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+            }
+            if (fd < 0) {
+                close(dirfd);
+                free(tmp);
+                return NULL; /* ELOOP: symlinked component; ENOENT; ... */
+            }
+            close(dirfd);
+            dirfd = fd;
+            start = slash + 1;
+        }
+        last = start; /* final component, relative to dirfd */
+        if (*last == '\0') { /* path ended in '/', e.g. "sub/" */
+            close(dirfd);
+            free(tmp);
+            errno = EISDIR;
+            return NULL;
+        }
+        if (last[0] == '.' && (last[1] == '\0' ||
+                               (last[1] == '.' && last[2] == '\0'))) {
+            close(dirfd);
+            free(tmp);
+            errno = EACCES;
+            return NULL;
+        }
+        fd = openat(dirfd, last, flags, 0666);
+        saved_errno = errno;
+        close(dirfd);
+        free(tmp);
+        errno = saved_errno;
+        if (fd < 0)
+            return NULL;
     }
 
-    fd = open(path, flags, 0666);
-    if (fd < 0)
-        return NULL;
     fp = fdopen(fd, mode);
     if (!fp)
         close(fd);
@@ -1188,7 +1193,7 @@ procheader(char *name, struct zm_fileinfo *zi)
     /* Check for existing file */
     if (zconv != ZCRESUM && !Rxclob && (zmanag&ZF1_ZMMASK) != ZF1_ZMCLOB 
             && (zmanag&ZF1_ZMMASK) != ZF1_ZMAPND
-            && (fout=safe_open(name, "r"))) {
+            && (fout=safe_open(name, "r", MKDIR_NO))) {
         struct stat sta;
         char *tmpname;
         int i;
@@ -1309,7 +1314,7 @@ procheader(char *name, struct zm_fileinfo *zi)
 
         if (Thisbinary && zconv==ZCRESUM) {
                 struct stat st;
-                fout = safe_open(name_static, "r+");
+                fout = safe_open(name_static, "r+", MKDIR_NO);
                 if (fout && 0==fstat(fileno(fout),&st))
                 {
                         int can_resume=true;
@@ -1347,13 +1352,12 @@ procheader(char *name, struct zm_fileinfo *zi)
                         fout=NULL;
                 }
         }
-        fout = safe_open(name_static, openmode);
 #ifdef ENABLE_MKDIR
-        if ( !fout && Restricted < 2) {
-                if (make_dirs(name_static))
-                        fout = safe_open(name_static, openmode);
-        }
+        if (Restricted < 2)
+                fout = safe_open(name_static, openmode, MKDIR_OK);
+        else
 #endif
+        fout = safe_open(name_static, openmode, MKDIR_NO);
         if ( !fout)
         {
                 int e=errno;
@@ -1393,58 +1397,6 @@ buffer_it:
 
 	return OK;
 }
-
-#ifdef ENABLE_MKDIR
-/*
- *  Directory-creating routines from Public Domain TAR by John Gilmore
- */
-
-/*
- * After a file/link/symlink/dir creation has failed, see if
- * it's because some required directory was not present, and if
- * so, create all required dirs.
- */
-static int
-make_dirs(char *pathname)
-{
-	char *p;		/* Points into path */
-	int madeone = 0;		/* Did we do anything yet? */
-	int save_errno = errno;		/* Remember caller's errno */
-
-	if (errno != ENOENT)
-		return 0;		/* Not our problem */
-
-	for (p = strchr(pathname, '/'); p != NULL; p = strchr(p+1, '/')) {
-		/* Avoid mkdir of empty string, if leading or double '/' */
-		if (p == pathname || p[-1] == '/')
-			continue;
-		/* Avoid mkdir where last part of path is '.' */
-		if (p[-1] == '.' && (p == pathname+1 || p[-2] == '/'))
-			continue;
-		/* Skip ".." components — don't create dirs above cwd */
-		if (p - pathname >= 2 && p[-1] == '.' && p[-2] == '.'
-		    && (p - pathname == 2 || p[-3] == '/'))
-			continue;
-		*p = 0;				/* Truncate the path there */
-		if ( !mkdir(pathname, 0777)) {	/* Try to create it as a dir */
-			vfile("Made directory %s\n", pathname);
-			madeone++;		/* Remember if we made one */
-			*p = '/';
-			continue;
-		}
-		*p = '/';
-		if (errno == EEXIST)		/* Directory already exists */
-			continue;
-		/*
-		 * Some other error in the mkdir.  We return to the caller.
-		 */
-		break;
-	}
-	errno = save_errno;		/* Restore caller's errno */
-	return madeone;			/* Tell them to retry if we made one */
-}
-
-#endif /* ENABLE_MKDIR */
 
 /*
  * Putsec writes the n characters of buf to receive file fout.
@@ -1548,7 +1500,7 @@ checkpath(const char *name)
 		const char *bn;
 		bn = strrchr(name, '/');
 		bn = bn ? bn + 1 : name;
-		if ((Restricted == 2 || *bn == '.') && (noleak = safe_open(name, "r")) != NULL) {
+		if ((Restricted == 2 || *bn == '.') && (noleak = safe_open(name, "r", MKDIR_NO)) != NULL) {
 			fclose(noleak);
 			canit(STDOUT_FILENO);
 			vstring("\r\n");

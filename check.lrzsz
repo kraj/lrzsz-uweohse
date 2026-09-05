@@ -1524,6 +1524,29 @@ zmanage() {
     cp $all_256_file $testdir/mode777.bin
     chmod 777 $testdir/mode777.bin
     doit "$key" "lsz sending 0777 file to lrz keeps group/other bits off" "$SZ -q" "$RZ -q" mode_cmp $testdir/mode777.bin x
+
+    #
+    # sender's pathnames must never escape the receiving directory. lrz's checkpath() shall reject such names; safe_open() confines
+    # to the CWD. The canaries live outside $key (the receiving directory); nothing may be written there, and nothing in $key either.
+    #
+    key="zmodem-lsz-lrz-MGMT-traversal-dotdot"
+    mkdir "$testdir/$key"
+    touch $testdir/escape-target.bin # the victim outside the receiver dir
+    doit "$key" "lsz sending ../escape-target.bin to lrz must fail" "$SZ -q" "$RZ -q" missing ../escape-target.bin
+    if test -s "$testdir/escape-target.bin" ; then
+        echo "$key: canary outside the receiving directory was modified"
+        echo "summary: $key FAILED (canary modified)" >>$testdir/failures.log
+        any_failure="$any_failure $key"
+    fi
+    key="zmodem-lsz-lrz-MGMT-traversal-subdir"
+    mkdir "$testdir/$key"
+    touch $testdir/outside.bin
+    doit "$key" "lsz sending sub/../../outside.bin to lrz must fail" "$SZ -q" "$RZ -q" missing sub/../../outside.bin
+    if test -s "$testdir/outside.bin" ; then
+        echo "$key: canary outside the receiving directory was modified"
+        echo "summary: $key FAILED (canary modified)" >>$testdir/failures.log
+        any_failure="$any_failure $key"
+    fi
 }
 
 
