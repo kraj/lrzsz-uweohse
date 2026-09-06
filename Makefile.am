@@ -5,7 +5,7 @@ EXTRA_DIST = m4/ChangeLog check.lrzsz COMPATABILITY README.cvs README.isdn4linux
 
 PR=@PACKAGE@-@VERSION@
 DISTCLEANFILES=fastcheck.done
-CLEAN_FILES=fastcheck.done
+CLEANFILES=fastcheck.done
 ACLOCAL_AMFLAGS = -I m4
 QUICKCHECKS=xmodem-lsz-lrz-16k-binary xmodem-lsz-lrz-large-binary-1k-crc zmodem-lsz-lrz-MGMT-default-nonexisting zmodem-lsz-lrz-MGMT-ZMCRC-r \
 	zmodem-lsz-lrz-multiple zmodem-lsz-lrz-4k zmodem-lsz-lrz-8k-turbo zmodem-lsz-lrz-MGMT-mode-0666 \

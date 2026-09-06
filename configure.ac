@@ -77,6 +77,13 @@ AX_APPEND_COMPILE_FLAGS([ -Wunused-result -Wpedantic -Wcast-qual -Wmissing-brace
 dnl that one does not take #ifdefs into account:
 AX_APPEND_COMPILE_FLAGS([ -Wno-pre-c23-compat], [WARN_CFLAGS])
 
+dnl -Werror is a development default; release builds may pass --disable-Werror.
+AC_ARG_ENABLE([Werror],
+	AS_HELP_STRING([--disable-Werror], [do not turn compiler warnings into errors]),
+	[], [enable_Werror=yes])
+AS_IF([test "x$enable_Werror" = xyes],
+	[AX_APPEND_COMPILE_FLAGS([ -Werror ], [WARN_CFLAGS])])
+
 if test "$want_coverage" != "no" ; then
     AX_APPEND_COMPILE_FLAGS([ --coverage ], [LRZSZ_CFLAGS])
     AX_APPEND_COMPILE_FLAGS([ --coverage], [LRZSZ_LDFLAGS])
