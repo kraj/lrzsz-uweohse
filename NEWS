@@ -148,9 +148,22 @@ if you use lrz to receive files from not perfectly trustworthy senders.
   and derivatives) allowed both, so lsz still keeps it for compatibility.
   A future release will keep allowing relative paths but will reject 
   absolute paths and ".." components with a fatal error.
-  On the receiving side lrz confines received filenames to the receiving 
-  directory regardless of what the sender transmits.
-  New setups should use plain relative filenames.
+   On the receiving side lrz confines received filenames to the receiving 
+   directory regardless of what the sender transmits.
+   New setups should use plain relative filenames.
+
+* the ZMODEM 8th-bit escaping capability (ESC8/TESC8) is now implemented:
+  the new option -7 / --escape-8bit makes lsz escape every byte >= 0x80
+  (as DLE plus the byte XORed with 0x40) and advertise the TESC8 flag in
+  ZSINIT, and makes lrz advertise ESC8 in ZRINIT. A peer's request is
+  always honored: lsz escapes high bytes when the receiver sets TESC8,
+  and lrz escapes the bytes it transmits when the sender sets TESC8,
+  even without -7. Previously such requests were silently ignored
+  (lsz sent unescaped bytes the peer had explicitly asked to have
+  escaped), and the receiver-side decoder rejected the escaped forms
+  of data bytes >= 0xc0, so transfers with such peers could not work.
+  The option is only needed on lines that corrupt the 8th bit, or to
+  force the capability advertisement.
 
 * on error recovery (ZRPOS) lsz now flushes its pending output with
   tcflush(TCOFLUSH), as the current ZMODEM documentation recommends,

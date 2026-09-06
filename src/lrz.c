@@ -209,6 +209,7 @@ static struct option const long_options[] =
 	{"bufsize", required_argument, NULL, 'B'},
 	{"allow-commands", no_argument, NULL, 'C'},
 	{"escape", no_argument, NULL, 'e'},
+	{"escape-8bit", no_argument, NULL, '7'},
 	{"rename", no_argument, NULL, 'E'},
 	{"help", no_argument, NULL, 'h'},
 	{"crc-check", no_argument, NULL, 'H'},
@@ -300,7 +301,7 @@ main(int argc, char *argv[])
 	bindtextdomain (PACKAGE, LOCALEDIR);
 	textdomain (PACKAGE);
 	while ((c = getopt_long (argc, argv, 
-		"A:a+bB:cCDeEghHJ:m:M:nNOprRqs:St:uUvVw:XZy",
+		"A:a+bB:cCDeEgh7HJ:m:M:nNOprRqs:St:uUvVw:XZy",
 		long_options, (int *) 0)) != EOF)
 	{
 		switch (c)
@@ -321,8 +322,9 @@ main(int argc, char *argv[])
 		case 'c': Crcflg=true; break;
 		case 'D': Nflag = true; break;
 		case 'E': Lzmanag = ZF1_ZMCHNG; break;
-		case 'e': Zctlesc = 1; break;
-	case 'h': usage(0,NULL); break;
+ 		case 'e': Zctlesc = 1; break;
+ 		case '7': Esc8 = 1; break;
+ 	case 'h': usage(0,NULL); break;
 	case 'J':
 		stats_journal_open(optarg);
 		break;
@@ -1671,9 +1673,11 @@ tryz(void)
 			Txhdr[ZF0] = CANFC32|CANFDX|CANOVIO|CANBRK;
 		else
 			Txhdr[ZF0] = CANFC32|CANFDX|CANOVIO;
-		if (Zctlesc)
-			Txhdr[ZF0] |= TESCCTL; /* TESCCTL == ESCCTL */
-		zshhdr(tryzhdrtype, Txhdr);
+ 		if (Zctlesc)
+ 			Txhdr[ZF0] |= TESCCTL; /* TESCCTL == ESCCTL */
+ 		if (Esc8)
+ 			Txhdr[ZF0] |= ESC8;
+ 		zshhdr(tryzhdrtype, Txhdr);
 
 		if (tryzhdrtype == ZSKIP)	/* Don't skip too far */
 			tryzhdrtype = ZRINIT;	/* CAF 8-21-87 */
@@ -1721,8 +1725,19 @@ again:
 			 * - sender receives TESCCTL and uses "|=..."
 			 * so: sz escapes, but rz doesn't unescape ... not good.
 			 */
- 			Zctlesc |= TESCCTL & Rxhdr[ZF0];
- 			if (zrdata(Attn, ZATTNLEN,&bytes_in_block) == GOTCRCW) {
+  			Zctlesc |= TESCCTL & Rxhdr[ZF0];
+  			/* the sender asks for 8th-bit escaping (TESC8):
+  			 * honor it unconditionally, like ESCCTL
+  			 * (zmodem-current.txt §2.1). Rebuild the send
+  			 * table when the escape flags changed — lrz
+  			 * sends headers/ACKs through zsendline, and a
+  			 * stale table would send the bytes wrong. This
+  			 * also fixes the long-standing staleness for
+  			 * late-arriving ESCCTL (the table was only
+  			 * initialized once at startup). */
+  			Esc8 |= TESC8 & Rxhdr[ZF0];
+  			zsendline_init();
+  			if (zrdata(Attn, ZATTNLEN,&bytes_in_block) == GOTCRCW) {
  				stohdr(0L); /* ZACK to a ZSINIT must carry 0 (see zmodem-current.txt §4) */
  				zshhdr(ZACK, Txhdr);
  				goto again;

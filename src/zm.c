@@ -40,6 +40,7 @@ char Attn[ZATTNLEN+1];	/* Attention string rx sends to tx on err */
 
 static char lastsent;	/* Last char we sent */
 bool turbo_escape;
+bool Esc8;		/* Escape all bytes >= 0x80 (ESC8/TESC8) */
 
 static const char *frametypes[] = {
 	"Carrier Lost",		/* -3 */
@@ -221,16 +222,33 @@ again2:
 		return 0x7f;
 	case ZRUB1:
 		return 0xff;
-	case XON:
-	case (XON|0x80):
-	case XOFF:
-	case (XOFF|0x80):
-		goto again2;
+ 	case XON:
+ 	case (XON|0x80):
+ 	case XOFF:
+ 	case (XOFF|0x80):
+ 		/* flow control: skipped. With ESC8/TESC8 negotiated the
+ 		 * high-bit forms (0x91/0x93) are the ZDLE-escaped data
+ 		 * bytes 0xd1/0xd3, not flow control — un-escape them
+ 		 * instead. */
+ 		if (Esc8 && (c == (XON|0x80) || c == (XOFF|0x80)))
+ 			goto unescape;
+ 		goto again2;
 	default:
 		if (Zctlesc && ! (c & 0x60)) {
 			goto again2;
 		}
-		if ((c & 0x60) ==  0x40)
+unescape:
+		/* ZDLE-escaped data: the classic rule accepts the escape
+		 * encoding of 0x40-0x5f/0xc0-0xdf ((c & 0x60) == 0x40) —
+		 * the escaped forms of the controls 0x00-0x1f/0x80-0x9f.
+		 * With ESC8/TESC8 negotiated, bytes >= 0x80 are escaped
+		 * too; their escape encodings are exactly the bytes whose
+		 * un-escape (c ^ 0x40) has the high bit set ((c^0x40)&0x80,
+		 * i.e. c in 0x80-0x9f/0xa0-0xbf/0xc0-0xdf/0xe0-0xff). In a
+		 * stream without ESC8 a ZDLE followed by such a byte cannot
+		 * occur legitimately, so accepting it here is harmless for
+		 * non-Esc8 peers. */
+		if ((c & 0x60) == 0x40 || ((c ^ 0x40) & 0x80))
 			return (c ^ 0x40);
 		break;
 	}
@@ -951,13 +969,19 @@ zsendline_init(void)
 				else 
 					zsendline_tab[i]=0;
 				break;
-			default:
-				if (Zctlesc)
-					zsendline_tab[i]=1;
-				else
-					zsendline_tab[i]=0;
-			}
-		}
+ 			default:
+ 				if (Zctlesc)
+ 					zsendline_tab[i]=1;
+ 				else
+ 					zsendline_tab[i]=0;
+ 			}
+ 		}
+ 	}
+	/* ESC8/TESC8: escape all bytes >= 0x80 (zmodem-current.txt §2.1).
+	 * Overrides everything else. */
+	if (Esc8) {
+		for (i=0x80; i<256; i++)
+			zsendline_tab[i]=1;
 	}
 }
 

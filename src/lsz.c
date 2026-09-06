@@ -267,6 +267,7 @@ static struct option const long_options[] =
   {"dot-to-slash", no_argument, NULL, 'd'},
   {"full-path", no_argument, NULL, 'f'},
   {"escape", no_argument, NULL, 'e'},
+  {"escape-8bit", no_argument, NULL, '7'},
   {"rename", no_argument, NULL, 'E'},
   {"help", no_argument, NULL, 'h'},
   {"crc-check", no_argument, NULL, 'H'},
@@ -367,7 +368,7 @@ main(int argc, char **argv)
 	Rxtimeout = 600;
 
 	while ((c = getopt_long (argc, argv,
-		"2+4589aA:bB:C:c:dfeEghHi:J:kL:l:m:M:NnOopRrqsSt:TUuvVw:XYyZ",
+		"2+4589aA:bB:C:c:dfeEghHi:J:kL:l:m:M:NnOop7RrqsSt:TUuvVw:XYyZ",
 		long_options, (int *) 0))!=EOF)
 	{
 		switch (c)
@@ -423,8 +424,9 @@ main(int argc, char **argv)
 			fatal_error(1,0,_("this option has been removed; see the manual"));
 			break;
 		case 'f': Fullname=true; break;
-		case 'e': Zctlesc = 1; break;
-		case 'E': Lzmanag = ZF1_ZMCHNG; break;
+ 		case 'e': Zctlesc = 1; break;
+ 		case '7': Esc8 = 1; break;
+ 		case 'E': Lzmanag = ZF1_ZMCHNG; break;
 		case 'h': usage(0,NULL); break;
 		case 'H': Lzmanag = ZF1_ZMCRC; break;
 		case 'J':
@@ -1425,16 +1427,20 @@ getzrxinit(void)
 		case ZCOMMAND:		/* They didn't see our ZRQINIT */
 			/* ??? Since when does a receiver send ZCOMMAND?  -- uwe */
 			continue;
-		case ZRINIT:
-			Rxflags = 0xff & Rxhdr[ZF0];
-			Txfcs32 = (Wantfcs32 && (Rxflags & CANFC32));
-			{
-				int old=Zctlesc;
-				Zctlesc |= Rxflags & TESCCTL;
-				/* update table - was initialised to not escape */
-				if (Zctlesc && !old)
-					zsendline_init();
-			}
+ 		case ZRINIT:
+ 			Rxflags = 0xff & Rxhdr[ZF0];
+ 			Txfcs32 = (Wantfcs32 && (Rxflags & CANFC32));
+ 			{
+ 				int old=Zctlesc;
+ 				Zctlesc |= Rxflags & TESCCTL;
+ 				/* the peer asks for 8th-bit escaping (TESC8):
+ 				 * honor it unconditionally, like ESCCTL
+ 				 * (zmodem-current.txt §2.1) */
+ 				Esc8 |= Rxflags & TESC8;
+ 				/* update table - was initialised to not escape */
+ 				if ((Zctlesc && !old) || (Rxflags & TESC8))
+ 					zsendline_init();
+ 			}
 			Rxbuflen = (0xff & Rxhdr[ZP0])+((0xff & Rxhdr[ZP1])<<8);
 			if ( !(Rxflags & CANFDX))
 				Txwindow = 0;
@@ -1515,7 +1521,7 @@ sendzsinit(void)
 {
 	int c;
 
-	if (Myattn[0] == '\0' && (!Zctlesc || (Rxflags & TESCCTL)))
+	if (Myattn[0] == '\0' && (!Zctlesc || (Rxflags & TESCCTL)) && !Esc8)
 		return OK;
 	errors = 0;
 	for (;;) {
@@ -1526,9 +1532,11 @@ sendzsinit(void)
                  * (zmodem-current.txt §2.2). zsbhdr sets Crc32t per negotiation, so 
                  * the subpacket goes out with the negotiated CRC (normally CRC-32).
 		 */
-		if (Zctlesc)
-			Txhdr[ZF0] |= TESCCTL;
-		zsbhdr(ZSINIT, Txhdr);
+ 		if (Zctlesc)
+ 			Txhdr[ZF0] |= TESCCTL;
+ 		if (Esc8)
+ 			Txhdr[ZF0] |= TESC8;
+ 		zsbhdr(ZSINIT, Txhdr);
 		ZSDATA(Myattn, 1+strlen(Myattn), ZCRCW);
 		c = zgethdr(Rxhdr, 1,NULL);
 		switch (c) {

@@ -108,17 +108,26 @@ a sequence of 5 consecutive CAN characters can serve as a session abort
 signal, compatible with YMODEM session abort.
 
 ZMODEM escapes ZDLE (0x18), 0x10, 0x90, 0x11, 0x91, 0x13, and 0x93.
-0x0d and 0x8d are also escaped if they are preceded by 0x40 or 0x80,
+0x0d and 0x8d are also escaped if they are preceded by 0x40 or 0xC0,
 to protect the Telenet command escape CR-@-CR. (Not telnet, but Telenet.
 See https://archive.org/download/howtouse-telenet/howtouse-telenet.pdf.)
+
+All ZMODEM implementations MUST, either by default or by an option, be
+able to escape and un-escape the full list of characters listed in the
+paragraph above.
 
 If the ESCCTL (ZRINIT) or TESCCTL (ZSINIT) flag is set, 0x7f and all
 bytes < 0x20 are escaped via ZDLE encoding, not just the default minimal
 set.
 
 If the ESC8 (ZRINIT) or TESC8 (ZSINIT) flag is set, all bytes >= 0x80
-are escaped via ZDLE encoding. Note: this option is not widely
-implemented.
+are escaped via ZDLE encoding.
+Note: this option is not widely implemented.
+
+A common extension or optimization is to not escape 0x10, 0x90, 0x0d 
+and 0x8d (this is often called turbo escaping).
+Another common extension is to escape additional characters, for example
+the ssh escape char.
 
 ### ZDLE decoding
 
