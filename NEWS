@@ -49,6 +49,12 @@ if you use lrz to receive files from not perfectly trustworthy senders.
   disabled in lrzsz since sometime in the 90s, by hiding it behind the 
   -C or --allow-remote-commands options.
 
+* the sending of remote commands (lsz -c / -i, "the fifth form") is
+  deprecated and will be removed in a future release.
+  The sending side is kept for compatibility with old ZMODEM
+  implementations (OMEN zmodem and older lrz) that still execute received
+  commands. New setups should not use these options.
+
 * lsz no longer sends the "rz\r" auto-download trigger. The original 
   zmodem software sent this to make the receiving side start its rz; 
   modern practice is to watch the data stream for a ZRQINIT frame
@@ -133,6 +139,18 @@ if you use lrz to receive files from not perfectly trustworthy senders.
   acted upon. lrzsz keeps it for compatibility and will likely remove it 
   in a future release. The received mode is filtered as before (type bits 
   stripped, umask applied).
+
+* the -f / --full-path option of lsz (transmit the path instead of the
+  bare filename) is deprecated and will be tightened in a future
+  release.
+  The current ZMODEM documentation states that a sender must not transmit
+  absolute pathnames or ".." components. The historical behavior (OMEN sz
+  and derivatives) allowed both, so lsz still keeps it for compatibility.
+  A future release will keep allowing relative paths but will reject 
+  absolute paths and ".." components with a fatal error.
+  On the receiving side lrz confines received filenames to the receiving 
+  directory regardless of what the sender transmits.
+  New setups should use plain relative filenames.
 
 * on error recovery (ZRPOS) lsz now flushes its pending output with
   tcflush(TCOFLUSH), as the current ZMODEM documentation recommends,

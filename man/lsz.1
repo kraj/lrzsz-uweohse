@@ -142,6 +142,11 @@ The fifth form sends a single COMMAND to a ZMODEM receiver for execution.
 .B Sz
 exits as soon as the receiver has correctly received the command,
 before it is executed.
+This form (and thus the
+.BR \-c / \-i
+options) is deprecated and will be removed in a future release: it
+asks the receiving program to execute COMMAND, which only old ZMODEM
+implementations still do.
 
 
 If
@@ -216,9 +221,20 @@ increases memory and CPU usage.
  .TP
 .B "-c COMMAND, --command COMMAND"
 Send COMMAND to the receiver for execution, return with COMMAND\'s exit status.
+Deprecated: this asks the
+.B receiving
+program to execute COMMAND. It is kept for compatibility with old
+ZMODEM implementations (OMEN zmodem and older
+.BR lrz )
+that still execute received commands, and will be removed in a future
+release. New setups should not use it; modern receivers
+(including lrz) never execute commands and answer with a failure status.
 .TP
 .B "-C N, --command-tries N"
-Retry to send command N times (default: 11).
+Retry to send command N times (default: 11). Only meaningful together
+with
+.BR \-c / \-i ,
+which are deprecated.
 .TP
 .B "--delay-startup N"
 Wait
@@ -260,6 +276,18 @@ name already exists.
 Send Full pathname.
 Normally directory prefixes are stripped from the transmitted
 filename.
+Deprecated: the current ZMODEM documentation states that a sender
+MUST NOT transmit absolute pathnames or
+.B ..
+components. This option is kept for compatibility with the historical
+behavior (OMEN
+.B sz
+and derivatives, and for mirroring directory trees with relative
+paths); a future release will continue to allow relative paths but
+will reject absolute paths and
+.B ..
+components with a fatal error. New setups should use plain relative
+filenames.
 .TP
 .B "-h, --help"
 give help.
@@ -271,6 +299,10 @@ differ.
 .B "-i COMMAND, --immediate-command COMMAND"
 Send COMMAND to the receiver for execution, return immediately
 upon the receiving program's successful reception of the command.
+Deprecated: for the same reasons as
+.BR \-c ;
+kept for compatibility with old ZMODEM implementations that still
+execute received commands, will be removed in a future release.
 .TP
 .B "-J FILE, --journal FILE"
 Append a transfer-statistics line to
