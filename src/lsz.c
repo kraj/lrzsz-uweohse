@@ -32,7 +32,6 @@
 #include <errno.h>
 #include <getopt.h>
 #include <stdint.h>
-#include <sys/mman.h>
 
 #include "timing.h"
 
@@ -43,9 +42,6 @@
 #ifndef HAVE_GETOPT_LONG
 #define getopt_long(argc,argv,str,longopts,longind) getopt(argc,argv,str)
 #endif
-
-static size_t mm_size;
-static void *mm_addr=NULL;
 
 #define DEBUG_WINDOWHANDLING 1
 static int debugmode=0;
@@ -103,12 +99,9 @@ static int wcputsec (char *buf, int sectnum, size_t cseclen);
 #define ZSDATA(x,y,z) \
 	do { if (Crc32t) {zsda32(x,y,z); } else {zsdata(x,y,z);}} while(0)
 
-#define DATAADR (mm_addr ? ((char *)mm_addr)+zi->bytes_sent : txbuf)
-
 static int Filesleft;
 static long Totalleft;
 static size_t buffersize=16384;
-static int use_mmap=1;
 
 /*
  * Attention string to be executed by receiver to interrupt streaming data
@@ -406,7 +399,6 @@ main(int argc, char **argv)
 				buffersize= (size_t) -1;
 			else
 				buffersize=(size_t) lrzsz_strtoul( "-B / --bufsize", optarg, "km", 0, 0);
-			use_mmap=0;
 			break;
 		case 'C':
                         Cmdtries = lrzsz_strtoul( "-C / --command-tries", optarg, NULL, 0, 0);
@@ -759,7 +751,6 @@ wcs(const char *oname, const char *remotename)
 	struct stat f;
 	static char *name=NULL;
 	struct zm_fileinfo zi;
-	int dont_mmap_this=0;
 	const char *shortname;
 	shortname=strrchr(oname,'/');
 	if (shortname)
@@ -804,7 +795,6 @@ wcs(const char *oname, const char *remotename)
 			name=xstrdup(tmp);
 		}
 		input_f=stdin;
-		dont_mmap_this=1;
 	} else if ((input_f=fopen(oname, "r"))==NULL) {
 		int e=errno;
 		lrzsz_warning(e, _("cannot open %s"),oname);
@@ -814,7 +804,6 @@ wcs(const char *oname, const char *remotename)
 	} else {
 		name=xstrdup(oname);
 	}
-	if (!use_mmap || dont_mmap_this)
 	{
 		static char *s=NULL;
 		static size_t last_length=0;
@@ -1634,32 +1623,7 @@ again:
 			return ERROR;
 		case ZCRC:
 			crc = 0xFFFFFFFFL;
-			if (use_mmap && !mm_addr)
-			{
-				struct stat st;
-				/* mmap on files of 0 length can give 0 as result .. under linux 2.2.9 at least */
-				if (fstat (fileno (input_f), &st) == 0 && st.st_size!=0) {
-					mm_size = st.st_size;
-				mm_addr = mmap (0, mm_size, PROT_READ,
-								MAP_PRIVATE, fileno (input_f), 0);
-					if ((caddr_t) mm_addr == (caddr_t) - 1)
-						mm_addr = NULL;
-					else {
-						fclose (input_f);
-						input_f = NULL;
-					}
-				}
-			}
-			if (mm_addr) {
-				size_t i;
-				size_t count;
-				char *p=mm_addr;
-				count=(rxpos < mm_size && rxpos > 0)? rxpos: mm_size;
-				for (i=0;i<count;i++,p++) {
-					crc = UPDC32(*p, crc);
-				}
-				crc = ~crc;
-			} else if (Canseek >= 0) {
+			if (Canseek >= 0) {
                                 /* the input_f check is for the static analyzer clang-tidy,
                                  * which doesn't catch the logic around input_f. */
                                 if (input_f) {
@@ -1687,9 +1651,6 @@ again:
 			if (input_f) {
 				fclose(input_f);
 				input_f=NULL;
-			} else if (mm_addr) {
-				munmap(mm_addr,mm_size);
-				mm_addr=NULL;
 			}
 
 			vfile("receiver skipped");
@@ -1701,7 +1662,7 @@ again:
 			 * Suppress zcrcw request otherwise triggered by
 			 * lastsync==bytcnt
 			 */
-			if (!mm_addr && rxpos && fseeko(input_f, (off_t) rxpos, 0)) {
+			if (rxpos && fseeko(input_f, (off_t) rxpos, 0)) {
 				int er=errno;
 				vfile("fseeko failed: %s", strerror(er));
 				DO_SYSLOG((LOG_INFO, "%s/%s: fseeko failed: %s",
@@ -1736,22 +1697,6 @@ zsendfdata (struct zm_fileinfo *zi)
 	/* volatile: modified and read across the setjmp(intrjmp)/longjmp pair;
 	 * without it gcc -Wclobbered is right to complain. */
         volatile int need_wait = 1;
-
-	if (use_mmap && !mm_addr)
-	{
-		struct stat st;
-		if (fstat (fileno (input_f), &st) == 0 && st.st_size!=0) {
-			mm_size = st.st_size;
-			mm_addr = mmap (0, mm_size, PROT_READ,
-							MAP_PRIVATE, fileno (input_f), 0);
-			if ((caddr_t) mm_addr == (caddr_t) - 1)
-				mm_addr = NULL;
-			else {
-				fclose (input_f);
-				input_f = NULL;
-			}
-		}
-	}
 
 
 	Lrxpos = 0;
@@ -1841,14 +1786,7 @@ zsendfdata (struct zm_fileinfo *zi)
 		total_sent += blklen + OVERHEAD;
 		if (Verbose > 2 && blklen != old)
 			vstringf (_("blklen now %lu\n"), blklen);
-		if (mm_addr) {
-			if (zi->bytes_sent + blklen < mm_size)
-				n = blklen;
-			else {
-				n = mm_size - zi->bytes_sent;
-				zi->eof_seen = 1;
-			}
-		} else {
+		{
 			n = zfilbuf (zi);
                 }
 		if (zi->eof_seen) {
@@ -1941,7 +1879,7 @@ zsendfdata (struct zm_fileinfo *zi)
 			last_txpos = zi->bytes_sent;
 		} else if (Verbose)
 			not_printed++;
-		ZSDATA (DATAADR, n, e);
+		ZSDATA (txbuf, n, e);
 		bytcnt = zi->bytes_sent += n;
 		if (e == ZCRCW)
 			goto waitack;
@@ -2253,7 +2191,7 @@ getinsync(struct zm_fileinfo *zi, int flag)
 
                         /* the input_f check is for the static analyzer clang-tidy,
                          * which doesn't catch the logic around input_f. */
-			if (!mm_addr && input_f && fseeko(input_f, (off_t) rxpos, 0))
+			if (input_f && fseeko(input_f, (off_t) rxpos, 0))
 				return ERROR;
 			zi->eof_seen = 0;
 			bytcnt = Lrxpos = zi->bytes_sent = rxpos;
@@ -2274,18 +2212,12 @@ getinsync(struct zm_fileinfo *zi, int flag)
 			if (input_f) {
 				fclose (input_f);
 				input_f=NULL;
-			} else if (mm_addr) {
-				munmap(mm_addr,mm_size);
-				mm_addr=NULL;
 			}
 			return ZRINIT;
 		case ZSKIP:
 			if (input_f) {
 				fclose (input_f);
 				input_f=NULL;
-			} else if (mm_addr) {
-				munmap(mm_addr,mm_size);
-				mm_addr=NULL;
 			}
 			return ZSKIP;
 		case ERROR:

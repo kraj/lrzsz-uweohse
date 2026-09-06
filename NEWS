@@ -165,6 +165,14 @@ if you use lrz to receive files from not perfectly trustworthy senders.
   The option is only needed on lines that corrupt the 8th bit, or to
   force the capability advertisement.
 
+* lsz no longer uses mmap() for input files. input is now read via stdio
+  only. this also means the input file is no longer closed early, and a
+  file truncated during the transfer fails with a read error instead of
+  killing the sender with SIGBUS. Wire behavior is unchanged.
+  A benchmark (buffered with 8192..262144-byte buffers vs mmap, 15 MiB
+  file) showed buffered I/O at parity or better than mmap, so the
+  special case was not worth its complexity.
+
 * on error recovery (ZRPOS) lsz now flushes its pending output with
   tcflush(TCOFLUSH), as the current ZMODEM documentation recommends,
   so a buffered modem or serial driver does not keep delivering stale
