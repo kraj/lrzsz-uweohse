@@ -543,10 +543,8 @@ process_byte(struct parser *p, unsigned char c)
                 if (p->byte_idx == 14) {
                     /* Parse: type(2) + data[0..3](8) + crc(4) = 14 hex chars */
                     unsigned int type, d0, d1, d2, d3, crc;
-                    sscanf(hexbuf, "%2x%2x%2x%2x%2x%2x%2x",
-                           &type, &d0, &d1, &d2, &d3, &crc, &crc);
-                    /* crc is 4 hex chars = 2 bytes, need to parse separately */
-                    sscanf(hexbuf + 10, "%4x", &crc);
+                    sscanf(hexbuf, "%2x%2x%2x%2x%2x%4x",
+                           &type, &d0, &d1, &d2, &d3, &crc);
                     p->hdr_type = type & 0xff;
                     p->hdr[0] = d0 & 0xff;
                     p->hdr[1] = d1 & 0xff;
