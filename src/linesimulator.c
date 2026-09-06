@@ -486,7 +486,6 @@ static void
 dir_init(struct direction *d)
 {
     memset(d, 0, sizeof(*d));
-    memset(d, 0, sizeof(*d));
     rl_init(&d->rl, RL_NONE, 0, 0, 0, 0);
     es_init(&d->es);
 }
