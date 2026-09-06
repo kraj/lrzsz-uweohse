@@ -118,8 +118,6 @@ AC_CHECK_HEADERS(sys/select.h strings.h arpa/inet.h locale.h)
 
 dnl Checks for typedefs, structures, and compiler characteristics.
 
-AC_CHECK_TYPES([struct utimbuf], [], [], [[#include <utime.h>]])
-
 AC_CHECK_FUNCS(gettimeofday sigaction getopt_long fseeko)
 
 dnl O_NOFOLLOW is POSIX.1-2008; this is to provide fallback for ancient systems.

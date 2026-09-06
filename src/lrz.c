@@ -31,10 +31,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include <getopt.h>
-
-#ifdef HAVE_UTIME_H
 #include <utime.h>
-#endif
 
 #ifndef HAVE_GETOPT_LONG
 #define getopt_long(argc,argv,str,longopts,longind) getopt(argc,argv,str)
@@ -2112,17 +2109,10 @@ closeit(struct zm_fileinfo *zi)
 		return ERROR;
 	}
 	if (zi->modtime) {
-#ifdef HAVE_STRUCT_UTIMBUF
 		struct utimbuf timep;
 		timep.actime = time(NULL);
 		timep.modtime = zi->modtime;
 		utime(Pathname, &timep);
-#else
-		time_t timep[2];
-		timep[0] = time(NULL);
-		timep[1] = zi->modtime;
-		utime(Pathname, timep);
-#endif
 	}
 #ifdef S_ISREG
  	if (S_ISREG(zi->mode)) {
