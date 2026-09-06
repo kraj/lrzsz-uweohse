@@ -142,14 +142,24 @@ int enable_syslog=true;
 } while(0)
 
 
-/* async-signal-safe signal handler */
+/* Signal handler for SIGINT/SIGTERM/SIGPIPE.
+ * This is not strictly async-signal safe, because of the tcsetattr and tcflush
+ * calls in io_mode(), but these functions are, under linux at least, simple 
+ * syscall wrappers.
+ * Leaving the terminal in raw mode would be worse. So we rely on undefined 
+ * behaviour here. Oh well.
+ * _exit() skips atexit/stdio on purpose, exit() would risk stdio/malloc 
+ * re-entrancy from the handler. */
 LRZSZ_NORETURN static void
 bibi_sighandler(int n)
 {
+	int saved_errno = errno;
+
 	if (zmodem_requested)
 		zmputs(Attn);
 	canit(STDOUT_FILENO);
 	io_mode(0,0);
+	errno = saved_errno;
 	_exit(128+n);
 }
 

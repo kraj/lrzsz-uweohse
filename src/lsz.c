@@ -179,12 +179,22 @@ static int io_mode_fd=0;
 static int zrqinits_sent=0;
 static int play_with_sigint=0;
 
-/* async-signal-safe signal handler */
+/* Signal handler for SIGINT/SIGTERM/SIGPIPE/SIGHUP. 
+ * This is not strictly async-signal safe, because of the tcsetattr and tcflush
+ * calls in io_mode(), but these functions are, under linux at least, simple 
+ * syscall wrappers. 
+ * Leaving the terminal in raw mode would be worse. So we rely on undefined 
+ * behaviour here. Oh well.
+ * _exit() skips atexit/stdio on purpose, exit() would risk stdio/malloc 
+ * re-entrancy from the handler. */
 LRZSZ_NORETURN static void
 bibi_sighandler(int n)
 {
+	int saved_errno = errno;
+
 	canit(STDOUT_FILENO);
 	io_mode(io_mode_fd, 0);
+	errno = saved_errno;
 	_exit(128 + n);
 }
 
