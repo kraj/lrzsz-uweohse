@@ -4,7 +4,7 @@ EXTRA_DIST = m4/ChangeLog check.lrzsz COMPATABILITY README.cvs README.isdn4linux
 	doc/README doc/zmodem-forsberg.txt doc/zmodem-zmtx-zmrx.txt doc/zmodem-current.txt doc/zmodemsnif.txt
 
 PR=@PACKAGE@-@VERSION@
-DISTCLEANFILES=fastcheck.done stamp-h
+DISTCLEANFILES=fastcheck.done
 CLEAN_FILES=fastcheck.done
 ACLOCAL_AMFLAGS = -I m4
 QUICKCHECKS=xmodem-lsz-lrz-16k-binary xmodem-lsz-lrz-large-binary-1k-crc zmodem-lsz-lrz-MGMT-default-nonexisting zmodem-lsz-lrz-MGMT-ZMCRC-r \

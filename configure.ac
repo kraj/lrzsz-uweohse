@@ -146,6 +146,4 @@ AM_GNU_GETTEXT(external)
 dnl AC_DEFINE_UNQUOTED(LOCALEDIR,"$prefix/$DATADIRNAME","Description… autoheader wants this")
 
 AC_CONFIG_FILES([Makefile man/Makefile po/Makefile.in src/Makefile Specfile])
-AC_CONFIG_COMMANDS([default],[
-test -z "$CONFIG_HEADERS" || echo timestamp > stamp-h],[])
 AC_OUTPUT
