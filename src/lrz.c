@@ -1271,7 +1271,7 @@ procheader(char *name, struct zm_fileinfo *zi)
              * a SHOULD NOT per doc/zmodem-current.txt §4 ("file access
              * rights"), kept for compatibility with old peers. See also
              * the mode checks in closeit()/S1. */
-            if (zi->mode & UNIXFILE)
+            if (zi->mode & S_IFMT)
                 ++Thisbinary;
         }
     }
@@ -1371,11 +1371,11 @@ procheader(char *name, struct zm_fileinfo *zi)
             *p = 0;
     }
 
-    /* NOTE: the UNIXFILE check is the same legacy marker as above (V4):
+    /* NOTE: the S_IFMT check is the same legacy marker as above (V4):
      * a full st_mode from an old sender means "Unix peer, keep case".
      * Deprecated per doc/zmodem-current.txt §4, kept for old peers. */
     if (!zmodem_requested && MakeLCPathname && !IsAnyLower(name_static)
-            && !(zi->mode&UNIXFILE))
+            && !(zi->mode&S_IFMT))
         uncaps(name_static);
     }
 
