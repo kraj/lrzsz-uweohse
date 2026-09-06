@@ -346,15 +346,20 @@ main(int argc, char *argv[])
 				struct tm *tm;
 				time_t t;
 				int hh,mm;
-				char *nex;
+				char *nex, *mstart;
 				
 				hh = strtoul (optarg, &nex, 10);
+				if (nex == optarg)
+					usage(2,_("unparsable stop time: empty hour"));
 				if (hh>23)
 					usage(2,_("hour too large (0..23)"));
 				if (*nex!=':')
-					usage(2, _("unparsable stop time\n"));
+					usage(2, _("unparsable stop time"));
                                 nex++;
+                                mstart = nex;
                                 mm = strtoul(nex, &nex, 10);
+                                if (nex == mstart)
+                                        usage(2,_("unparsable stop time: empty minute"));
                                 if (mm>59)
                                         usage(2,_("minute too large (0..59)"));
                                 

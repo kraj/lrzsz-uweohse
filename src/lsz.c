@@ -361,7 +361,7 @@ main(int argc, char **argv)
 	Rxtimeout = 600;
 
 	while ((c = getopt_long (argc, argv,
-		"2+4589aA:bB:C:c:dfeEghHi:J:kL:l:m:M:NnOop7RrqsSt:TUuvVw:XYyZ",
+		"2+4589aA:bB:C:c:dfeEghHi:J:kL:l:m:M:NnOop7Rrqs:St:TUuvVw:XYyZ",
 		long_options, (int *) 0))!=EOF)
 	{
 		switch (c)
@@ -455,15 +455,20 @@ main(int argc, char **argv)
 				struct tm *tm;
 				time_t t;
 				int hh,mm;
-				char *nex;
+				char *nex, *mstart;
 
 				hh = strtoul (optarg, &nex, 10);
+				if (nex == optarg)
+					usage(2, _("unparsable stop time: empty hour"));
 				if (hh>23)
 					usage(2,_("hour too large (0..23)"));
 				if (*nex!=':')
-					usage(2, _("unparsable stop time\n"));
+					usage(2, _("unparsable stop time"));
 			nex++;
+			mstart = nex;
 			mm = strtoul (nex, &nex, 10);
+			if (nex == mstart)
+				usage(2, _("unparsable stop time: empty minute"));
 			if (mm>59)
 				usage(2,_("minute too large (0..59)"));
 
@@ -477,7 +482,7 @@ main(int argc, char **argv)
 				if (stop_time - t <10)
 					usage(2,_("stop time too small"));
 			} else {
-                                stop_time = time(0) + (time_t) lrzsz_strtoul( "-s / --stop-at", optarg, NULL, 10, 0);
+				stop_time = time(0) + (time_t) lrzsz_strtoul( "-s / --stop-at", optarg, NULL, 1, 0);
 			}
 			break;
 		case 'S':
