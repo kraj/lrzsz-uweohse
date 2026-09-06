@@ -576,7 +576,8 @@ main(int argc, char **argv)
 	if (npats < 1 && !command_mode)
 		usage(2,_("need at least one file to send"));
 	if (command_mode && Restricted) {
-		printf(_("Can't send command in restricted mode\n"));
+		/* stderr, not stdout: stdout is the protocol stream. */
+		lrzsz_warning(0, _("can't send command in restricted mode"));
 		exit(1);
 	}
 
