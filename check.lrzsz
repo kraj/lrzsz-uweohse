@@ -902,31 +902,26 @@ zcompat() {
 }
 zbuffer() {
     compat_traits "lrzsz"
-    _SZ_1k="$BENCH_SZ_1k";
+    _SZ_8k="$BENCH_SZ_8k";
     _RZ="$BENCH_RZ";
     sender="lsz"
     receiver="lrz"
     for i in $(seq 1 7); do
-            for speed in unlimited; do
-                FAULT=""
-                all_binaries="$all_256_file $binary_4k $binary_16k $binary_128k $binary_256k $binary_1m $binary_8m"
+	FAULT=""
+	all_binaries="$all_256_file $binary_4k $binary_16k $binary_64k $binary_256k $binary_1m $binary_2m $binary_4m $binary_8m"
 
-                key="zmodem-$sender-$receiver-buffer-4096"
-                doit "$key" "$sender sending multiple files to $receiver" "$_SZ_1k" "$_RZ -B4096" cmp "$all_binaries" 
-                key="zmodem-$sender-$receiver-buffer-8192"
-                doit "$key" "$sender sending multiple files to $receiver" "$_SZ_1k" "$_RZ -B8192" cmp "$all_binaries" 
-                key="zmodem-$sender-$receiver-buffer-16384"
-                doit "$key" "$sender sending multiple files to $receiver" "$_SZ_1k" "$_RZ -B16384" cmp "$all_binaries" 
-                key="zmodem-$sender-$receiver-buffer-32768"
-                doit "$key" "$sender sending multiple files to $receiver" "$_SZ_1k" "$_RZ -B32768" cmp "$all_binaries" 
-                key="zmodem-$sender-$receiver-buffer-65536"
-                doit "$key" "$sender sending multiple files to $receiver" "$_SZ_1k" "$_RZ -B65536" cmp "$all_binaries" 
-                key="zmodem-$sender-$receiver-buffer-131072"
-                doit "$key" "$sender sending multiple files to $receiver" "$_SZ_1k" "$_RZ -B131072" cmp "$all_binaries" 
-                key="zmodem-$sender-$receiver-buffer-262144"
-                doit "$key" "$sender sending multiple files to $receiver" "$_SZ_1k" "$_RZ -B262144" cmp "$all_binaries" 
-            done
-            
+	for i in 8192 16384 32768 65536 131072 262144 ; do
+		key="zmodem-$sender-$receiver-rbuf-$i"
+		doit "$key" "$sender sending multiple files to $receiver" "$_SZ_8k" "$_RZ -B$i" cmp "$all_binaries" 
+	done
+	for i in 8192 16384 32768 65536 131072 262144 ; do
+		key="zmodem-$sender-$receiver-sbuf-$i"
+		doit "$key" "$sender sending multiple files to $receiver" "$_SZ_8k -B$i" "$_RZ" cmp "$all_binaries" 
+	done
+	for i in 8192 16384 32768 65536 131072 262144 ; do
+		key="zmodem-$sender-$receiver-srbuf-$i"
+		doit "$key" "$sender sending multiple files to $receiver" "$_SZ_8k -B$i" "$_RZ -B$i" cmp "$all_binaries" 
+	done
     done
 }
 # for the benchmarking.
@@ -1737,7 +1732,6 @@ if test "$mode" = zbuffer ; then
     # very special stuff, not a regular self check.
     zbuffer
 fi
-
 
 
 if test -s "$testdir/failures.log" ; then
