@@ -80,11 +80,12 @@ tidy:
 
 qa: asan msan ubsan coverage
 
-# make is so strange.
+.PHONY: $(SANITIZERS) qa coverage
+
 SANITIZERS = asan msan ubsan
 $(SANITIZERS): CC_LIST = clang gcc
 msan: CC_LIST = clang
-$(SANITIZERS): %: src/*.c src/*.h
+$(SANITIZERS):
 	for i in $(CC_LIST) ; do if command -v "$$i" >/dev/null ; then \
 		echo "running clean/configure/vcheck with $$i --enable-$@"; \
 		make -s V=0 clean >/dev/null ; \
@@ -94,7 +95,7 @@ $(SANITIZERS): %: src/*.c src/*.h
 	fi ; done
 
 coverage: coverage/coverage.html
-coverage/coverage.html: src/*.c src/*.h
+coverage/coverage.html: $(wildcard src/*.c src/*.h)
 	mkdir coverage 2>/dev/null || exit 0
 	make -s V=0 clean
 	./configure --enable-coverage -q
