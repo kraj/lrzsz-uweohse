@@ -15,17 +15,9 @@ AC_SUBST(SUPPORTED_C_STDS, "$supported_c_stds")
 
 AC_PREREQ([2.72])
 
-PACKAGE_VERSION="$PACKAGE-$VERSION"
-AC_DEFINE_UNQUOTED([PACKAGE], ["$PACKAGE"], [Name of package])
-AC_DEFINE_UNQUOTED([VERSION], ["$VERSION"], [Version number of package])
-#AC_DEFINE_UNQUOTED([PACKAGE_VERSION], ["$PACKAGE_VERSION"], [The concatenation of the strings PACKAGE, "-", and VERSION.])
-AC_SUBST(PACKAGE)
-AC_SUBST(VERSION)
-#AC_SUBST(PACKAGE_VERSION)
-
-AS_CASE([$VERSION],
-  [[0-9]*.[0-9]*.[0-9]*], [README_ALPHA="README-alpha"],
-  [*], [README_ALPHA=])
+dnl AM_INIT_AUTOMAKE AC_DEFINEs and AC_SUBSTs PACKAGE and VERSION.
+dnl Tarball name (Specfile.in); must not shadow autoconf's plain PACKAGE_VERSION.
+AC_SUBST([DIST_TARBALL], ["$PACKAGE-$VERSION"])
 
 
 AC_ARG_ENABLE(mkdir,

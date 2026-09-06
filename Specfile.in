@@ -4,7 +4,7 @@ Version: @VERSION@
 Release: 0
 Copyright: GPL
 Group: Applications/Communications
-Source: ftp://ftp.ohse.de/uwe/releases/@PACKAGE_VERSION@.tar.gz
+Source: ftp://ftp.ohse.de/uwe/releases/@DIST_TARBALL@.tar.gz
 BuildRoot: /var/tmp/lrzsz-root
 Summary(de): lzrz - sz, rz und Co.
 Summary(fr): lzrz - sz, rz, et consorts
@@ -16,20 +16,20 @@ files using the Z, X, and Y protocols.  Many terminal programs
 (like minicom) make use of these programs to transfer files.
 
 %description -l de
-Diese Sammlung von Befehlen läßt sich zum Herunter- und 
-Aufwärtsladen von Dateien anhand der Z-, X- und Y-Protokolle benutzen. 
-Viele Terminalprogramme (wie Minicom) setzen diese Programme für die
-Übertragung von Dateien ein. 
+Diese Sammlung von Befehlen lï¿½ï¿½t sich zum Herunter- und 
+Aufwï¿½rtsladen von Dateien anhand der Z-, X- und Y-Protokolle benutzen. 
+Viele Terminalprogramme (wie Minicom) setzen diese Programme fï¿½r die
+ï¿½bertragung von Dateien ein. 
 
 %description -l fr
-Cet ensemble de commande sert à télécharger des fichiers en utilisant
+Cet ensemble de commande sert ï¿½ tï¿½lï¿½charger des fichiers en utilisant
 les protocoles Z, X et Y. De nombreux programmes de terminal (comme
-minicom) utilisent ces programmes pour transférer les fichiers.
+minicom) utilisent ces programmes pour transfï¿½rer les fichiers.
 
 %description -l tr
-Bu komutlar topluluðu Z, X ve Y protokollerini kullanarak dosya aktarýmý
-için kullanýlabilir. Pek çok uç birim programý (örneðin minicom) dosya
-taþýmak için bu programlarý kullanýr.
+Bu komutlar topluluï¿½u Z, X ve Y protokollerini kullanarak dosya aktarï¿½mï¿½
+iï¿½in kullanï¿½labilir. Pek ï¿½ok uï¿½ birim programï¿½ (ï¿½rneï¿½in minicom) dosya
+taï¿½ï¿½mak iï¿½in bu programlarï¿½ kullanï¿½r.
 
 %prep
 %setup
