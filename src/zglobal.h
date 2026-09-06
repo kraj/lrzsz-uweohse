@@ -31,24 +31,9 @@
 
 #  include <sys/time.h>
 #  include <time.h>
-#  define INCLUDED_SYS_TIME
-
-#ifdef SYS_TIME_WITHOUT_SYS_SELECT
-# ifdef INCLUDED_SYS_TIME
-#  undef HAVE_SYS_SELECT_H
-# endif
-#endif
-
 
 #ifdef HAVE_SYS_SELECT_H
 #  include <sys/select.h>
-#endif
-#ifdef __BEOS__
- /* BeOS 4.0: sys/select.h is almost completely #ifdefd out */
-#define  HAVE_SOCKET_H
-#ifdef HAVE_SOCKET_H
-#include <socket.h>
-#endif
 #endif
 
 #include <string.h>
@@ -75,7 +60,6 @@ struct termios;
 #  error neither termios.h nor sys/termios.h found. Cannot continue.
 # endif
 #endif
-
 
 /* Take care of NLS matters.  */
 #if HAVE_LOCALE_H

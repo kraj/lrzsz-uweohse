@@ -76,8 +76,6 @@ if test "x$CFLAGS" = x ; then old_cflags_empty=1; fi
 
 dnl Checks for programs.
 AC_PROG_CC
-AC_C_CONST
-AC_C_INLINE
 AX_COMPILER_FLAGS_CFLAGS()
 
 for i in $supported_c_stds ; do
@@ -117,28 +115,15 @@ if test "$want_ubsan" != "no" ; then
 fi
 
 dnl Checks for libraries.
-dnl slowlartis needs this
-AC_CHECK_LIB(nsl,gethostbyname,,,)
 
 AC_CHECK_INCLUDES_DEFAULT
 
 AC_CHECK_HEADERS(fcntl.h limits.h sys/ioctl.h sys/time.h unistd.h sys/times.h)
-LRZSZ_HEADERS_TERM_IO
-AC_CHECK_HEADERS(termios.h sys/termios.h termio.h sys/termio.h sgtty.h)
+AC_CHECK_HEADERS(termios.h sys/termios.h)
 AC_CHECK_HEADERS(utime.h syslog.h sys/syslog.h sys/param.h)
 AC_CHECK_HEADERS(sys/select.h strings.h arpa/inet.h locale.h)
 
 dnl Checks for typedefs, structures, and compiler characteristics.
-AC_TYPE_SIZE_T
-AC_TYPE_MODE_T
-AC_TYPE_OFF_T
-LRZSZ_TYPE_SPEED_T
-
-AC_CHECK_HEADERS_ONCE([sys/time.h])
-
-UO_TYPE_SOCKLEN_T
-lrzsz_HEADER_SYS_SELECT
-AC_STRUCT_TM
 
 AC_CHECK_TYPES([struct utimbuf], [], [], [[#include <utime.h>]])
 
@@ -162,8 +147,10 @@ AC_SUBST(LRZSZ_LDFLAGS)
 AC_SUBST(LDFLAGS)
 AC_SUBST(LIBS)
 
+dnl gettext infrastructure is vendored (m4/, po/, config.rpath); do not add
+dnl AM_GNU_GETTEXT_VERSION / AM_GNU_GETTEXT_REQUIRE_VERSION here — autoreconf -fi
+dnl would try to run autopoint (target version would be 0.23).
 AM_GNU_GETTEXT(external)
-AM_GNU_GETTEXT_REQUIRE_VERSION([0.23])
 
 dnl AC_DEFINE_UNQUOTED(LOCALEDIR,"$prefix/$DATADIRNAME","Description… autoheader wants this")
 
