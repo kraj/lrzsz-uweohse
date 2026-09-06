@@ -1734,8 +1734,6 @@ zsendfdata (struct zm_fileinfo *zi)
 		}
 	}
 
-	if (play_with_sigint)
-		signal (SIGINT, onintr);
 
 	Lrxpos = 0;
 	junkcount = 0;
@@ -1745,6 +1743,7 @@ zsendfdata (struct zm_fileinfo *zi)
 	low_bps = 0;
 	not_printed = 0;
 
+	/* onintr() longjmps to intrjmp, which setjmp() below fills in. */
   somemore:
 	if (setjmp (intrjmp)) {
 	    if (play_with_sigint)
@@ -1805,6 +1804,10 @@ zsendfdata (struct zm_fileinfo *zi)
 			}
 		}
 	}
+
+	/* Normal flow: setjmp has completed, so onintr may now be installed. */
+	if (play_with_sigint)
+		signal (SIGINT, onintr);
 
         newcnt = Rxbuflen;
 	Txwcnt = 0;
