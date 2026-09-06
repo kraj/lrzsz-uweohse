@@ -1533,6 +1533,44 @@ zmanage() {
     doit "$key" "lsz sending 0777 file to lrz keeps group/other bits off" "$SZ -q" "$RZ -q" mode_cmp $testdir/mode777.bin x
 
     #
+    # sanity check: closeit() must never leave the owner without read/
+    # write access to their own uploaded file, no matter what mode bits the
+    # sender chose (the ZFILE field carries the full st_mode; lsz sends it
+    # too, so mode 0100406 = S_IFREG|0406 reaches lrz verbatim). Old code
+    # chmod'ed to (mode&0777)&~umask = 0400 here — the reported worst case
+    # 0100006 (= S_IFREG|0006) even produced 0000: the owner locked out of
+    # their own upload. closeit() now ORs in owner read/write. A source
+    # with mode 0006 cannot be exercised directly (lsz could not open it,
+    # owner has no read), so 0406 (owner r, no owner w) is used: the write
+    # bit must come from the |0600 clamp, and group/other must stay masked.
+    #
+    key="zmodem-lsz-lrz-MGMT-mode-0406"
+    mkdir "$testdir/$key"
+    cp $all_256_file $testdir/mode0406.bin
+    chmod 0406 $testdir/mode0406.bin
+    mode_owner_rw_cmp() {
+        if cmp "$1" "$2" >&5 ; then
+            :
+        else
+            echo "-- files differ"
+            return 1
+        fi
+        case $(ls -l "$2" | cut -c2-4) in
+        rw-) ;;
+        *)
+            echo "-- received file lacks owner rw: $(ls -l "$2" | cut -c1-10)"
+            return 1 ;;
+        esac
+        case $(ls -l "$2" | cut -c5-10) in
+        ------) ;;
+        *)
+            echo "-- received file has group/other permission bits set: $(ls -l "$2" | cut -c1-10)"
+            return 1 ;;
+        esac
+    }
+    doit "$key" "lsz sending a 0406-mode file leaves the owner rw-" "$SZ -q" "$RZ -q" mode_owner_rw_cmp $testdir/mode0406.bin
+
+    #
     # A sender's pathnames must never escape the receiving directory:
     # checkpath() rejects traversing names, safe_open() confines resolution
     # to the CWD. The canaries live outside $key (the receiving directory);

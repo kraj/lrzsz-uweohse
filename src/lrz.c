@@ -2105,18 +2105,24 @@ closeit(struct zm_fileinfo *zi)
 #endif
 	}
 #ifdef S_ISREG
-	if (S_ISREG(zi->mode)) {
+ 	if (S_ISREG(zi->mode)) {
 #else
 	if ((zi->mode&S_IFMT) == S_IFREG) {
 #endif
-		/* we must not make this program executable if running 
+		/* we must not make this program executable if running
 		 * under rsh, because the user might have uploaded an
 		 * unrestricted shell.
 		 */
+		/* sanity check: a sender-chosen mode without owner read/
+		 * write (e.g. 0100006 = S_IFREG|0006) would leave the owner
+		 * locked out of their own uploaded file once the umask is
+		 * applied. Owner rw is therefore granted unconditionally; 
+                 * the sender keeps influence over exec and group/other bits.
+                 */
 		if (under_rsh)
-			chmod(Pathname, (0666 & zi->mode) & ~lrz_umask);
+			chmod(Pathname, ((0666 & zi->mode) | 0600) & ~lrz_umask);
 		else
-			chmod(Pathname, (0777 & zi->mode) & ~lrz_umask);
+			chmod(Pathname, ((0777 & zi->mode) | 0600) & ~lrz_umask);
 	}
 	return OK;
 }
