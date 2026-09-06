@@ -20,16 +20,12 @@ dnl Tarball name (Specfile.in); must not shadow autoconf's plain PACKAGE_VERSION
 AC_SUBST([DIST_TARBALL], ["$PACKAGE-$VERSION"])
 
 
-AC_ARG_ENABLE(mkdir,
-	[  --disable-mkdir   disable support for creating directories (lrz)],
-	[if test "$enableval" = "no" ; then 
-		:
-	  else
-	  	AC_DEFINE([ENABLE_MKDIR], [], [Define to 1 if lrz shall create directories if needed.])
-	  fi],
-	[AC_DEFINE([ENABLE_MKDIR], [], [Define to 1 if lrz shall create directories if needed.])])
+AC_ARG_ENABLE([mkdir],
+	AS_HELP_STRING([--disable-mkdir], [disable support for creating directories (lrz)]))
+AS_IF([test "x$enable_mkdir" != xno],
+	[AC_DEFINE([ENABLE_MKDIR], [1], [Define to 1 if lrz shall create directories if needed.])])
 AC_ARG_WITH([syslog-facility],
-	[  --with-syslog-facility=FACILITY  syslog facility (default: LOG_UUCP)],
+	AS_HELP_STRING([--with-syslog-facility=FACILITY], [syslog facility (default: LOG_UUCP)]),
 	[AS_CASE([$withval],
 		[yes|no|""], [syslog_facility=LOG_UUCP],
 		[syslog_facility=$withval])],
@@ -38,27 +34,27 @@ AC_DEFINE_UNQUOTED([SYSLOG_FACILITY], [$syslog_facility],
 	[Define to the syslog facility constant to use for openlog().])
 have_std=
 AC_ARG_ENABLE([std],
-              [  --enable-std=STD Use a specific C std ($supported_c_stds)],
+              AS_HELP_STRING([--enable-std=STD], [use a specific C std (c23 c17 c11 c99)]),
               [have_std=$enableval],
               [have_std="no"])
 AC_ARG_ENABLE([asan],
-              [  --enable-asan enable the address sanitizer (if available)],
+              AS_HELP_STRING([--enable-asan], [enable the address sanitizer (if available)]),
               [want_asan=$enableval],
               [want_asan="no"])
 AC_ARG_ENABLE([lsan],
-              [  --enable-lsan enable the leak sanitizer (if available)],
+              AS_HELP_STRING([--enable-lsan], [enable the leak sanitizer (if available)]),
               [want_lsan=$enableval],
               [want_lsan="no"])
 AC_ARG_ENABLE([msan],
-              [  --enable-msan enable the memory sanitizer (if available)],
+              AS_HELP_STRING([--enable-msan], [enable the memory sanitizer (if available)]),
               [want_msan=$enableval],
               [want_msan="no"])
 AC_ARG_ENABLE([ubsan],
-              [  --enable-ubsan enable the undefined behavior sanitizer (if available)],
+              AS_HELP_STRING([--enable-ubsan], [enable the undefined behavior sanitizer (if available)]),
               [want_ubsan=$enableval],
               [want_ubsan="no"])
 AC_ARG_ENABLE([coverage],
-              [  --enable-coverage compile with coverage information],
+              AS_HELP_STRING([--enable-coverage], [compile with coverage information]),
               [want_coverage=$enableval],
               [want_coverage="no"])
 
