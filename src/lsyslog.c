@@ -29,10 +29,11 @@ void
 lsyslog(int prio, const char *format, ...)
 {
     static char *username=NULL;
-    /* i'd really hate this function to fail! 21 is enough for \0 plus 
+    /* i'd really hate this function to fail! 21 is enough for \0 plus
      * uint64_t uids, which most likely will never exist... */
     static char uid_string[21]="";
     char s[1024];
+    char scrub[1024];
     static int init_done=0;
     va_list ap;
     if (!enable_syslog)
@@ -55,5 +56,6 @@ lsyslog(int prio, const char *format, ...)
     va_start(ap, format);
     vsnprintf(s, sizeof(s), format, ap);
     va_end(ap);
-    syslog(prio,"[%s] %s",username, s);
+    (void) sanitize_bytes(scrub, sizeof(scrub), s);
+    syslog(prio,"[%s] %s",username, scrub);
 }

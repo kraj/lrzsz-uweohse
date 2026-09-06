@@ -39,6 +39,8 @@ unsigned long lrzsz_strtoul(const char *name, const char *value, const char *val
 char * xstrdup(const char *s);
 void * xmalloc(size_t size);
 
+size_t sanitize_bytes(char *dst, size_t dstcap, const char *src);
+
 void report_transfer_result (int sending, const char *shortname,
     const char *fname, long bytes, long total, long skipped);
 

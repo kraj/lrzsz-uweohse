@@ -196,3 +196,26 @@ fd_readable(int fd)
     tv.tv_usec = 0;
     return select(fd + 1, &fds, NULL, NULL, &tv);
 }
+
+/* Log-forging protection for syslog and the transfer journal: escape C0
+ * control characters (and DEL) as \xNN; printable ASCII and bytes >=0x80
+ * (multi-byte UTF-8 sequences, which live entirely in 0x80-0xff) pass
+ * through verbatim. Stops cleanly at an escape boundary when dst runs
+ * out; dst is always NUL-terminated. Returns the written length. */
+size_t
+sanitize_bytes(char *dst, size_t dstcap, const char *src)
+{
+    size_t o = 0, i;
+
+    for (i = 0; src[i] && o + 4 < dstcap; i++) {
+        unsigned char c = (unsigned char) src[i];
+        if (c >= 0x20 && c != 0x7f) {
+            dst[o++] = (char) c;
+        } else {
+            snprintf(dst + o, 5, "\\x%02x", c);
+            o += 4;
+        }
+    }
+    dst[o] = '\0';
+    return o;
+}
