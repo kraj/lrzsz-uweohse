@@ -5,14 +5,13 @@ AM_INIT_AUTOMAKE(foreign)
 AC_CONFIG_HEADERS(config.h)
 AC_USE_SYSTEM_EXTENSIONS
 
-dnl Enable 64-bit file offsets on 32-bit platforms
-AC_DEFINE([_FILE_OFFSET_BITS], [64], [Define to 64 to enable 64-bit file offsets on 32-bit platforms.])
+dnl Enable 64-bit file offsets on 32-bit platforms (noop if off_t is already 64-bit)
+AC_SYS_LARGEFILE
 
 dnl Policy: about 20 years. Rounded to the nearest _POSIX_C_SOURCE. Not below 15 years.
 supported_c_stds="c23 c17 c11 c99"
 AC_SUBST(MIN_POSIX_C_STD, "200809L")
 AC_SUBST(SUPPORTED_C_STDS, "$supported_c_stds")
-
 
 AC_PREREQ([2.72])
 
