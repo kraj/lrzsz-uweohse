@@ -1693,7 +1693,7 @@ zsendfdata (struct zm_fileinfo *zi)
 	static long last_bps = 0;
 	static long not_printed = 0;
 	static long total_sent = 0;
-	static time_t low_bps=0;
+	static double low_bps=0;
         int newcnt;
 	/* the first data subpacket after a ZRPOS must be ZCRCW
 	 * (zmodem-current.txt §5, sender-side error recovery). Without this
@@ -1834,12 +1834,12 @@ zsendfdata (struct zm_fileinfo *zi)
 			int minleft = 0;
 			int secleft = 0;
 			time_t now;
-			{
-				double d = timing_elapsed(&now);
-				if (d == 0)
-					d = 0.5;
-				last_bps = (long) ((zi->bytes_sent / d));
-			}
+			double d;
+			now=time(NULL); /* wall clock: -s stop deadline */
+			d=timing_elapsed();
+			if (d == 0)
+				d = 0.5; /* first call: zero elapsed */
+			last_bps = (long) ((zi->bytes_sent / d));
 			if (last_bps > 0) {
 				minleft = (zi->bytes_total - zi->bytes_sent) / last_bps / 60;
 				secleft = ((zi->bytes_total - zi->bytes_sent) / last_bps) % 60;
@@ -1847,7 +1847,7 @@ zsendfdata (struct zm_fileinfo *zi)
 			if (min_bps) {
 				if (low_bps) {
 					if (last_bps<min_bps) {
-						if (now-low_bps>=min_bps_time) {
+						if (d-low_bps>=min_bps_time) {
 							/* too bad */
 							if (Verbose) {
 								vstringf(_("zsendfdata: bps rate %ld below min %ld"),
@@ -1861,7 +1861,7 @@ zsendfdata (struct zm_fileinfo *zi)
 					} else
 						low_bps=0;
 				} else if (last_bps < min_bps) {
-					low_bps=now;
+					low_bps=d;
 				}
 			}
 			if (stop_time && now>=stop_time) {

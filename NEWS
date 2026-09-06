@@ -173,6 +173,12 @@ if you use lrz to receive files from not perfectly trustworthy senders.
   file) showed buffered I/O at parity or better than mmap, so the
   special case was not worth its complexity.
 
+* lrzsz now measures transfer durations (bps, ETA, the -m/--min-bps
+  watchdog) with a monotonic clock instead of the wall clock. NTP steps
+  or manual date changes during a transfer no longer produce absurd
+  bps values or stall the min-bps abort. The -s/--stop-at deadline is
+  intentionally still wall clock (it is specified in wall-clock terms).
+
 * on error recovery (ZRPOS) lsz now flushes its pending output with
   tcflush(TCOFLUSH), as the current ZMODEM documentation recommends,
   so a buffered modem or serial driver does not keep delivering stale

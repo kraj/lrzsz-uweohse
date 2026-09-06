@@ -31,13 +31,16 @@ static int initialized = 0;
 static double
 timing_now(void)
 {
-#ifdef HAVE_GETTIMEOFDAY
-  struct timeval tv;
-  gettimeofday(&tv, NULL);
-  return tv.tv_sec + tv.tv_usec/1000000.0;
-#else
-  return (double) time(NULL);
-#endif
+  /* CLOCK_MONOTONIC: durations (bps, ETA, min_bps watchdog) must not be
+   * affected by NTP steps or date changes (zmodem-current.txt uses wall
+   * time only for the user-specified -s stop deadline, which timing.c
+   * callers obtain via time(2) separately). */
+  struct timespec ts;
+  if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) {
+    /* unreachable on POSIX-2008 systems */
+    return (double) time(NULL);
+  }
+  return ts.tv_sec + ts.tv_nsec/1000000000.0;
 }
 
 void
@@ -48,11 +51,9 @@ timing_reset(void)
 }
 
 double
-timing_elapsed(time_t *nowp)
+timing_elapsed(void)
 {
   double yet = timing_now();
-  if (nowp)
-    *nowp = (time_t) yet;
   if (!initialized) {
     starttime = yet;
     initialized = 1;
@@ -63,8 +64,8 @@ timing_elapsed(time_t *nowp)
 long
 timing_bps(double bytes)
 {
-  double d = timing_elapsed(NULL);
-  if (d == 0) /* can happen if timing uses time() */
+  double d = timing_elapsed();
+  if (d == 0) /* can happen on the very first call (zero elapsed) */
     d = 0.5;
   return (long) (bytes / d);
 }

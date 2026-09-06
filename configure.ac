@@ -118,7 +118,7 @@ AC_CHECK_HEADERS(sys/select.h strings.h arpa/inet.h locale.h)
 
 dnl Checks for typedefs, structures, and compiler characteristics.
 
-AC_CHECK_FUNCS(gettimeofday sigaction getopt_long fseeko)
+AC_CHECK_FUNCS(sigaction getopt_long fseeko)
 
 dnl O_NOFOLLOW is POSIX.1-2008; this is to provide fallback for ancient systems.
 AH_TEMPLATE([HAVE_O_NOFOLLOW],

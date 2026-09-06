@@ -1841,7 +1841,7 @@ rzfile(struct zm_fileinfo *zi)
 	long last_rxbytes=0;
 	unsigned long last_bps=0;
 	long not_printed=0;
-	time_t low_bps=0;
+	double low_bps=0;
 	size_t bytes_in_block=0;
 
 	zi->eof_seen=false;
@@ -1938,9 +1938,10 @@ moredata:
 				int secleft =  0;
 				time_t now;
 				double d;
-				d=timing_elapsed(&now);
+				now=time(NULL); /* wall clock: -s stop deadline */
+				d=timing_elapsed();
 				if (d==0)
-					d=0.5; /* timing_elapsed() might use time() */
+					d=0.5; /* first call: zero elapsed */
 				last_bps=(unsigned long) (zi->bytes_received/d);
 				if (last_bps > 0) {
 					minleft =  (R_BYTESLEFT(zi))/last_bps/60;
@@ -1949,9 +1950,9 @@ moredata:
 				if (min_bps) {
 					if (low_bps) {
 						if (last_bps<min_bps) {
-							if (now-low_bps>=min_bps_time) {
+							if (d-low_bps>=min_bps_time) {
 								/* too bad */
-								vfile(_("rzfile: bps rate %lu below min %lu"), 
+								vfile(_("rzfile: bps rate %lu below min %lu"),
 									  last_bps, min_bps);
 								DO_SYSLOG_FNAME((LOG_INFO, "%s/%s: bps rate low: %lu < %lu",
 										   shortname, protname(), last_bps, min_bps));
@@ -1961,7 +1962,7 @@ moredata:
 						else
 							low_bps=0;
 					} else if (last_bps<min_bps) {
-						low_bps=now;
+						low_bps=d;
 					}
 				}
 				if (stop_time && now>=stop_time) {
