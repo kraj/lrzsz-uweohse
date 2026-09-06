@@ -333,7 +333,7 @@ main(int argc, char **argv)
         lrzsz_set_progname (argv[0], "lsz"); /* needed for the error handling => early */
 
 	if (((cp = getenv("ZNULLS")) != NULL) && *cp)
-		Znulls = atoi(cp);
+		Znulls = (int) lrzsz_strtoul("ZNULLS", cp, NULL, 0, 65535);
 	if (((cp=getenv("SHELL"))!=NULL) && cp[0]) {
 		const char *base = strrchr(cp, '/');
 		base = base ? base + 1 : cp;
