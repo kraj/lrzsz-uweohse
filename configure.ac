@@ -1,4 +1,5 @@
 dnl Process this file with autoconf to produce a configure script.
+AC_PREREQ([2.72])
 AC_INIT([lrzsz],[0.13.0-beta])
 AC_CONFIG_SRCDIR([src/crctab.c])
 AM_INIT_AUTOMAKE(foreign)
@@ -12,8 +13,6 @@ dnl Policy: about 20 years. Rounded to the nearest _POSIX_C_SOURCE. Not below 15
 supported_c_stds="c23 c17 c11 c99"
 AC_SUBST(MIN_POSIX_C_STD, "200809L")
 AC_SUBST(SUPPORTED_C_STDS, "$supported_c_stds")
-
-AC_PREREQ([2.72])
 
 dnl AM_INIT_AUTOMAKE AC_DEFINEs and AC_SUBSTs PACKAGE and VERSION.
 dnl Tarball name (Specfile.in); must not shadow autoconf's plain PACKAGE_VERSION.
