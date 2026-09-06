@@ -118,19 +118,21 @@ if you use lrz to receive files from not perfectly trustworthy senders.
   works in XMODEM mode.
 
 * the ASCII conversion option (-a / --ascii, ZMODEM ZCNL conversion) is
-  deprecated. The current ZMODEM documentation marks ZCNL as historic
-  and says a receiver must assume binary transfer for it, and a transfer
-  using it cannot be resumed. lrzsz keeps the feature for compatibility
-  with old peers; it will likely be removed in a future release.
+  deprecated, and kept for compatibility for now, but will be removed in
+  a future release.
+  The current ZMODEM documentation marks ZCNL as historic, because transfers
+  using ASCII conversion cannot be resumed, and because the conversion is
+  questionable (it removes every carriage return and cuts the file short at
+  the first CPM EOF character / ^X).
 
-* likewise deprecated: acting on the historical full st_mode in the file
-  metadata. A sender transmitting file type bits (e.g. 0100644 instead
+* likewise deprecated is the acting on the historical full st_mode in the 
+  file metadata. A sender transmitting file type bits (e.g. 0100644 instead
   of 0644) still makes lrz force binary transfer for that file (which
-  overrides -a) and skip the lower-casing of the file name. The current
-  ZMODEM documentation says this should not be sent nor acted upon;
-  lrzsz keeps it for old peers and will likely remove it in a future
-  release. The received mode is filtered as before (type bits stripped,
-  setuid bits never set, umask applied).
+  overrides -a) and skip the lower-casing of the file name.
+  The current ZMODEM documentation states this should neither be sent nor 
+  acted upon. lrzsz keeps it for compatibility and will likely remove it 
+  in a future release. The received mode is filtered as before (type bits 
+  stripped, umask applied).
 
 * on error recovery (ZRPOS) lsz now flushes its pending output with
   tcflush(TCOFLUSH), as the current ZMODEM documentation recommends,
