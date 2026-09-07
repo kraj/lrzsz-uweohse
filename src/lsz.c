@@ -1680,13 +1680,18 @@ again:
 static int
 zsendfdata (struct zm_fileinfo *zi)
 {
-	static int c;
-	static int junkcount;				/* Counts garbage chars received by TX */
-	static size_t last_txpos = 0;
-	static long last_bps = 0;
-	static long not_printed = 0;
+	/* total_sent is the only state here that must persist across files:
+	 * it feeds calc_blklen()'s adaptive blocksize for the whole batch
+	 * (and must never shrink back for file 2). Everything below it is
+	 * per-file state.
+	 */
 	static long total_sent = 0;
-	static double low_bps=0;
+	int c;
+	int junkcount;				/* Counts garbage chars received by TX */
+	size_t last_txpos = 0;
+	long last_bps = 0;
+	long not_printed = 0;
+	double low_bps = 0;
         int newcnt;
 	/* the first data subpacket after a ZRPOS must be ZCRCW
 	 * (zmodem-current.txt §5, sender-side error recovery). Without this
