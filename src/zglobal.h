@@ -183,16 +183,9 @@ LRZSZ_FORMAT_PRINTF(1,2) void vfile (const char *format, ...);
 #define vchar(x) putc(x,stderr)
 #define vstring(x) fputs(x,stderr)
 
-#ifdef __GNUC__
-#if __GNUC__ > 1
-#define vstringf(...) fprintf(stderr, __VA_ARGS__)
-#endif
-#endif
-#ifndef vstringf
 LRZSZ_FORMAT_PRINTF(1,2) void vstringf (const char *format, ...);
-#endif
-#define VPRINTF(level,format_args) do {if ((Verbose)>=(level)) \
-	vstringf format_args ; } while(0)
+#define VPRINTF(level, ...) do {if ((Verbose)>=(level)) \
+	vstringf(__VA_ARGS__) ; } while(0)
 
 /* rbsb.c */
 int from_cu (void);

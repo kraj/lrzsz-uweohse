@@ -155,7 +155,7 @@ zgethex(void)
 	int c;
 
 	c = zgeth1();
-	VPRINTF(9,("zgethex: %02X", (unsigned int) c));
+	VPRINTF(9, "zgethex: %02X", (unsigned int) c);
 	return c;
 }
 
@@ -252,7 +252,7 @@ unescape:
 			return (c ^ 0x40);
 		break;
 	}
-	VPRINTF(2,(_("Bad escape sequence 0x%x"), (unsigned int) c));
+	VPRINTF(2, _("Bad escape sequence 0x%x"), (unsigned int) c);
 	return ERROR;
 }
 
@@ -344,7 +344,7 @@ zsbhdr(int type, unsigned char *hdr)
 	int n;
 	unsigned short crc;
 
-	VPRINTF(3,("zsbhdr: %s %lx", frametype_to_string(type), rclhdr(hdr)));
+	VPRINTF(3, "zsbhdr: %s %lx", frametype_to_string(type), rclhdr(hdr));
 	if (type == ZDATA)
 		for (n = Znulls; --n >=0; )
 			xsendline(0);
@@ -400,7 +400,7 @@ zshhdr(int type, unsigned char *hdr)
 	unsigned char s[30];
 	size_t len;
 
-	VPRINTF(3,("zshhdr: %s %lx", frametype_to_string(type & 0x7f), rclhdr(hdr)));
+	VPRINTF(3, "zshhdr: %s %lx", frametype_to_string(type & 0x7f), rclhdr(hdr));
 	s[0]=ZPAD;
 	s[1]=ZPAD;
 	s[2]=ZDLE;
@@ -455,8 +455,8 @@ zsdata(const char *buf, size_t length, int frameend)
 {
 	unsigned short crc;
 
-	VPRINTF(3,("zsdata: %lu %s", (unsigned long) length,
-		Zendnames[(frameend-ZCRCE)&3]));
+	VPRINTF(3, "zsdata: %lu %s", (unsigned long) length,
+		Zendnames[(frameend-ZCRCE)&3]);
 	crc = 0;
 
         stats_msg_valid(length);
@@ -481,7 +481,7 @@ zsda32(const char *buf, size_t length, int frameend)
 	int c;
 	unsigned long crc;
 	int i;
-	VPRINTF(3,("zsdat32: %lu %s", length, Zendnames[(frameend-ZCRCE)&3]));
+	VPRINTF(3, "zsdat32: %lu %s", length, Zendnames[(frameend-ZCRCE)&3]);
 
 	crc = 0xFFFFFFFFL;
         stats_msg_valid(length);
@@ -553,8 +553,8 @@ crcfoo:
 					}
                                         stats_msg_valid(0);
 					*bytes_received = length - (end - buf);
-					VPRINTF(3,("zrdata: %lu  %s", (unsigned long) (*bytes_received),
-							Zendnames[(d-GOTCRCE)&3]));
+					VPRINTF(3, "zrdata: %lu  %s", (unsigned long) (*bytes_received),
+							Zendnames[(d-GOTCRCE)&3]);
 					return d;
 				}
 			case GOTCAN:
@@ -620,8 +620,8 @@ crcfoo:
 				}
                                 stats_msg_valid(0);
 				*bytes_received = length - (end - buf);
-				VPRINTF(3,("zrdat32: %lu %s", (unsigned long) *bytes_received,
-					Zendnames[(d-GOTCRCE)&3]));
+				VPRINTF(3, "zrdat32: %lu %s", (unsigned long) *bytes_received,
+					Zendnames[(d-GOTCRCE)&3]);
 				return d;
 			case GOTCAN:
 				zperr(_("Sender Canceled"));
@@ -809,7 +809,7 @@ fifi:
 	zperr(_("Got %s"), frametype_to_string(c));
 	/* FALLTHROUGH */
     default:
-		VPRINTF(3,("zgethdr: %s %lx", frametype_to_string(c), (unsigned long) rxpos));
+		VPRINTF(3, "zgethdr: %s %lx", frametype_to_string(c), (unsigned long) rxpos);
 	}
 	return c;
 }
@@ -929,7 +929,7 @@ zputhex(unsigned int c, unsigned char *pos)
 {
 	static char	digits[]	= "0123456789abcdef";
 
-	VPRINTF(9,("zputhex: %02X", c));
+	VPRINTF(9, "zputhex: %02X", c);
 	pos[0]=digits[(c&0xF0)>>4];
 	pos[1]=digits[c&0x0F];
 }

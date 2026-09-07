@@ -68,9 +68,7 @@ vfile(const char *format, ...)
     putc('\n',stderr);
 }
 
-#ifndef vstringf
-/* if using gcc this function is not needed */
-void 
+void
 vstringf(const char *format, ...)
 {
     va_list ap;
@@ -79,4 +77,3 @@ vstringf(const char *format, ...)
     vfprintf(stderr,format, ap);
     va_end(ap);
 }
-#endif
