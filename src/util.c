@@ -2,6 +2,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <signal.h>
+#include <limits.h>
+#include <ctype.h>
+#include <time.h>
 #include <sys/select.h>
 #include "zglobal.h"
 #include "timing.h"
@@ -218,4 +222,143 @@ sanitize_bytes(char *dst, size_t dstcap, const char *src)
     }
     dst[o] = '\0';
     return o;
+}
+
+/* Install a "cancel" handler for SIG unless it is being ignored; see
+ * util.h. The identical lrz/lsz logic, moved verbatim. */
+int
+lrzsz_install_signal (int sig, void (*handler)(int))
+{
+#ifdef HAVE_SIGACTION
+	struct sigaction sa, old;
+	sa.sa_handler = handler;
+	sigemptyset(&sa.sa_mask);
+	sa.sa_flags = 0;
+	if (sigaction(sig, &sa, &old) == 0) {
+		if (old.sa_handler == SIG_IGN) {
+			sigaction(sig, &old, NULL);
+			return 0;
+		}
+		return 1;
+	}
+	return 0;
+#else
+	if (signal(sig, handler) == SIG_IGN) {
+		signal(sig, SIG_IGN);
+		return 0;
+	}
+	return 1;
+#endif
+}
+
+/* Derive protocol and initial Verbose from the invoked name; see util.h.
+ * From lrz.c/lsz.c, parameterized by the direction letter. */
+void
+chkinvok (const char *s, char dir)
+{
+	const char *p;
+
+	p = s;
+	while (*p == '-')
+		s = ++p;
+	while (*p)
+		if (*p++ == '/')
+			s = p;
+	if (*s == 'v') {
+		Verbose = 1;
+		++s;
+	}
+	if (*s == 'l')
+		s++; /* lrz/lsz -> rz/sz */
+	protocol = ZM_ZMODEM;
+	if (s[0] == dir && s[1] == 'x')
+		protocol = ZM_XMODEM;
+	if (s[0] == dir && (s[1] == 'b' || s[1] == 'y'))
+		protocol = ZM_YMODEM;
+}
+
+/* Parse the -s/--stop-at argument; see util.h. Both programs' copies were
+ * identical except the +N upper bound (lrz capped at LONG_MAX, lsz was
+ * unbounded); the cap wins — it protects the time_t cast below, and
+ * LONG_MAX seconds is beyond any practical stop time. */
+time_t
+lrzsz_parse_stop_time (const char *optarg, void (*die)(int, const char *))
+{
+	struct tm *tm;
+	time_t t;
+	int hh, mm;
+	char *nex, *mstart;
+	time_t stop_time;
+
+	if (isdigit((unsigned char) (*optarg))) {
+		hh = strtoul (optarg, &nex, 10);
+		if (nex == optarg)
+			die(2, _("unparsable stop time: empty hour"));
+		if (hh > 23)
+			die(2, _("hour too large (0..23)"));
+		if (*nex != ':')
+			die(2, _("unparsable stop time"));
+		nex++;
+		mstart = nex;
+		mm = strtoul (nex, &nex, 10);
+		if (nex == mstart)
+			die(2, _("unparsable stop time: empty minute"));
+		if (mm > 59)
+			die(2, _("minute too large (0..59)"));
+
+		t = time(NULL);
+		tm = localtime(&t);
+		tm->tm_hour = hh;
+		tm->tm_min = mm;
+		stop_time = mktime(tm);
+		if (stop_time < t)
+			stop_time += 86400L; /* one day more */
+		if (stop_time - t < 10)
+			die(2, _("stop time too small"));
+	} else {
+		stop_time = time(0) + (time_t) lrzsz_strtoul(_("-s / --stop-at"),
+				optarg, NULL, 1, LONG_MAX);
+	}
+	return stop_time;
+}
+
+/* Pathname traversal check; see util.h. The lrz checkpath() and lsz wcs()
+ * walks, identical except lrz's very-restricted dotfile ban, which the
+ * RESTRICTED_LEVEL parameter expresses. */
+bool
+lrzsz_path_component_violation (const char *name, int restricted_level)
+{
+	const char *cp;
+
+	/* deny absolute paths */
+	if (name[0] == '/')
+		return true;
+
+	/* walk path components */
+	for (cp = name; *cp; ) {
+		const char *slash = strchr(cp, '/');
+		size_t len = slash ? (size_t)(slash - cp) : strlen(cp);
+		if (len > 0) {
+			if (restricted_level > 1 && cp[0] == '.')
+				return true;
+			if (len == 2 && strncmp(cp, "..", 2) == 0)
+				return true;
+		}
+		if (!slash)
+			break;
+		cp = slash + 1;
+	}
+	return false;
+}
+
+/* ETA arithmetic for the progress displays; see util.h. */
+void
+lrzsz_eta (long bps, size_t left, int *minleft, int *secleft)
+{
+	*minleft = 0;
+	*secleft = 0;
+	if (bps > 0) {
+		*minleft = (int) (left / (unsigned long) bps / 60);
+		*secleft = (int) ((left / (unsigned long) bps) % 60);
+	}
 }

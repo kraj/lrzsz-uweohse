@@ -3,6 +3,10 @@
 
 #include "config.h" /* noreturn and format_printf */
 
+#include <time.h> /* time_t */
+#include <sys/types.h> /* size_t */
+#include <stdbool.h>
+
 #if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 202000L
 #  define LRZSZ_NORETURN [[noreturn]]
 #elif defined(__GNUC__) || defined(__clang__)
@@ -45,5 +49,32 @@ void report_transfer_result (int sending, const char *shortname,
     const char *fname, long bytes, long total, long skipped);
 
 int fd_readable(int fd);
+
+/* Install a "cancel" handler for sig unless it is being ignored; returns 1
+ * if the handler was installed, 0 if the old disposition was SIG_IGN (and
+ * was left alone). Shared by lrz.c and lsz.c; the handler itself is
+ * program-specific. */
+int lrzsz_install_signal (int sig, void (*handler)(int));
+
+/* Derive the protocol (ZM_XMODEM/YMODEM/ZMODEM) and the initial Verbose
+ * from the invoked name; DIR is 'r' (lrz: rx/rb/rz prefixes) or 's'
+ * (lsz: sx/sb/sz). */
+void chkinvok (const char *s, char dir);
+
+/* Parse the -s/--stop-at argument: "HH:MM" (wall clock, today or tomorrow,
+ * must be at least 10 s away) or "+N" seconds. Calls DIE (a program's
+ * usage(int, const char*)) on unparsable or too-small values. Returns the
+ * absolute stop time, or 0 for the "no stop time" sentinel use of -s? no:
+ * always a valid time. */
+time_t lrzsz_parse_stop_time (const char *optarg, void (*die)(int, const char *));
+
+/* Check a received/sent pathname for traversal components. Returns true if
+ * NAME is absolute, contains a ".." component, or (when RESTRICTED_LEVEL > 1)
+ * contains a component starting with '.'. The caller owns the reaction. */
+bool lrzsz_path_component_violation (const char *name, int restricted_level);
+
+/* ETA arithmetic for the progress displays: BPS bytes/second, LEFT bytes
+ * remaining. */
+void lrzsz_eta (long bps, size_t left, int *minleft, int *secleft);
 
 #endif

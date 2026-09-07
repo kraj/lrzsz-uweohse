@@ -72,11 +72,9 @@ static int wctx (struct zm_fileinfo *);
 static int zsendfdata (struct zm_fileinfo *);
 static int getinsync (struct zm_fileinfo *, int flag);
 static void countem (int argc, char **argv);
-static void chkinvok (const char *s);
 static void usage (int exitcode, const char *what);
 static int zsendcmd (const char *buf, size_t blen);
 static void saybibi (void);
-static int install_signal_handler (int sig);
 static int wcsend (int argc, char *argp[]);
 static int wcputsec (char *buf, int sectnum, size_t cseclen);
 
@@ -204,30 +202,8 @@ bibi(int n)
 	exit(128 + n);
 }
 
-static int
-install_signal_handler(int sig)
-{
-#ifdef HAVE_SIGACTION
-	struct sigaction sa, old;
-	sa.sa_handler = bibi_sighandler;
-	sigemptyset(&sa.sa_mask);
-	sa.sa_flags = 0;
-	if (sigaction(sig, &sa, &old) == 0) {
-		if (old.sa_handler == SIG_IGN) {
-			sigaction(sig, &old, NULL);
-			return 0;
-		}
-		return 1;
-	}
-	return 0;
-#else
-	if (signal(sig, bibi_sighandler) == SIG_IGN) {
-		signal(sig, SIG_IGN);
-		return 0;
-	}
-	return 1;
-#endif
-}
+/* the cancel-handler installer is shared: see lrzsz_install_signal() in
+ * util.c; lsz installs its own bibi_sighandler with it. */
 
 /* Called when ZMODEM gets an interrupt (^C) */
 LRZSZ_NORETURN static void
@@ -341,7 +317,7 @@ main(int argc, char **argv)
 	if (getenv("ZMODEM_RESTRICTED")!=NULL)
 		Restricted=1;
 	from_cu();
-	chkinvok(argv[0]);
+	chkinvok(argv[0], 's');
 
         journal_filename=getenv("LSZ_JOURNAL");
         if (!journal_filename || !*journal_filename) {
@@ -451,39 +427,7 @@ main(int argc, char **argv)
 		case 'R': Restricted = true; break;
 		case 'q': Quiet=true; Verbose=0; break;
 		case 's':
-			if (isdigit((unsigned char) (*optarg))) {
-				struct tm *tm;
-				time_t t;
-				int hh,mm;
-				char *nex, *mstart;
-
-				hh = strtoul (optarg, &nex, 10);
-				if (nex == optarg)
-					usage(2, _("unparsable stop time: empty hour"));
-				if (hh>23)
-					usage(2,_("hour too large (0..23)"));
-				if (*nex!=':')
-					usage(2, _("unparsable stop time"));
-			nex++;
-			mstart = nex;
-			mm = strtoul (nex, &nex, 10);
-			if (nex == mstart)
-				usage(2, _("unparsable stop time: empty minute"));
-			if (mm>59)
-				usage(2,_("minute too large (0..59)"));
-
-			t=time(NULL);
-			tm=localtime(&t);
-			tm->tm_hour=hh;
-			tm->tm_min=mm;
-				stop_time=mktime(tm);
-				if (stop_time<t)
-					stop_time+=86400L; /* one day more */
-				if (stop_time - t <10)
-					usage(2,_("stop time too small"));
-			} else {
-				stop_time = time(0) + (time_t) lrzsz_strtoul( "-s / --stop-at", optarg, NULL, 1, 0);
-			}
+			stop_time = lrzsz_parse_stop_time(optarg, usage);
 			break;
 		case 'S':
 			fprintf(stderr,
@@ -626,11 +570,11 @@ main(int argc, char **argv)
 		lrzsz_warning(0, _("cannot set transfer line mode; continuing"));
 	readline_setup(io_mode_fd, 128, 256);
 
-	if (install_signal_handler(SIGINT))
+	if (lrzsz_install_signal(SIGINT, bibi_sighandler))
 		play_with_sigint=1;
-	install_signal_handler(SIGTERM);
-	install_signal_handler(SIGPIPE);
-	install_signal_handler(SIGHUP);
+	lrzsz_install_signal(SIGTERM, bibi_sighandler);
+	lrzsz_install_signal(SIGPIPE, bibi_sighandler);
+	lrzsz_install_signal(SIGHUP, bibi_sighandler);
 
 	if ( protocol!=ZM_XMODEM) {
 		countem(npats, patts);
@@ -760,24 +704,8 @@ wcs(const char *oname, const char *remotename)
 
 	if (Restricted) {
 		/* restrict pathnames to current tree */
-		/* deny absolute paths */
-		if (oname[0] == '/')
+		if (lrzsz_path_component_violation(oname, Restricted))
 			goto violation;
-		/* walk path components */
-		{
-			const char *cp;
-			for (cp = oname; *cp; ) {
-				const char *slash = strchr(cp, '/');
-				size_t len = slash ? (size_t)(slash - cp) : strlen(cp);
-				if (len > 0) {
-					if (len == 2 && strncmp(cp, "..", 2) == 0)
-						goto violation;
-				}
-				if (!slash)
-					break;
-				cp = slash + 1;
-			}
-		}
 	}
 
 	if (0==strcmp(oname,"-")) {
@@ -1830,10 +1758,8 @@ zsendfdata (struct zm_fileinfo *zi)
 			if (d == 0)
 				d = 0.5; /* first call: zero elapsed */
 			last_bps = (long) ((zi->bytes_sent / d));
-			if (last_bps > 0) {
-				minleft = (zi->bytes_total - zi->bytes_sent) / last_bps / 60;
-				secleft = ((zi->bytes_total - zi->bytes_sent) / last_bps) % 60;
-			}
+			lrzsz_eta(last_bps, zi->bytes_total - zi->bytes_sent,
+				&minleft, &secleft);
 			if (min_bps) {
 				if (low_bps) {
 					if (last_bps<min_bps) {
@@ -2296,33 +2222,7 @@ listen:
 	}
 }
 
-/*
- * If called as lsb use YMODEM protocol
- */
-static void
-chkinvok (const char *s)
-{
-	const char *p;
-
-	p = s;
-	while (*p == '-')
-		s = ++p;
-	while (*p)
-		if (*p++ == '/')
-			s = p;
-	if (*s == 'v') {
-		Verbose = 1;
-		++s;
-	}
-	if (*s == 'l')
-		s++;					/* lsz -> sz */
-	protocol = ZM_ZMODEM;
-	if (s[0] == 's' && s[1] == 'x')
-		protocol = ZM_XMODEM;
-	if (s[0] == 's' && (s[1] == 'b' || s[1] == 'y')) {
-		protocol = ZM_YMODEM;
-	}
-}
+/* chkinvok() lives in util.c (shared with lrz); called with 's' here. */
 
 static void
 countem (int argc, char **argv)
