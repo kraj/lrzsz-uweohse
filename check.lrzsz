@@ -316,6 +316,30 @@ mode_cmp() {
     fi
     return 0
 }
+
+# --keep-incomplete check: $2 (the received partial) must exist, be smaller
+# than the original ($1), and be a strict prefix of it (aborted mid-transfer).
+incomplete_keep_cmp() {
+    if test ! -f "$2" ; then
+        echo "-- incomplete file was not kept: $2 missing"
+        return 1
+    fi
+    if cmp -s "$1" "$2" >&5 ; then
+        echo "-- file is complete; the abort never happened"
+        return 1
+    fi
+    _orig_size=$(stat -c %s "$1")
+    _part_size=$(stat -c %s "$2")
+    if test "$_part_size" -ge "$_orig_size" ; then
+        echo "-- partial ($_part_size) is not smaller than original ($_orig_size)"
+        return 1
+    fi
+    head -c "$_part_size" "$1" | cmp -s - "$2" || {
+        echo "-- partial file is not a prefix of the original"
+        return 1
+    }
+    return 0
+}
 FAULTS="not slightly moderately noticeably significantly very extremely"
 fault2num() {
     case "$1" in
@@ -1698,6 +1722,45 @@ SEOF
         "$SZ -q -y" "env ZMODEM_RESTRICTED=1 $RZ -q -R -y" cmp $testdir/newfile.bin
     doit "$key" "ZMODEM_RESTRICTED + -y refuses to overwrite existing file" \
         "$SZ -q -y" "env ZMODEM_RESTRICTED=1 $RZ -q -y" cmp $testdir/newfile.bin
+
+    #
+    # -U/--unrestrict was removed: both programs must print the removal
+    # message and exit nonzero, without touching the protocol stream.
+    # Checked directly (no transfer): the receiver wrapper exits immediately,
+    # so the sender side is a short-lived no-op, not a protocol peer.
+    #
+    key="zmodem-lsz-lrz-MGMT-U-removed"
+    mkdir "$testdir/$key"
+    u_removed_rc=0
+    for u_prog in $SZ $RZ ; do
+        $u_prog -U >$testdir/$key/u.out 2>$testdir/$key/u.err && u_removed_rc=1
+        grep -q "has been removed" $testdir/$key/u.err || u_removed_rc=1
+        $u_prog --unrestrict >$testdir/$key/u.out 2>$testdir/$key/u.err && u_removed_rc=1
+        grep -q "has been removed" $testdir/$key/u.err || u_removed_rc=1
+    done
+    if test $u_removed_rc = 0 ; then
+        echo "filecheck-success: $key (-U and --unrestrict rejected by both programs)" >>$runlog
+    else
+        echo "filecheck-fail: $key (-U/--unrestrict not handled as removed)" >>$runlog
+        echo "summary: $key FAILED" >>$testdir/failures.log
+        any_failure="$any_failure $key"
+    fi
+
+    #
+    # --keep-incomplete: an aborted transfer must DELETE the partial file by
+    # default and KEEP it with --keep-incomplete. The abort is deterministic:
+    # the receiver hits its -s +1 stop deadline while the linesimulator's
+    # 1m-baud limit keeps the ~1MiB transfer busy for ~8s, so lrz aborts
+    # mid-file (rzfile: reached stop time -> ERROR -> session fubar).
+    #
+    key="zmodem-lsz-lrz-MGMT-keep-incomplete"
+    mkdir "$testdir/$key"
+    FAULT="$SIMU -s 1 -f 9999999999 -r 1m"
+    doit "$key-delete-default" "aborted transfer deletes the incomplete file" \
+        "$SZ -q -Z" "$RZ -q -Z -s +1" missing $binary_1m
+    doit "$key-keep" "aborted transfer keeps the incomplete file with --keep-incomplete" \
+        "$SZ -q -Z" "$RZ -q -Z --keep-incomplete -s +1" incomplete_keep_cmp $binary_1m
+    FAULT=
 }
 
 

@@ -299,15 +299,22 @@ Crash recovery mode. lrz tries to resume interrupted file transfers.
 Enter the very restricted mode. lrz will not create directories or files
 with a leading dot, and will not overwrite any existing file.
 This option always enables the very restricted mode, even if it was
-turned off or downgraded before (e.g. by
-.BR "\-U" ,
-or by combining it with the
+downgraded before (e.g. by combining it with the
 .B ZMODEM_RESTRICTED
 environment variable).
 
 See
 .B SECURITY
-for mode information about restricted mode.
+for the security model and the description of the restricted levels.
+.TP
+.B "--keep-incomplete"
+Keep partially received files when a transfer fails with an error.
+The default is to remove incomplete files; this option is the opt-in
+for keeping them, e.g. to
+.B --resume
+the transfer later, or when receiving on a private system where the
+partial data is worth more than the disk space. Interrupted
+transfers (Ctrl-C, modem hangup) always keep the partial file.
 .TP
 .B "-s HH:MM, --stop-at HH:MM"
 Stop transmission at
@@ -334,8 +341,13 @@ through the
 option.
 .TP
 .B "-U, --unrestrict"
-turn off restricted mode (this is not possible if running under
-a restricted shell).
+Removed. Security-relevant options cannot be turned off; see
+.B SECURITY
+and the
+.B HISTORICAL NOTES
+section. Use
+.B --keep-incomplete
+if you want failed transfers to leave the partial file in place.
 .TP
 .B "--version"
 prints out version number.
@@ -364,26 +376,33 @@ use ZMODEM protocol.
 .PD
 .ne 6
 .SH SECURITY
-Contrary to the original ZMODEM lrz defaults to restricted mode. In
-restricted mode lrz will not accept absolute pathnames or references 
-to a parent directory, will not modify an existing file, and
-removes any files received in error. Remote command execution is 
-disabled.
+Contrary to the original ZMODEM lrz defaults to restricted mode.
+Security-relevant options can be enabled but never disabled: restricted
+mode cannot be turned off, and the very restricted mode cannot be
+downgraded.
 
-To use a more restricted mode set the environment variable 
-.B ZMODEM_RESTRICTED 
-or give the
-.B R
-option. This disables creation of subdirectories and invisible
-files, and overwriting existing files.
+Remote command execution is always denied, in every mode.
 
-Restricted mode may be turned off with the
-.B U 
-option, unless lrz runs under a restricted shell.
-The
+lrz has two restricted levels:
+
+.TP
+.B restricted (the default)
+lrz will not accept absolute pathnames or references to a parent
+directory, will not modify an existing file, and removes any files
+received in error (see
+.B --keep-incomplete
+for an exception).
+
+.TP
+.B very restricted
+Additionally disables creation of subdirectories and files with a
+leading dot, and refuses to overwrite existing files instead of
+skipping them. Entered by setting the environment variable
+.B ZMODEM_RESTRICTED
+or giving the
 .B R
-option always turns the very restricted mode on, regardless of
-the order in which the options are given.
+option — in either case, and regardless of the order in which
+options are given.
 
 .SH ENVIRONMENT
 lrz uses the following environment variables:
@@ -396,10 +415,10 @@ or
 \.
 .TP
 .B ZMODEM_RESTRICTED
-lrz enters the more restricted mode if the variable is set.
+lrz enters the very restricted mode if the variable is set.
 Giving the
 .B R
-option additionally always enables the very restricted mode.
+option also enables the very restricted mode.
 
 .SH NOTES
 Sending serial data to timesharing minicomputers
@@ -486,6 +505,17 @@ to only set this option when the remote user is perfectly trustworthy.
 Time synchronization.
 Removed because no other still-available implementation supported it,
 and setting the local time would have required root privileges.
+.TP
+.B "-U, --unrestrict"
+Turned off restricted mode (impossible under a restricted shell).
+Removed because security-relevant options cannot be turned off:
+whoever can pass \-U can equally well drop it from the command line,
+so the option provided no protection — only a trap. The one
+legitimate use, keeping partially received files on error, lives on
+as the
+.B --keep-incomplete
+option. See
+.BR SECURITY .
 .TP
 .B PUBDIR
 The

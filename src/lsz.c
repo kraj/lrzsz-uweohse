@@ -285,7 +285,7 @@ static struct option const long_options[] =
   {"timeout", required_argument, NULL, 't'},
   {"turbo", no_argument, NULL, 'T'},
   {"unlink", no_argument, NULL, 'u'},
-  {"unrestrict", no_argument, NULL, 'U'},
+  {"unrestrict", no_argument, NULL, 'U'}, /* removed, kept for the error message */
   {"verbose", no_argument, NULL, 'v'},
   {"version", no_argument, 0, 'V'},
   {"windowsize", required_argument, NULL, 'w'},
@@ -495,12 +495,9 @@ main(int argc, char **argv)
 			break;
 		case 'u': ++Unlinkafter; break;
 		case 'U':
-			if (!under_rsh)
-				Restricted=0;
-			else
-				fatal_error(1,0,
-                                _("security violation: can't do that under restricted shell\n"));
-			break;
+			fprintf(stderr,
+				_("this option has been removed. See the manual page for more information.\n"));
+			exit(1);
 		case 'v': ++Verbose; break;
                 case 'V': show_version(); break;
 		case 'w':
@@ -778,8 +775,6 @@ wcs(const char *oname, const char *remotename)
 				const char *slash = strchr(cp, '/');
 				size_t len = slash ? (size_t)(slash - cp) : strlen(cp);
 				if (len > 0) {
-					if (Restricted > 1 && cp[0] == '.')
-						goto violation;
 					if (len == 2 && strncmp(cp, "..", 2) == 0)
 						goto violation;
 				}
@@ -1364,7 +1359,6 @@ usage(int exitcode, const char *what)
 "  -s, --stop-at {HH:MM|+N}    stop transmission at HH:MM or in N seconds\n"
 /* -S was timesync */
 "  -u, --unlink                unlink file after transmission\n"
-"  -U, --unrestrict            turn off restricted mode (if allowed to)\n"
 "  -v, --verbose               be verbose, provide debugging information\n"
 "  -V, --version               show version information\n"
 "  -w, --windowsize N          Window is N bytes (Z)\n"

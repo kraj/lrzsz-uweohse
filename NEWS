@@ -179,6 +179,25 @@ if you use lrz to receive files from not perfectly trustworthy senders.
   bps values or stall the min-bps abort. The -s/--stop-at deadline is
   intentionally still wall clock (it is specified in wall-clock terms).
 
+* the -U/--unrestrict option has been removed from both lrz and lsz.
+  Rationale: Security-relevant options cannot be turned off: whoever 
+  can add -U to a command line can equally well drop it, so the option 
+  provided no protection - only a trap.
+  The one legitimate use, keeping partially received files on transfer
+  error, lives on as lrz's new --keep-incomplete option (below).
+
+* lrz has a new --keep-incomplete option: on a transfer error the
+  partially received file is kept instead of deleted (the default),
+  e.g. to resume the transfer later with -r. Interrupted transfers
+  (Ctrl-C, hangup) always keep the partial file, as before.
+
+* lrz and lsz documentation now describes the restricted security
+  model as named levels: "restricted" (the lrz default; lsz's level
+  reached via -R, ZMODEM_RESTRICTED or a restricted shell) and
+  "very restricted" (lrz only, via -R or ZMODEM_RESTRICTED). Remote
+  command execution is denied unconditionally in lrz, in every mode.
+  With -U gone, restricted mode cannot be lowered by any option.
+
 * on error recovery (ZRPOS) lsz now flushes its pending output with
   tcflush(TCOFLUSH), as the current ZMODEM documentation recommends,
   so a buffered modem or serial driver does not keep delivering stale

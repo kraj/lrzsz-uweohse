@@ -67,6 +67,7 @@ static int Rxbinary=false;	/* receive all files in bin mode */
 static int Rxascii=false;	/* receive files in ascii (translate) mode */
 static int Thisbinary;		/* current file is to be received in bin mode */
 static bool try_resume=false;
+static bool keep_incomplete=false;
 static bool junk_path=false;
 bool no_timeout=false;
 enum zm_type_enum protocol;
@@ -226,7 +227,7 @@ static struct option const long_options[] =
 	{"timesync", no_argument, NULL, 'S'},
 	{"timeout", required_argument, NULL, 't'},
 	{"keep-uppercase", no_argument, NULL, 'u'},
-	{"unrestrict", no_argument, NULL, 'U'},
+	{"unrestrict", no_argument, NULL, 'U'}, /* removed, kept for the error message */
 	{"verbose", no_argument, NULL, 'v'},
 	{"windowsize", required_argument, NULL, 'w'},
 	{"with-crc", no_argument, NULL, 'c'},
@@ -241,6 +242,7 @@ static struct option const long_options[] =
 	{"delay-startup", required_argument, NULL, 4},
 	{"o-sync", no_argument, NULL, 5},
 	{"o_sync", no_argument, NULL, 5},
+	{"keep-incomplete", no_argument, NULL, 6},
 	{NULL,0,NULL,0}
 };
 #endif
@@ -387,6 +389,7 @@ main(int argc, char *argv[])
 			break;
 		case 'C':
 		case 'S':
+		case 'U':
 			fprintf(stderr,
 				_("this option has been removed. See the manual page for more information.\n"));
 			exit(1);
@@ -398,15 +401,6 @@ main(int argc, char *argv[])
 			break;
 		case 'u':
 			MakeLCPathname=false; break;
-		case 'U':
-			if (!under_rsh)
-				Restricted=0;
-			else  {
-				DO_SYSLOG((LOG_INFO,"--unrestrict option used under restricted shell"));
-				fatal_error(1,0,
-	_("security violation: can't do that under restricted shell\n"));
-			}
-			break;
 		case 'v':
 			++Verbose; break;
 		case 'V':
@@ -435,6 +429,9 @@ main(int argc, char *argv[])
 #else
 			lrzsz_warning(0, _("O_SYNC not supported by the kernel"));
 #endif
+			break;
+		case 6:
+			keep_incomplete=true;
 			break;
 		default:
 			usage(2,NULL);
@@ -546,6 +543,7 @@ usage(int exitcode, const char *what)
 "  -h, --help                  Help, print this usage message\n"
 "  -H, --crc-check             accept file if lengths and/or CRCs differ (Z)\n"
 "  -J, --journal FILE          append transfer statistics to FILE\n"
+"      --keep-incomplete       keep partially received files on error (default: delete)\n"
 "  -m, --min-bps N             stop transmission if BPS below N\n"
 "  -M, --min-bps-time N          for at least N seconds (default: 120)\n"
 "  -n, --newer                 receive file if source newer (Z)\n"
@@ -561,7 +559,6 @@ usage(int exitcode, const char *what)
 "      --syslog[=off]          turn syslog on or off, if possible\n"
 "  -t, --timeout N             set timeout to N tenths of a second\n"
 "  -u, --keep-uppercase        keep upper case filenames\n"
-"  -U, --unrestrict            disable restricted mode (if allowed to)\n"
 "  -v, --verbose               be verbose, provide debugging information\n"
 "  -V, --version               show version\n"
 "  -w, --windowsize N          Window is N bytes (Z)\n"
@@ -697,7 +694,12 @@ fubar:
             fout = NULL;
         }
 
-        if (Restricted && Pathname) {
+        if (Pathname && keep_incomplete) {
+            /* the partial file is kept for later --resume; the message may
+             * name a file never created (error before open) — harmless */
+            vstringf(_("\r\n%s: %s kept (incomplete).\r\n"),
+                lrzsz_progname, Pathname);
+        } else if (Pathname) {
             unlink(Pathname);
             vstringf(_("\r\n%s: %s removed.\r\n"), lrzsz_progname, Pathname);
         }
@@ -2106,7 +2108,8 @@ closeit(struct zm_fileinfo *zi)
 		zpfatal(_("file close error"));
 		/* this may be any sort of error, including random data corruption */
 
-		unlink(Pathname);
+		if (!keep_incomplete)
+			unlink(Pathname);
 		return ERROR;
 	}
 	if (zi->modtime) {
