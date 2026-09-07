@@ -90,6 +90,7 @@ static int putsec (struct zm_fileinfo *zi, char *buf, size_t n);
 enum safe_mkdir { MKDIR_NO, MKDIR_OK };
 static FILE *safe_open (const char *path, const char *mode, enum safe_mkdir mkdir_ok);
 static int procheader (char *name, struct zm_fileinfo *);
+static int setup_output_buffer (struct zm_fileinfo *zi, FILE *fout);
 static int wcgetsec (size_t *Blklen, char *rxbuf, unsigned int maxtime);
 static int wcrx (struct zm_fileinfo *);
 static int wcrxpn (struct zm_fileinfo *, char *rpn);
@@ -1433,7 +1434,9 @@ procheader(char *name, struct zm_fileinfo *zi)
                                         fout=NULL;
                                         return ERROR;
                                 }
-                                goto buffer_it;
+                                /* resume from the recorded offset; must not
+                                 * run the bytes_skipped=0 reset below */
+                                return setup_output_buffer(zi, fout);
                         }
                         else {
                                 /* resume impossible, file has changed:
@@ -1471,34 +1474,42 @@ procheader(char *name, struct zm_fileinfo *zi)
                 return ERROR;
         }
 
-buffer_it:
-	{
-		static char *s=NULL;
-		static size_t last_length=0;
+        return setup_output_buffer(zi, fout);
+}
+
+/* Apply o_sync and the (once-allocated) large stdio buffer to the output
+ * file, and record the receive start offset. Called from both the normal
+ * open path and the ZCRESUM resume path of procheader(); the statics
+ * deliberately persist across files. The global fout is passed explicitly
+ * (the new stream, already assigned) to keep this helper self-contained. */
+static int
+setup_output_buffer(struct zm_fileinfo *zi, FILE *fp)
+{
+        static char *s=NULL;
+        static size_t last_length=0;
 #if defined(F_GETFL) && defined(F_SETFL) && defined(O_SYNC)
-		if (o_sync) {
-			int oldflags;
-			oldflags = fcntl (fileno(fout), F_GETFL, 0);
-			if (oldflags>=0 && !(oldflags & O_SYNC)) {
-				oldflags|=O_SYNC;
-				fcntl (fileno(fout), F_SETFL, oldflags); /* errors don't matter */
-			}
-		}
+        if (o_sync) {
+                int oldflags;
+                oldflags = fcntl (fileno(fp), F_GETFL, 0);
+                if (oldflags>=0 && !(oldflags & O_SYNC)) {
+                        oldflags|=O_SYNC;
+                        fcntl (fileno(fp), F_SETFL, oldflags); /* errors don't matter */
+                }
+        }
 #endif
 
-		if (!s && buffersize) {
-			last_length=buffersize;
-			/* buffer `4096' bytes pages */
-			last_length=(last_length+4095)&0xfffff000;
-			s=xmalloc(last_length);
-		}
-		if (s) {
-                    setvbuf(fout,s,_IOFBF,last_length);
-		}
-	}
-	zi->bytes_received=zi->bytes_skipped;
+        if (!s && buffersize) {
+                last_length=buffersize;
+                /* buffer `4096' bytes pages */
+                last_length=(last_length+4095)&0xfffff000;
+                s=xmalloc(last_length);
+        }
+        if (s) {
+                setvbuf(fp,s,_IOFBF,last_length);
+        }
+        zi->bytes_received=zi->bytes_skipped;
 
-	return OK;
+        return OK;
 }
 
 /*
