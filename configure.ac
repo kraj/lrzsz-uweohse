@@ -73,8 +73,14 @@ fi
 
 AX_APPEND_COMPILE_FLAGS([ -g3], [LRZSZ_CFLAGS])
 AX_APPEND_COMPILE_FLAGS([ -Wunused-result -Wpedantic -Wcast-qual -Wmissing-braces -Wcomments -Wformat], [WARN_CFLAGS])
-dnl that one does not take #ifdefs into account:
-AX_APPEND_COMPILE_FLAGS([ -Wno-pre-c23-compat], [WARN_CFLAGS])
+
+dnl that one does not take #ifdefs into account. clang-only warning family.
+dnl probe the positive form: gcc errors on unknown positive -W flags immediately,
+dnl but silently accepts unknown -Wno-* forms and then prints a per-file
+dnl "unrecognized command-line option" note on every file / translation unit
+dnl that has any diagnostic.
+AX_CHECK_COMPILE_FLAG([-Wpre-c23-compat],
+	[AX_APPEND_COMPILE_FLAGS([ -Wno-pre-c23-compat], [WARN_CFLAGS])])
 
 dnl -Werror is a development default; release builds may pass --disable-Werror.
 AC_ARG_ENABLE([Werror],
