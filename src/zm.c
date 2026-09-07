@@ -305,7 +305,7 @@ zsendline_s(const char *s, size_t count)
 		}
 		if (t!=s) {
 			fwrite(s,(size_t)(t-s),1,stdout);
-                        stat_for_file.net_bytes_out+=(unsigned long) (t-s);
+                        stats_net_write((size_t)(t-s));
 			lastsent=t[-1];
 			s=t;
 		}
@@ -431,7 +431,7 @@ zshhdr(int type, unsigned char *hdr)
 		s[len++]=XON;
 	}
 	fwrite(s, 1, len, stdout);
-	stat_for_file.net_bytes_out += len;
+	stats_net_write(len);
 	flushmo();
 }
 
@@ -455,12 +455,11 @@ zsdata(const char *buf, size_t length, int frameend)
 {
 	unsigned short crc;
 
-	VPRINTF(3,("zsdata: %lu %s", (unsigned long) length, 
+	VPRINTF(3,("zsdata: %lu %s", (unsigned long) length,
 		Zendnames[(frameend-ZCRCE)&3]));
 	crc = 0;
 
-        stat_for_file.total_message_bytes += length;
-        stat_for_file.valid_messages++;
+        stats_msg_valid(length);
 	for( ; length; length--) {
 	  zsendline(*buf); crc = updcrc((0xff & *buf), crc);
 	  buf++;
@@ -485,8 +484,7 @@ zsda32(const char *buf, size_t length, int frameend)
 	VPRINTF(3,("zsdat32: %lu %s", length, Zendnames[(frameend-ZCRCE)&3]));
 
 	crc = 0xFFFFFFFFL;
-        stat_for_file.total_message_bytes += length;
-        stat_for_file.valid_messages++;
+        stats_msg_valid(length);
 	zsendline_s(buf,length);
 	for (; length; length--) {
 		c = *buf & 0xff;
@@ -547,29 +545,29 @@ crcfoo:
 						goto crcfoo;
 					crc = updcrc(c, crc);
 
-                                        stat_for_file.total_message_bytes += length - (end - buf);
+                                        stats_msg_bytes(length - (end - buf));
 					if (crc & 0xFFFF) {
-                                                stat_for_file.invalid_messages++;
+                                                stats_msg_invalid();
 						zperr(badcrc);
 						return ERROR;
 					}
-                                        stat_for_file.valid_messages++;
+                                        stats_msg_valid(0);
 					*bytes_received = length - (end - buf);
-					VPRINTF(3,("zrdata: %lu  %s", (unsigned long) (*bytes_received), 
+					VPRINTF(3,("zrdata: %lu  %s", (unsigned long) (*bytes_received),
 							Zendnames[(d-GOTCRCE)&3]));
 					return d;
 				}
 			case GOTCAN:
 				zperr(_("Sender Canceled"));
-                                stat_for_file.cancels++;
+                                stats_cancel();
 				return ZCAN;
 			case TIMEOUT:
 				zperr(_("TIMEOUT"));
-                                stat_for_file.timeouts++;
+                                stats_timeout();
 				return c;
 			default:
 				zperr(_("Bad data subpacket"));
-                                stat_for_file.format_errors++;
+                                stats_msg_format_error();
 				return c;
 			}
 		}
@@ -578,7 +576,7 @@ crcfoo:
 		crc = updcrc(c, crc);
 	}
 	zperr(_("Data subpacket too long"));
-        stat_for_file.format_errors++;
+        stats_msg_format_error();
 	return ERROR;
 }
 
@@ -614,27 +612,27 @@ crcfoo:
 				if ((c = zdlread()) & ~0xff)
 					goto crcfoo;
 				crc = UPDC32(c, crc);
-                                stat_for_file.total_message_bytes += length - (end - buf);
+                                stats_msg_bytes(length - (end - buf));
 				if (crc != 0xDEBB20E3) {
 					zperr(badcrc);
-                                        stat_for_file.invalid_messages++;
+                                        stats_msg_invalid();
 					return ERROR;
 				}
-                                stat_for_file.valid_messages++;
+                                stats_msg_valid(0);
 				*bytes_received = length - (end - buf);
-				VPRINTF(3,("zrdat32: %lu %s", (unsigned long) *bytes_received, 
+				VPRINTF(3,("zrdat32: %lu %s", (unsigned long) *bytes_received,
 					Zendnames[(d-GOTCRCE)&3]));
 				return d;
 			case GOTCAN:
 				zperr(_("Sender Canceled"));
-                                stat_for_file.cancels++;
+                                stats_cancel();
 				return ZCAN;
 			case TIMEOUT:
 				zperr(_("TIMEOUT"));
-                                stat_for_file.timeouts++;
+                                stats_timeout();
 				return c;
 			default:
-                                stat_for_file.format_errors++;
+                                stats_msg_format_error();
 				zperr(_("Bad data subpacket"));
 				return c;
 			}
@@ -644,7 +642,7 @@ crcfoo:
 		crc = UPDC32(c, crc);
 	}
 	zperr(_("Data subpacket too long"));
-        stat_for_file.format_errors++;
+        stats_msg_format_error();
 	return ERROR;
 }
 
@@ -744,9 +742,9 @@ splat:
                 Crc32 = false;
 		c =  zrbhdr(hdr);
                 if (c==ERROR) {
-                    stat_for_file.invalid_messages++;
+                    stats_msg_invalid();
                 } else {
-                    stat_for_file.valid_messages++;
+                    stats_msg_valid(0);
                 }
 		break;
 	case ZBIN32:
@@ -754,9 +752,9 @@ splat:
 		Crc32 = true;
 		c =  zrbhdr32(hdr);
                 if (c==ERROR) {
-                    stat_for_file.invalid_messages++;
+                    stats_msg_invalid();
                 } else {
-                    stat_for_file.valid_messages++;
+                    stats_msg_valid(0);
                 }
 		break;
 	case ZHEX:
@@ -764,22 +762,22 @@ splat:
                 Crc32 = false;
 		c =  zrhhdr(hdr);
                 if (c==ERROR) {
-                    stat_for_file.invalid_messages++;
+                    stats_msg_invalid();
                 } else {
-                    stat_for_file.valid_messages++;
+                    stats_msg_valid(0);
                 }
 		break;
 	case CAN:
 		goto gotcan;
 	default:
-                stat_for_file.format_errors++;
+                stats_msg_format_error();
 		goto agn2;
 	}
         rxpos = rclhdr(hdr);
 
 	if (Rxpos)
 		*Rxpos = rxpos;
-        stat_for_file.total_message_bytes+=4;
+        stats_msg_bytes(4);
 fifi:
 	if (Verbose > 2)
 		vfile("zgethdr: returning %d (%s) after %d garbage bytes, rxpos=%lx, readline_left=%d",
@@ -789,10 +787,10 @@ fifi:
 	switch (c) {
 	case GOTCAN:
 	case ZCAN:
-            stat_for_file.cancels++;
+            stats_cancel();
             break;
 	case TIMEOUT:
-            stat_for_file.timeouts++;
+            stats_timeout();
             break;
         default:
             /* nothing to do */

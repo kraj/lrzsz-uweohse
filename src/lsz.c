@@ -798,7 +798,7 @@ wcs(const char *oname, const char *remotename)
 		int e=errno;
 		lrzsz_warning(e, _("cannot open %s"),oname);
 		++errcnt;
-                stat_for_file.local_errors++;
+                stats_file_local_error();
 		return OK;	/* pass over it, there may be others */
 	} else {
 		name=xstrdup(oname);
@@ -842,7 +842,7 @@ wcs(const char *oname, const char *remotename)
 #endif
 		lrzsz_warning(0, _("is not a file: %s"),name);
 		fclose(input_f);
-                stat_for_file.local_errors++;
+                stats_file_local_error();
 		return OK;
 	}
 
@@ -881,11 +881,11 @@ wcs(const char *oname, const char *remotename)
 	case ERROR:
 		if (enable_syslog)
 			lsyslog(LOG_INFO, _("%s/%s: error occured"),protname(),shortname);
-                stat_for_file.files_err++;
+                stats_file_error();
 		return ERROR;
 	case ZSKIP:
 		lrzsz_warning(0, _("skipped: %s"),name);
-                stat_for_file.skipped++;
+                stats_file_skipped();
 		if (enable_syslog)
 			lsyslog(LOG_INFO, _("%s/%s: skipped"),protname(),shortname);
 		return OK;
@@ -896,7 +896,7 @@ wcs(const char *oname, const char *remotename)
 	{
 		if (enable_syslog)
 			lsyslog(LOG_INFO, _("%s/%s: error occured"),protname(),shortname);
-                stat_for_file.files_err++;
+                stats_file_error();
 		return ERROR;
 	}
 	if (Unlinkafter)
@@ -904,11 +904,11 @@ wcs(const char *oname, const char *remotename)
 
 	report_transfer_result(1, shortname, zi.fname,
 		(long) zi.bytes_sent, 0, 0);
-        stat_for_file.files_ok++;
+        stats_file_ok();
 	return 0;
 
 violation:
-        stat_for_file.policy_rejects++;
+        stats_file_policy_reject();
         stats_account_one();
         stats_log(&stat_for_all, false);
 	canit(STDOUT_FILENO);
@@ -1027,7 +1027,7 @@ getnak(void)
 			Ascii = 0;	/* Receiver does the conversion */
 			return false;
 		case TIMEOUT:
-                        stat_for_file.timeouts++;
+                        stats_timeout();
 			/* 30 seconds are enough */
 			if (tries==3) {
 				zperr(_("Timeout on pathname"));
@@ -1120,7 +1120,7 @@ wctx(struct zm_fileinfo *zi)
 			break;
 	}
 	zperr(_("No ACK on EOT"));
-	stat_for_file.too_many_errors++;
+	stats_too_many_errors();
 	return ERROR;
 }
 
@@ -1154,7 +1154,7 @@ wcputsec(char *buf, int sectnum, size_t cseclen)
 			oldcrc=updcrc((0xff& *cp), oldcrc);
 			checksum += *cp++;
 		}
-                stat_for_file.total_message_bytes+=cseclen;
+                stats_msg_bytes(cseclen);
 		if (Crcflg) {
 			oldcrc=updcrc(0,updcrc(0,oldcrc));
 			sendline((int)oldcrc>>8);
@@ -1173,24 +1173,24 @@ gotnak:
 		case CAN:
 			if(Lastrx == CAN) {
 cancan:
-                                stat_for_file.cancels++;
+                                stats_cancel();
 				zperr(_("Cancelled"));  return ERROR;
 			}
 			break;
 		case TIMEOUT:
-                        stat_for_file.timeouts++;
+                        stats_timeout();
 			zperr(_("Timeout on sector ACK")); continue;
 		case WANTCRC:
 			if (firstsec)
 				Crcflg = true;
                         continue;
 		case NAK:
-                        stat_for_file.invalid_messages++;
+                        stats_msg_invalid();
 			zperr(_("NAK on sector")); continue;
 		case ACK:
 			firstsec=false;
 			Totsecs += (cseclen>>7);
-                        stat_for_file.valid_messages++;
+                        stats_msg_valid(0);
 			return OK;
 		case ERROR:
 			zperr(_("Got burst for sector ACK")); break;
@@ -1213,7 +1213,7 @@ cancan:
 		}
 	}
 	zperr(_("Retry Count Exceeded"));
-        stat_for_file.too_many_errors++;
+        stats_too_many_errors();
 	return ERROR;
 }
 
@@ -1229,7 +1229,7 @@ filbuf(char *buf, size_t count)
 		if (r < 0) {
 			int er = errno;
 			lrzsz_warning(0, _("read error: %s"), strerror(er));
-                        stat_for_file.local_errors++;
+                        stats_file_local_error();
 			return 0;
 		}
 		if (r == 0)
@@ -1256,7 +1256,7 @@ filbuf(char *buf, size_t count)
 	}
         if (ferror(input_f)) {
             lrzsz_warning(0, _("read error: %s"), strerror(errno));
-            stat_for_file.local_errors++;
+            stats_file_local_error();
             return 0;
         }
 	if (m==count)
@@ -2173,7 +2173,7 @@ getinsync(struct zm_fileinfo *zi, int flag)
 		case TIMEOUT:
 			return ERROR;
 		case ZABORT:
-			stat_for_file.cancels++;
+			stats_cancel();
 			return ERROR;
 		case ZRPOS:
 			/*  If sending to a buffered modem, you

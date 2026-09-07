@@ -632,7 +632,7 @@ wcreceive(int argc, char **argp)
 				report_transfer_result(0, shortname, zi.fname,
 					(long) zi.bytes_received, (long) zi.bytes_total,
 					(long) zi.bytes_skipped);
-                                stat_for_file.files_ok++;
+				stats_file_ok();
                                 stats_account_one();
 			}
 		}
@@ -703,7 +703,7 @@ fubar:
             unlink(Pathname);
             vstringf(_("\r\n%s: %s removed.\r\n"), lrzsz_progname, Pathname);
         }
-        stat_for_file.files_err++;
+        stats_file_error();
         stats_account_one();
         return ERROR;
 }
@@ -733,7 +733,7 @@ et_tu:
     while ((c = wcgetsec(&Blklen, rpn, 100)) != 0) {
         if (c == WCEOT) {
             zperr( _("Pathname fetch returned EOT"));
-            stat_for_file.out_of_sync_messages+=1;
+            stats_msg_out_of_sync();
             sendline(ACK);
             flushmo();
             purgeline(0);	/* Do read next time ... */
@@ -790,14 +790,14 @@ wcrx(struct zm_fileinfo *zi)
         else if (sectcurr==(sectnum&0xff)) {
             zperr( _("Received dup Sector"));
             sendchar=ACK;
-            stat_for_file.out_of_sync_messages+=1;
+            stats_msg_out_of_sync();
         }
         else if (sectcurr==WCEOT) {
             if (closeit(zi)) {
-                stat_for_file.local_errors+=1;
+                stats_file_local_error();
                 return ERROR;
             }
-            stat_for_file.files_ok+=1;
+            stats_file_ok();
             sendline(ACK);
             flushmo();
             purgeline(0);	/* Do read next time ... */
@@ -807,7 +807,7 @@ wcrx(struct zm_fileinfo *zi)
             return ERROR;
         else {
             zperr( _("Sync Error"));
-            stat_for_file.out_of_sync_messages+=1;
+            stats_msg_out_of_sync();
             return ERROR;
         }
     }
@@ -851,33 +851,33 @@ get2:
                     goto bilge;
                 if (Crcflg) {
                     oldcrc=updcrc(firstch, oldcrc);
-                    stat_for_file.total_message_bytes+=*Blklen;
+                    stats_msg_bytes(*Blklen);
                     if ((firstch=READLINE_PF(1)) < 0)
                         goto bilge;
                     oldcrc=updcrc(firstch, oldcrc);
                     if (oldcrc & 0xFFFF) {
-                        stat_for_file.invalid_messages+=1;
+                        stats_msg_invalid();
                         zperr( _("CRC"));
                     } else {
                         Firstsec=false;
-                        stat_for_file.valid_messages+=1;
+                        stats_msg_valid(0);
                         return sectcurr;
                     }
                 } else {
-                    stat_for_file.total_message_bytes+=*Blklen;
+                    stats_msg_bytes(*Blklen);
                     if (((checksum-firstch)&0xff)==0) {
                         Firstsec=false;
-                        stat_for_file.valid_messages+=1;
+                        stats_msg_valid(0);
                         return sectcurr;
                     }
                     else {
-                        stat_for_file.invalid_messages+=1;
+                        stats_msg_invalid();
                         zperr( _("Checksum"));
                     }
                 }
             }
             else {
-                stat_for_file.format_errors+=1;
+                stats_msg_format_error();
                 zperr(_("Sector number garbled"));
             }
         }
@@ -888,7 +888,7 @@ get2:
         else if (firstch==CAN) {
             if (Lastrx==CAN) {
                 zperr( _("Sender Cancelled"));
-                stat_for_file.cancels+=1;
+                stats_cancel();
                 return ERROR;
             } else {
                 Lastrx=CAN;
@@ -899,7 +899,7 @@ get2:
             if (Firstsec)
                 goto humbug;
 bilge:
-            stat_for_file.timeouts+=1;
+            stats_timeout();
             zperr( _("TIMEOUT"));
         } else {
             zperr( _("Got 0x%x sector header"), (unsigned int) firstch);
@@ -927,7 +927,7 @@ humbug:
     }
     /* try to stop the bubble machine. */
     canit(STDOUT_FILENO);
-    stat_for_file.too_many_errors+=1;
+    stats_too_many_errors();
     return ERROR;
 }
 
@@ -948,7 +948,7 @@ do_crc_check(FILE *f, size_t remote_bytes, size_t check_bytes)
     int c;
     int t1=0,t2=0;
     if (-1==fstat(fileno(f),&st)) {
-        stat_for_file.local_errors+=1;
+        stats_file_local_error();
         DO_SYSLOG((LOG_ERR,"cannot fstat open file: %s",strerror(errno)));
         return ERROR;
     }
@@ -975,21 +975,21 @@ do_crc_check(FILE *f, size_t remote_bytes, size_t check_bytes)
             rcrc=(unsigned long) tmp;
             switch (c) {
                 case TIMEOUT:
-                    stat_for_file.timeouts+=1;
+                    stats_timeout();
                     break;
                 case ERROR:
                 default: /* ignore */
                     break;
                 case ZFIN:
-                    stat_for_file.out_of_sync_messages+=1;
+                    stats_msg_out_of_sync();
                     return ERROR;
                 case ZRINIT:
-                    stat_for_file.out_of_sync_messages+=1;
+                    stats_msg_out_of_sync();
                     return ERROR;
                 case ZCAN:
                     if (Verbose)
                         vstringf(_("got ZCAN"));
-                    stat_for_file.cancels+=1;
+                    stats_cancel();
                     return ERROR;
                     break;
                 case ZCRC:
@@ -1002,7 +1002,7 @@ do_crc_check(FILE *f, size_t remote_bytes, size_t check_bytes)
         }
         t1++;
     }
-    stat_for_file.too_many_errors+=1;
+    stats_too_many_errors();
     return ERROR;
 }
 
@@ -1214,7 +1214,7 @@ procheader(char *name, struct zm_fileinfo *zi)
                 if (Verbose)
                     vstringf(_("file name ends with a /, skipped: %s\n"),name);
                 DO_SYSLOG((LOG_ERR,"file name ends with a /, skipped: %s", name));
-                stat_for_file.policy_rejects+=1;
+                stats_file_policy_reject();
                 return ERROR;
             }
             name=p;
@@ -1288,7 +1288,7 @@ procheader(char *name, struct zm_fileinfo *zi)
                     vstringf(_("file exists, skipped: %s\n"),name);
                 DO_SYSLOG((LOG_ERR,"cannot fstat open file %s: %s",
                             name,strerror(e)));
-                stat_for_file.local_errors+=1;
+                stats_file_local_error();
                 fclose(fout);
                 fout = NULL;
                 return ERROR;
@@ -1298,17 +1298,17 @@ procheader(char *name, struct zm_fileinfo *zi)
                     DO_SYSLOG((LOG_INFO,"skipping %s: newer file exists", name));
                     fclose(fout);
                     fout = NULL;
-                    stat_for_file.skipped+=1;
+                    stats_file_skipped();
                     return ERROR; /* skips file */
                 }
             } else {
                 /* newer-or-longer */
-                if (((size_t) sta.st_size) >= zi->bytes_total 
+                if (((size_t) sta.st_size) >= zi->bytes_total
                         && sta.st_mtime > zi->modtime) {
                     DO_SYSLOG((LOG_INFO,"skipping %s: longer+newer file exists", name));
                     fclose(fout);
                     fout = NULL;
-                    stat_for_file.skipped+=1;
+                    stats_file_skipped();
                     return ERROR; /* skips file */
                 }
             }
@@ -1324,7 +1324,7 @@ procheader(char *name, struct zm_fileinfo *zi)
             if (r!=ZCRC_DIFFERS) {
                 fclose(fout);
                 fout = NULL;
-                stat_for_file.skipped++;
+                stats_file_skipped();
                 return ERROR; /* skips */
             }
             fclose(fout);
@@ -1333,7 +1333,7 @@ procheader(char *name, struct zm_fileinfo *zi)
             fclose(fout);
             fout = NULL;
             if ((zmanag & ZF1_ZMMASK)!=ZF1_ZMCHNG) {
-                stat_for_file.skipped+=1;
+                stats_file_skipped();
                 if (Verbose)
                     vstringf(_("file exists, skipped: %s\n"),name);
                 return ERROR;
@@ -1344,9 +1344,9 @@ procheader(char *name, struct zm_fileinfo *zi)
             if (!fout) {
                 if (errno == EEXIST) {
                     /* all 1000 names taken */
-                    stat_for_file.policy_rejects+=1;
+                    stats_file_policy_reject();
                 } else {
-                    stat_for_file.local_errors+=1;
+                    stats_file_local_error();
                     if (Verbose)
                         vstringf(_("cannot claim %s.N: %s\n"),name,strerror(errno));
                 }
@@ -1428,7 +1428,7 @@ procheader(char *name, struct zm_fileinfo *zi)
                         zi->bytes_skipped = st.st_size & ~(1023);
                         if (can_resume) {
                                 if (fseeko(fout, (off_t) zi->bytes_skipped, SEEK_SET)) {
-                                        stat_for_file.local_errors+=1;
+                                        stats_file_local_error();
                                         fclose(fout);
                                         fout=NULL;
                                         return ERROR;
@@ -1464,7 +1464,7 @@ procheader(char *name, struct zm_fileinfo *zi)
         if ( !fout)
         {
                 int e=errno;
-                stat_for_file.local_errors+=1;
+                stats_file_local_error();
                 zpfatal(_("cannot open %s"), name_static);
                 DO_SYSLOG((LOG_ERR,"%s: cannot open: %s",
                         protname(),strerror(e)));
@@ -1803,19 +1803,19 @@ rzfiles(struct zm_fileinfo *zi)
 			report_transfer_result(0, NULL, zi->fname,
 				(long) zi->bytes_received, (long) zi->bytes_total,
 				(long) zi->bytes_skipped);
-                        stat_for_file.files_ok++;
+                        stats_file_ok();
                         stats_account_one();
 			break;
 		case ZSKIP:
-                        stat_for_file.skipped++;
+                        stats_file_skipped();
                         stats_account_one();
                         if (Verbose) 
                                 vstringf(_("Skipped"));
                         DO_SYSLOG_FNAME((LOG_INFO, "%s/%s: skipped",shortname,protname()));
 			break;
-		default: 
+		default:
 		case ERROR:
-                        stat_for_file.files_err++;
+                        stats_file_error();
                         stats_account_one();
 			DO_SYSLOG_FNAME((LOG_INFO, "%s/%s: error",shortname,protname()));
 			return ERROR;

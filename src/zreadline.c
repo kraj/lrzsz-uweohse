@@ -73,7 +73,7 @@ readline_internal(unsigned int timeout)
 			return TIMEOUT;
 		if (Verbose > 5)
 			vstringf("select error: errno=%d:%s\n", errno, strerror(errno));
-		stat_for_file.net_errors++;
+		stats_net_error();
 		return ERROR;
 	}
 	if (rc == 0)
@@ -81,10 +81,7 @@ readline_internal(unsigned int timeout)
 
 	readline_ptr=readline_buffer;
 	readline_left=read(readline_fd, readline_ptr, readline_readnum);
-	stat_for_file.net_read_ops++;
-	if (readline_left>=0) {
-		stat_for_file.net_bytes_in += readline_left;
-	}
+	stats_net_read(readline_left);
 	if (Verbose > 5) {
 		vstringf("Read returned %d bytes\n", readline_left);
 		if (readline_left==-1)
@@ -105,7 +102,7 @@ readline_internal(unsigned int timeout)
 		/* EOF: carrier lost, peer closed the line */
 		if (Verbose > 5)
 			vstringf("read: EOF on the line\n");
-		stat_for_file.net_errors++;
+		stats_net_error();
 		return RCDO;
 	}
 	if (readline_left < 0) {
@@ -113,7 +110,7 @@ readline_internal(unsigned int timeout)
 			return TIMEOUT;
 		if (Verbose > 5)
 			vstringf("read error: errno=%d:%s\n", errno, strerror(errno));
-		stat_for_file.net_errors++;
+		stats_net_error();
 		return ERROR;
 	}
 	--readline_left;

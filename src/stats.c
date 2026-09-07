@@ -277,3 +277,130 @@ stats_journal_close(void)
         journal_fp = NULL;
     }
 }
+
+/*
+ * Event accounting helpers (see stats.h). Each updates exactly the fields
+ * its event implies; STATS_TRACE builds additionally log the event.
+ */
+#ifdef STATS_TRACE
+#define STATS_TRACE_FMT(name) fprintf(stderr, "stats: " name "\n")
+#define STATS_TRACE_FMT1(name, fmt, val) fprintf(stderr, "stats: " name " " fmt "\n", (val))
+#else
+#define STATS_TRACE_FMT(name) ((void) 0)
+#define STATS_TRACE_FMT1(name, fmt, val) ((void) 0)
+#endif
+
+void
+stats_msg_valid(size_t bytes)
+{
+    stat_for_file.total_message_bytes += bytes;
+    stat_for_file.valid_messages++;
+    STATS_TRACE_FMT1("msg_valid", "%zu", bytes);
+}
+
+void
+stats_msg_invalid(void)
+{
+    stat_for_file.invalid_messages++;
+    STATS_TRACE_FMT("msg_invalid");
+}
+
+void
+stats_msg_out_of_sync(void)
+{
+    stat_for_file.out_of_sync_messages++;
+    STATS_TRACE_FMT("msg_out_of_sync");
+}
+
+void
+stats_msg_format_error(void)
+{
+    stat_for_file.format_errors++;
+    STATS_TRACE_FMT("msg_format_error");
+}
+
+void
+stats_msg_bytes(size_t bytes)
+{
+    stat_for_file.total_message_bytes += bytes;
+    STATS_TRACE_FMT1("msg_bytes", "%zu", bytes);
+}
+
+void
+stats_file_ok(void)
+{
+    stat_for_file.files_ok++;
+    STATS_TRACE_FMT("file_ok");
+}
+
+void
+stats_file_error(void)
+{
+    stat_for_file.files_err++;
+    STATS_TRACE_FMT("file_error");
+}
+
+void
+stats_file_local_error(void)
+{
+    stat_for_file.local_errors++;
+    STATS_TRACE_FMT("file_local_error");
+}
+
+void
+stats_file_policy_reject(void)
+{
+    stat_for_file.policy_rejects++;
+    STATS_TRACE_FMT("file_policy_reject");
+}
+
+void
+stats_file_skipped(void)
+{
+    stat_for_file.skipped++;
+    STATS_TRACE_FMT("file_skipped");
+}
+
+void
+stats_cancel(void)
+{
+    stat_for_file.cancels++;
+    STATS_TRACE_FMT("cancel");
+}
+
+void
+stats_timeout(void)
+{
+    stat_for_file.timeouts++;
+    STATS_TRACE_FMT("timeout");
+}
+
+void
+stats_too_many_errors(void)
+{
+    stat_for_file.too_many_errors++;
+    STATS_TRACE_FMT("too_many_errors");
+}
+
+void
+stats_net_read(long n)
+{
+    stat_for_file.net_read_ops++;
+    if (n >= 0)
+        stat_for_file.net_bytes_in += (unsigned long long) n;
+    STATS_TRACE_FMT1("net_read", "%ld", n);
+}
+
+void
+stats_net_write(size_t bytes)
+{
+    stat_for_file.net_bytes_out += bytes;
+    STATS_TRACE_FMT1("net_write", "%zu", bytes);
+}
+
+void
+stats_net_error(void)
+{
+    stat_for_file.net_errors++;
+    STATS_TRACE_FMT("net_error");
+}
