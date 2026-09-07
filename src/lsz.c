@@ -699,7 +699,6 @@ main(int argc, char **argv)
         stats_log(&stat_for_all,false);
 	stats_journal_close();
 	exit(dm);
-	/*NOTREACHED*/
 }
 
 static int
@@ -974,7 +973,10 @@ wctxpn(struct zm_fileinfo *zi)
 		p=q;
 	}
 
-        f.st_size=0; /* TODO: smelly code below */
+	/* zero the size in case the fstat below is skipped (stdin, ascii,
+	 * empty name) or fails: the batch-estimate arithmetic below
+	 * (Totalleft) uses f.st_size unconditionally. */
+	f.st_size=0;
 
 	/* note that we may lose some information here in case mode_t is wider than an
 	 * int. But i believe sending %lo instead of %o _could_ break compatability
@@ -1552,9 +1554,6 @@ zsendfile(struct zm_fileinfo *zi, const char *buf, size_t blen)
 	/* we are going to send a ZFILE. There cannot be much useful
 	 * stuff in the line right now (*except* ZCAN?).
 	 */
-#if 0
-	purgeline(io_mode_fd); /* might possibly fix stefan glasers problems */
-#endif
 
 	for (;;) {
 		int gotblock;

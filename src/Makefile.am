@@ -8,6 +8,9 @@ noinst_PROGRAMS = zmodemsnif linesimulator timestamp
 LDADD = @LIBINTL@
 AM_CPPFLAGS = -I.. -I$(srcdir) -I$(top_srcdir)/src -DLOCALEDIR=\"$(localedir)\" -D_FORTIFY_SOURCE=2 -D_POSIX_C_SOURCE=@MIN_POSIX_C_STD@
 AM_CFLAGS = @WARN_CFLAGS@ @LRZSZ_CFLAGS@
+# clang development aid: to enable nearly every clang warning, move the
+# following line into AM_CFLAGS above (removing the leading '#'); the
+# -Wno-* list mutes the warnings that are pure noise for this code base.
 #-Weverything -Wno-disabled-macro-expansion -Wno-reserved-macro-identifier -Wno-used-but-marked-unused -Wno-padded -Wno-unsafe-buffer-usage -Wno-implicit-int-conversion -Wno-sign-conversion -Wno-implicit-fallthrough -Wno-unreachable-code-break -Wno-implicit-int-float-conversion -Wno-float-equal -Wno-covered-switch-default -Wno-unused-macros
 AM_LDFLAGS = @LRZSZ_LDFLAGS@
 
