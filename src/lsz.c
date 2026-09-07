@@ -730,13 +730,8 @@ wcsend (int argc, char *argp[])
 		saybibi ();
 	else if (protocol == ZM_YMODEM) {
 		struct zm_fileinfo zi;
+		zi_init(&zi);
 		zi.fname = xstrdup(""); /* empty filename packet signals end of batch */
-		zi.modtime = 0;
-		zi.mode = 0;
-		zi.bytes_total = 0;
-		zi.bytes_sent = 0;
-		zi.bytes_received = 0;
-		zi.bytes_skipped = 0;
 		wctxpn (&zi);
                 free(zi.fname);
 	}
@@ -753,6 +748,7 @@ wcs(const char *oname, const char *remotename)
 	static char *name=NULL;
 	struct zm_fileinfo zi;
 	const char *shortname;
+	zi_init(&zi);
 	shortname=strrchr(oname,'/');
 	if (shortname)
 		shortname++;
@@ -863,10 +859,6 @@ wcs(const char *oname, const char *remotename)
 #else
 	zi.bytes_total= c == S_IFIFO ? DEFBYTL : f.st_size;
 #endif
-	zi.bytes_sent=0;
-	zi.bytes_received=0;
-	zi.bytes_skipped=0;
-	zi.eof_seen=0;
 	timing_reset();
 	stats_set_filename(shortname);
 	stats_start_one();

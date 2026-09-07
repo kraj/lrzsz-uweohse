@@ -586,14 +586,7 @@ wcreceive(int argc, char **argp)
 	int c;
 	struct zm_fileinfo zi;
 	const char *shortname=NULL;
-	zi.fname=NULL;
-	zi.modtime=0;
-	zi.mode=0;
-	zi.bytes_total=0;
-	zi.bytes_sent=0;
-	zi.bytes_received=0;
-	zi.bytes_skipped=0;
-	zi.eof_seen=0;
+	zi_init(&zi);
 
 	if (protocol!=ZM_XMODEM || argc==0) {
 		Crcflg=1;

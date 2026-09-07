@@ -127,6 +127,19 @@ struct zm_fileinfo {
 	int    eof_seen;
 };
 
+/* zero every field (fname=NULL, counters 0, eof_seen=0) */
+static inline void zi_init(struct zm_fileinfo *zi)
+{
+	zi->fname = NULL;
+	zi->modtime = 0;
+	zi->mode = 0;
+	zi->bytes_total = 0;
+	zi->bytes_sent = 0;
+	zi->bytes_received = 0;
+	zi->bytes_skipped = 0;
+	zi->eof_seen = 0;
+}
+
 #define R_BYTESLEFT(x) ((x)->bytes_total-(x)->bytes_received)
 
 extern enum zm_type_enum protocol;
