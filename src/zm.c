@@ -173,70 +173,77 @@ zdlread(void)
 		return c;
 	return zdlread2(c);
 }
-/* no, i don't like gotos. -- uwe */
 static int
 zdlread2(int c)
 {
-	goto jump_over; /* bad style */
+	bool have_byte = true;	/* zdlread() passes the first byte in */
+	bool after_zdle = false;	/* set once a ZDLE has been seen */
 
-again:
-	/* Quick check for non control characters */
-	if ((c = READLINE_PF(Rxtimeout)) < 0)
-		return c;
-	if (c & 0x60)
-		return c;
-jump_over:
-	switch (c) {
-	case ZDLE:
-		break;
-	case XON:
-	case (XON|0x80):
-	case XOFF:
-	case (XOFF|0x80):
-		goto again;
-	default:
-		if (Zctlesc && !(c & 0x60)) {
-			goto again;
+	for (;;) {
+		if (!after_zdle) {
+			/* unescaped context: a plain byte passes through */
+			if (!have_byte) {
+				if ((c = READLINE_PF(Rxtimeout)) < 0)
+					return c;
+				if (c & 0x60)
+					return c;
+			}
+			have_byte = false;
+			switch (c) {
+			case ZDLE:
+				after_zdle = true;
+				continue;
+			case XON:
+			case (XON|0x80):
+			case XOFF:
+			case (XOFF|0x80):
+				/* flow control: skipped */
+				continue;
+			default:
+				if (Zctlesc && !(c & 0x60))
+					continue;	/* skip control garbage */
+				return c;
+			}
 		}
-		return c;
-	}
-again2:
-	if ((c = READLINE_PF(Rxtimeout)) < 0)
-		return c;
-	if (c == CAN && (c = READLINE_PF(Rxtimeout)) < 0)
-		return c;
-	if (c == CAN && (c = READLINE_PF(Rxtimeout)) < 0)
-		return c;
-	if (c == CAN && (c = READLINE_PF(Rxtimeout)) < 0)
-		return c;
-	switch (c) {
-	case CAN:
-		return GOTCAN;
-	case ZCRCE:
-	case ZCRCG:
-	case ZCRCQ:
-	case ZCRCW:
-		return (c | GOTOR);
-	case ZRUB0:
-		return 0x7f;
-	case ZRUB1:
-		return 0xff;
- 	case XON:
- 	case (XON|0x80):
- 	case XOFF:
- 	case (XOFF|0x80):
- 		/* flow control: skipped. With ESC8/TESC8 negotiated the
- 		 * high-bit forms (0x91/0x93) are the ZDLE-escaped data
- 		 * bytes 0xd1/0xd3, not flow control — un-escape them
- 		 * instead. */
- 		if (Esc8 && (c == (XON|0x80) || c == (XOFF|0x80)))
- 			goto unescape;
- 		goto again2;
-	default:
-		if (Zctlesc && ! (c & 0x60)) {
-			goto again2;
+		/* escaped context: read + CAN*5 chain + escaped switch */
+		if ((c = READLINE_PF(Rxtimeout)) < 0)
+			return c;
+		if (c == CAN && (c = READLINE_PF(Rxtimeout)) < 0)
+			return c;
+		if (c == CAN && (c = READLINE_PF(Rxtimeout)) < 0)
+			return c;
+		if (c == CAN && (c = READLINE_PF(Rxtimeout)) < 0)
+			return c;
+		switch (c) {
+		case CAN:
+			return GOTCAN;
+		case ZCRCE:
+		case ZCRCG:
+		case ZCRCQ:
+		case ZCRCW:
+			return (c | GOTOR);
+		case ZRUB0:
+			return 0x7f;
+		case ZRUB1:
+			return 0xff;
+		case XON:
+		case (XON|0x80):
+		case XOFF:
+		case (XOFF|0x80):
+			/* flow control: skipped. With ESC8/TESC8 negotiated the
+			 * high-bit forms (0x91/0x93) are the ZDLE-escaped data
+			 * bytes 0xd1/0xd3, not flow control — un-escape them
+			 * instead. */
+			if (!(Esc8 && (c == (XON|0x80) || c == (XOFF|0x80))))
+				continue;
+			/* fall through to the unescape rule */
+			;
+			/* FALLTHRU */
+		default:
+			if (Zctlesc && !(c & 0x60))
+				continue;	/* skip and stay escaped */
+			break;
 		}
-unescape:
 		/* ZDLE-escaped data: the classic rule accepts the escape
 		 * encoding of 0x40-0x5f/0xc0-0xdf ((c & 0x60) == 0x40) —
 		 * the escaped forms of the controls 0x00-0x1f/0x80-0x9f.
@@ -249,10 +256,9 @@ unescape:
 		 * non-Esc8 peers. */
 		if ((c & 0x60) == 0x40 || ((c ^ 0x40) & 0x80))
 			return (c ^ 0x40);
-		break;
+		VPRINTF(2, _("Bad escape sequence 0x%x"), (unsigned int) c);
+		return ERROR;
 	}
-	VPRINTF(2, _("Bad escape sequence 0x%x"), (unsigned int) c);
-	return ERROR;
 }
 
 
