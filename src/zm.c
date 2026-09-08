@@ -93,7 +93,6 @@ static int zrbhdr (unsigned char *hdr);
 static int zrbhdr32 (unsigned char *hdr);
 static int zrhhdr (unsigned char *hdr);
 static unsigned char zsendline_tab[256];
-static int zrdat32 (char *buf, int length, size_t *);
 static void zsbh32 (unsigned char *hdr, int type);
 static inline void zsendline_s (const char *s, size_t count);
 
@@ -511,21 +510,38 @@ zsda32(const char *buf, size_t length, int frameend)
 /*
  * Receive array buf of max length with ending ZDLE sequence
  *  and CRC.  Returns the ending character or error code.
- *  NB: On errors may store length+1 bytes!
+ *  NB: on the too-long error path (a data byte arriving when the buffer
+ *  is already full) the offending byte is stored at buf[length] — buf
+ *  must provide length+1 bytes. Callers allocate exactly that (secbuf:
+ *  1+LRZSZ_MAX_SUBPACKET_LEN; Attn: ZATTNLEN+1).
+ *
+ * zrdata1 is the shared body of the 16-bit and 32-bit CRC variants: the
+ * two differ only in the CRC chain (init, update, byte count in the
+ * frame-end cases, final compare) and the debug name. The 16-bit chain
+ * is emulated bit-exactly: the original code stored each updcrc() result
+ * into an unsigned short, truncating to 16 bits on every update, so the
+ * merged function masks each update with 0xFFFF. CRC32 is loop-invariant,
+ * so the per-byte branch costs nothing measurable. The GOTCAN/TIMEOUT/
+ * default verdict cases are shared; the only order change (stats call vs
+ * zperr in the invalid-CRC and default cases) is unobservable outside a
+ * STATS_TRACE build.
  */
-int
-zrdata(char *buf, int length, size_t *bytes_received)
+static int
+zrdata1(char *buf, int length, size_t *bytes_received, bool crc32)
 {
 	int c;
-	unsigned short crc;
+	unsigned long crc32v;
+	unsigned short crc16;
 	char *end;
 	int d;
+	unsigned int i;
 
 	*bytes_received=0;
-	if (Rxframeind == ZBIN32)
-		return zrdat32(buf, length, bytes_received);
-
-	crc = 0;  end = buf + length;
+	if (crc32)
+		crc32v = 0xFFFFFFFFL;
+	else
+		crc16 = 0;
+	end = buf + length;
 	while (buf <= end) {
 		if ((c = zdlread()) & ~0xff) {
 crcfoo:
@@ -534,27 +550,47 @@ crcfoo:
 			case GOTCRCG:
 			case GOTCRCQ:
 			case GOTCRCW:
-				{ 
+				{
 					d = c;
 					c &= 0xff;
-					crc = updcrc(c, crc);
-					if ((c = zdlread()) & ~0xff)
-						goto crcfoo;
-					crc = updcrc(c, crc);
-					if ((c = zdlread()) & ~0xff)
-						goto crcfoo;
-					crc = updcrc(c, crc);
+					if (crc32)
+						crc32v = UPDC32(c, crc32v);
+					else
+						crc16 = updcrc(c, crc16) & 0xFFFF;
+					for (i = 0; i < (crc32 ? 4 : 2); i++) {
+						if ((c = zdlread()) & ~0xff)
+							goto crcfoo;
+						if (crc32)
+							crc32v = UPDC32(c, crc32v);
+						else
+							crc16 = updcrc(c, crc16) & 0xFFFF;
+					}
 
                                         stats_msg_bytes(length - (end - buf));
-					if (crc & 0xFFFF) {
-                                                stats_msg_invalid();
+					if (crc32) {
+						if (crc32v != 0xDEBB20E3) {
+							stats_msg_invalid();
+							zperr(badcrc);
+							return ERROR;
+						}
+					} else if (crc16 != 0) {
+						/* CRC-16/XMODEM: the sender sends
+						 * the ones-complement, so the
+						 * accumulator over data plus the
+						 * received CRC bytes ends at 0 for
+						 * good data; nonzero means corruption. */
+						stats_msg_invalid();
 						zperr(badcrc);
 						return ERROR;
 					}
                                         stats_msg_valid(0);
 					*bytes_received = length - (end - buf);
-					VPRINTF(3, "zrdata: %lu  %s", (unsigned long) (*bytes_received),
+					if (crc32)
+						VPRINTF(3, "zrdat32: %lu %s", (unsigned long) *bytes_received,
 							Zendnames[(d-GOTCRCE)&3]);
+					else
+						VPRINTF(3, "zrdata: %lu  %s", (unsigned long) (*bytes_received),
+								Zendnames[(d-GOTCRCE)&3]);
 					return d;
 				}
 			case GOTCAN:
@@ -573,77 +609,20 @@ crcfoo:
 		}
 		if (buf == end) break;
 		*buf++ = c;
-		crc = updcrc(c, crc);
+		if (crc32)
+			crc32v = UPDC32(c, crc32v);
+		else
+			crc16 = updcrc(c, crc16) & 0xFFFF;
 	}
 	zperr(_("Data subpacket too long"));
         stats_msg_format_error();
 	return ERROR;
 }
 
-static int
-zrdat32(char *buf, int length, size_t *bytes_received)
+int
+zrdata(char *buf, int length, size_t *bytes_received)
 {
-	int c;
-	unsigned long crc;
-	char *end;
-	int d;
-
-	crc = 0xFFFFFFFFL;  end = buf + length;
-	while (buf <= end) {
-		if ((c = zdlread()) & ~0xff) {
-crcfoo:
-			switch (c) {
-			case GOTCRCE:
-			case GOTCRCG:
-			case GOTCRCQ:
-			case GOTCRCW:
-				d = c;
-				c &= 0xff;
-				crc = UPDC32(c, crc);
-				if ((c = zdlread()) & ~0xff)
-					goto crcfoo;
-				crc = UPDC32(c, crc);
-				if ((c = zdlread()) & ~0xff)
-					goto crcfoo;
-				crc = UPDC32(c, crc);
-				if ((c = zdlread()) & ~0xff)
-					goto crcfoo;
-				crc = UPDC32(c, crc);
-				if ((c = zdlread()) & ~0xff)
-					goto crcfoo;
-				crc = UPDC32(c, crc);
-                                stats_msg_bytes(length - (end - buf));
-				if (crc != 0xDEBB20E3) {
-					zperr(badcrc);
-                                        stats_msg_invalid();
-					return ERROR;
-				}
-                                stats_msg_valid(0);
-				*bytes_received = length - (end - buf);
-				VPRINTF(3, "zrdat32: %lu %s", (unsigned long) *bytes_received,
-					Zendnames[(d-GOTCRCE)&3]);
-				return d;
-			case GOTCAN:
-				zperr(_("Sender Canceled"));
-                                stats_cancel();
-				return ZCAN;
-			case TIMEOUT:
-				zperr(_("TIMEOUT"));
-                                stats_timeout();
-				return c;
-			default:
-                                stats_msg_format_error();
-				zperr(_("Bad data subpacket"));
-				return c;
-			}
-		}
-		if (buf == end) break;
-		*buf++ = c;
-		crc = UPDC32(c, crc);
-	}
-	zperr(_("Data subpacket too long"));
-        stats_msg_format_error();
-	return ERROR;
+	return zrdata1(buf, length, bytes_received, Rxframeind == ZBIN32);
 }
 
 /*
@@ -838,8 +817,8 @@ zrbhdr(unsigned char *hdr)
 	if ((c = zdlread()) & ~0xff)
 		return c;
 	crc = updcrc(c, crc);
-	if (crc & 0xFFFF) {
-		zperr(badcrc); 
+	if (crc != 0) {
+		zperr(badcrc);
 		return ERROR;
 	}
 	protocol = ZM_ZMODEM;
@@ -905,7 +884,7 @@ zrhhdr(unsigned char *hdr)
 	if ((c = zgethex()) < 0)
 		return c;
 	crc = updcrc(c, crc);
-	if (crc & 0xFFFF) {
+	if (crc != 0) {
 		zperr(badcrc); return ERROR;
 	}
 	switch (READLINE_PF(1)) {

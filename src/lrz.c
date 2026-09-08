@@ -780,7 +780,7 @@ wcgetsec(size_t *Blklen, char *rxbuf, unsigned int maxtime)
                             timed_out = true;
                         else {
                             oldcrc=updcrc(firstch, oldcrc);
-                            if (oldcrc & 0xFFFF) {
+                            if (oldcrc != 0) {
                                 stats_msg_invalid();
                                 zperr( _("CRC"));
                             } else {
