@@ -750,48 +750,51 @@ wcgetsec(size_t *Blklen, char *rxbuf, unsigned int maxtime)
     int sectcurr;
 
     for (Lastrx=errors=0; errors<RETRYMAX; errors++) {
+        bool timed_out = false;
 
-        if ((firstch=READLINE_PF(maxtime))==STX) {
-            *Blklen=1024; goto get2;
-        }
-        if (firstch==SOH) {
-            *Blklen=128;
-get2:
+        if ((firstch=READLINE_PF(maxtime))==STX || firstch==SOH) {
+            *Blklen = (firstch==STX) ? 1024 : 128;
             sectcurr=READLINE_PF(1);
             if ((sectcurr+(oldcrc=READLINE_PF(1)))==0xff) {
                 oldcrc=checksum=0;
                 for (p=rxbuf,wcj=*Blklen; --wcj>=0; ) {
-                    if ((firstch=READLINE_PF(1)) < 0)
-                        goto bilge;
+                    if ((firstch=READLINE_PF(1)) < 0) {
+                        timed_out = true;
+                        break;
+                    }
                     oldcrc=updcrc(firstch, oldcrc);
                     checksum += (*p++ = firstch);
                 }
-                if ((firstch=READLINE_PF(1)) < 0)
-                    goto bilge;
-                if (Crcflg) {
-                    oldcrc=updcrc(firstch, oldcrc);
-                    stats_msg_bytes(*Blklen);
+                if (!timed_out) {
                     if ((firstch=READLINE_PF(1)) < 0)
-                        goto bilge;
-                    oldcrc=updcrc(firstch, oldcrc);
-                    if (oldcrc & 0xFFFF) {
-                        stats_msg_invalid();
-                        zperr( _("CRC"));
+                        timed_out = true;
+                    else if (Crcflg) {
+                        oldcrc=updcrc(firstch, oldcrc);
+                        stats_msg_bytes(*Blklen);
+                        if ((firstch=READLINE_PF(1)) < 0)
+                            timed_out = true;
+                        else {
+                            oldcrc=updcrc(firstch, oldcrc);
+                            if (oldcrc & 0xFFFF) {
+                                stats_msg_invalid();
+                                zperr( _("CRC"));
+                            } else {
+                                Firstsec=false;
+                                stats_msg_valid(0);
+                                return sectcurr;
+                            }
+                        }
                     } else {
-                        Firstsec=false;
-                        stats_msg_valid(0);
-                        return sectcurr;
-                    }
-                } else {
-                    stats_msg_bytes(*Blklen);
-                    if (((checksum-firstch)&0xff)==0) {
-                        Firstsec=false;
-                        stats_msg_valid(0);
-                        return sectcurr;
-                    }
-                    else {
-                        stats_msg_invalid();
-                        zperr( _("Checksum"));
+                        stats_msg_bytes(*Blklen);
+                        if (((checksum-firstch)&0xff)==0) {
+                            Firstsec=false;
+                            stats_msg_valid(0);
+                            return sectcurr;
+                        }
+                        else {
+                            stats_msg_invalid();
+                            zperr( _("Checksum"));
+                        }
                     }
                 }
             }
@@ -815,16 +818,16 @@ get2:
             }
         }
         else if (firstch==TIMEOUT) {
-            if (Firstsec)
-                goto humbug;
-bilge:
-            stats_timeout();
-            zperr( _("TIMEOUT"));
+            if (!Firstsec)
+                timed_out = true;   /* a timeout in the first sector is not counted */
         } else {
             zperr( _("Got 0x%x sector header"), (unsigned int) firstch);
         }
 
-humbug:
+        if (timed_out) {
+            stats_timeout();
+            zperr( _("TIMEOUT"));
+        }
         Lastrx=0;
         {
             int cnt=1000;
