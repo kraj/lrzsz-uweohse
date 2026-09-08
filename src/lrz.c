@@ -1729,7 +1729,14 @@ rzfiles(struct zm_fileinfo *zi)
  * Receive a file with ZMODEM protocol
  *  Assumes file name frame is in secbuf
  * returns: ERROR ZSIKP ZEOF
+ *
+ * The control flow is an explicit three-state machine:
+ *  ST_ZRPOS — send ZRPOS (on entry and after every retry)
+ *  ST_HDR   — wait for a header (former nxthdr label)
+ *  ST_DATA  — receive data subpackets (former moredata label)
  */
+enum rzfile_state { ST_ZRPOS, ST_HDR, ST_DATA };
+
 static int
 rzfile(struct zm_fileinfo *zi)
 {
@@ -1739,6 +1746,7 @@ rzfile(struct zm_fileinfo *zi)
 	long not_printed=0;
 	double low_bps=0;
 	size_t bytes_in_block=0;
+	int state = ST_ZRPOS;
 
 	zi->eof_seen=false;
 
@@ -1752,83 +1760,98 @@ rzfile(struct zm_fileinfo *zi)
         stats_set_filename(zi->fname);
 
 	for (;;) {
-		stohdr(zi->bytes_received);
-		zshhdr(ZRPOS, Txhdr);
-	nxthdr:
-		c = zgethdr(Rxhdr, 0, NULL);
-		switch (c) {
-		default:
-			DO_SYSLOG(LOG_INFO, "%s/%s: error: zgethdr returned %d", lrzsz_basename(zi->fname),
+		switch (state) {
+		case ST_ZRPOS:
+			stohdr(zi->bytes_received);
+			zshhdr(ZRPOS, Txhdr);
+			state = ST_HDR;
+			/* fall through */
+		case ST_HDR:
+			c = zgethdr(Rxhdr, 0, NULL);
+			switch (c) {
+			default:
+				DO_SYSLOG(LOG_INFO, "%s/%s: error: zgethdr returned %d", lrzsz_basename(zi->fname),
 					   protname(), c);
-			vfile("rzfile: zgethdr returned %d", c);
-			return ERROR;
-		case ZNAK:
-		case TIMEOUT:
-			if ( --n < 0) {
-				DO_SYSLOG(LOG_INFO, "%s/%s: error: zgethdr returned %s", lrzsz_basename(zi->fname),
-					   protname(), c == ZNAK ? "ZNAK" : "TIMEOUT");
 				vfile("rzfile: zgethdr returned %d", c);
 				return ERROR;
-			}
-                        /* traditionally we fell through to the ZFILE block and did an ZRDATA,
-                         * but that is wrong.
-                         */
-                        continue;
-		case ZFILE:
-			zrdata(secbuf, LRZSZ_MAX_SUBPACKET_LEN, &bytes_in_block);
-			continue;
-		case ZEOF:
-			if (rclhdr(Rxhdr) != (unsigned long) zi->bytes_received) {
-				/*
-				 * Ignore eof if it's at wrong place - force
-				 *  a timeout because the eof might have gone
-				 *  out before we sent our zrpos.
-				 */
-				errors = 0;  goto nxthdr;
-			}
-			if (closeit(zi)) {
-				tryzhdrtype = ZFERR;
-				DO_SYSLOG(LOG_INFO, "%s/%s: error: closeit return <>0",
-						   lrzsz_basename(zi->fname), protname());
-				vfile("rzfile: closeit returned <> 0");
-				return ERROR;
-			}
-			vfile("rzfile: normal EOF");
-			return c;
-		case ERROR:	/* Too much garbage in header search error */
-			if ( --n < 0) {
-				DO_SYSLOG(LOG_INFO, "%s/%s: error: zgethdr returned %d",
-						   lrzsz_basename(zi->fname), protname(), c);
-				vfile("rzfile: zgethdr returned %d", c);
-				return ERROR;
-			}
-			zmputs(Attn);
-			continue;
-		case ZSKIP:
-			closeit(zi);
-			DO_SYSLOG(LOG_INFO, "%s/%s: error: sender skipped",
-					   lrzsz_basename(zi->fname), protname());
-			vfile("rzfile: Sender SKIPPED file");
-			return c;
-		case ZDATA:
-			if (rclhdr(Rxhdr) != (unsigned long) zi->bytes_received) {
+			case ZNAK:
+			case TIMEOUT:
 				if ( --n < 0) {
-					vfile("rzfile: out of sync");
-					DO_SYSLOG(LOG_INFO, "%s/%s: error: out of sync",
-					   lrzsz_basename(zi->fname), protname());
+					DO_SYSLOG(LOG_INFO, "%s/%s: error: zgethdr returned %s", lrzsz_basename(zi->fname),
+						   protname(), c == ZNAK ? "ZNAK" : "TIMEOUT");
+					vfile("rzfile: zgethdr returned %d", c);
 					return ERROR;
 				}
+                                /* traditionally we fell through to the ZFILE block and did an ZRDATA,
+                                 * but that is wrong.
+                                 */
+				state = ST_ZRPOS;
+				continue;
+			case ZFILE:
+				zrdata(secbuf, LRZSZ_MAX_SUBPACKET_LEN, &bytes_in_block);
+				state = ST_ZRPOS;
+				continue;
+			case ZEOF:
+				if (rclhdr(Rxhdr) != (unsigned long) zi->bytes_received) {
+					/*
+					 * Ignore eof if it's at wrong place - force
+					 *  a timeout because the eof might have gone
+					 *  out before we sent our zrpos.
+					 */
+					errors = 0;
+					state = ST_HDR;
+					continue;
+				}
+				if (closeit(zi)) {
+					tryzhdrtype = ZFERR;
+					DO_SYSLOG(LOG_INFO, "%s/%s: error: closeit return <>0",
+							   lrzsz_basename(zi->fname), protname());
+					vfile("rzfile: closeit returned <> 0");
+					return ERROR;
+				}
+				vfile("rzfile: normal EOF");
+				return c;
+			case ERROR:	/* Too much garbage in header search error */
+				if ( --n < 0) {
+					DO_SYSLOG(LOG_INFO, "%s/%s: error: zgethdr returned %d",
+						   lrzsz_basename(zi->fname), protname(), c);
+					vfile("rzfile: zgethdr returned %d", c);
+					return ERROR;
+				}
+				zmputs(Attn);
+				state = ST_ZRPOS;
+				continue;
+			case ZSKIP:
+				closeit(zi);
+				DO_SYSLOG(LOG_INFO, "%s/%s: error: sender skipped",
+						   lrzsz_basename(zi->fname), protname());
+				vfile("rzfile: Sender SKIPPED file");
+				return c;
+			case ZDATA:
+				if (rclhdr(Rxhdr) != (unsigned long) zi->bytes_received) {
+					if ( --n < 0) {
+						vfile("rzfile: out of sync");
+						DO_SYSLOG(LOG_INFO, "%s/%s: error: out of sync",
+						   lrzsz_basename(zi->fname), protname());
+						return ERROR;
+					}
                                 /* this is a data block with subframes. if the sender streams
                                  * fast, this is a mass of data, which can easily overflow 
                                  * the garbage max or the cancel max.
                                  * so we read and forget it.
                                  */
-				zrdata(secbuf, LRZSZ_MAX_SUBPACKET_LEN, &bytes_in_block);
-				zmputs(Attn);  continue;
+					zrdata(secbuf, LRZSZ_MAX_SUBPACKET_LEN, &bytes_in_block);
+					zmputs(Attn);
+					state = ST_ZRPOS;
+					continue;
+				}
+				state = ST_DATA;
+				continue;
 			}
-moredata:
+			continue;
+		case ST_DATA:
 			if ((Verbose>1 || min_bps || stop_time)
-				&& (not_printed > (min_bps ? 3 : 7) 
+				&& (not_printed > (min_bps ? 3 : 7)
 					|| zi->bytes_received > last_bps / 2 + last_rxbytes)) {
 				int minleft =  0;
 				int secleft =  0;
@@ -1865,10 +1888,10 @@ moredata:
 							   lrzsz_basename(zi->fname), protname());
 					return ERROR;
 				}
-				
+
 				if (Verbose > 1) {
 					vstringf(_("\rBytes received: %7ld/%7ld   BPS:%-6lu ETA %02d:%02d  "),
-						(long) zi->bytes_received, (long) zi->bytes_total, 
+						(long) zi->bytes_received, (long) zi->bytes_total,
 						last_bps, minleft, secleft);
 					last_rxbytes=zi->bytes_received;
 					not_printed=0;
@@ -1890,6 +1913,7 @@ moredata:
 					return ERROR;
 				}
 				zmputs(Attn);
+				state = ST_ZRPOS;
 				continue;
 			case TIMEOUT:
 				if ( --n < 0) {
@@ -1898,6 +1922,7 @@ moredata:
 					vfile("rzfile: zgethdr returned %d", c);
 					return ERROR;
 				}
+				state = ST_ZRPOS;
 				continue;
 			case GOTCRCW:
 				n = 20;
@@ -1907,7 +1932,8 @@ moredata:
 				      (long)zi->bytes_received, bytes_in_block, readline_left);
 				stohdr(zi->bytes_received);
 				zshhdr(ZACK | 0x80, Txhdr);
-				goto nxthdr;
+				state = ST_HDR;
+				continue;
 			case GOTCRCQ:
 				n = 20;
 				putsec(zi, secbuf, bytes_in_block);
@@ -1916,22 +1942,37 @@ moredata:
 				      (long)zi->bytes_received, bytes_in_block, readline_left);
 				stohdr(zi->bytes_received);
 				zshhdr(ZACK, Txhdr);
-				goto moredata;
+				state = ST_DATA;
+				continue;
 			case GOTCRCG:
 				n = 20;
 				putsec(zi, secbuf, bytes_in_block);
 				zi->bytes_received += bytes_in_block;
-				goto moredata;
+				state = ST_DATA;
+				continue;
 			case GOTCRCE:
 				n = 20;
 				putsec(zi, secbuf, bytes_in_block);
 				zi->bytes_received += bytes_in_block;
 				vfile("GOTCRCE: bytes_received=%ld, block=%zu, readline_left=%d",
 				      (long)zi->bytes_received, bytes_in_block, readline_left);
-				goto nxthdr;
+				state = ST_HDR;
+				continue;
                         default:
-                                ;
+                                ;   /* practically unreachable: zrdata always
+                                       returns a frame-end, error, or timeout;
+                                       the original fell out of the loop body
+                                       (re-sending ZRPOS), which ST_ZRPOS
+                                       mirrors */
+				state = ST_ZRPOS;
+				continue;
 			}
+			continue;
+		default:
+			/* unreachable: state always holds one of the three enum
+			 * values; maps to the loop head like any retry */
+			state = ST_ZRPOS;
+			continue;
 		}
 	}
 }
