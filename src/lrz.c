@@ -635,7 +635,7 @@ fubar:
  * Length is indeterminate as long as less than Blklen
  * A null string represents no more files (YMODEM)
  */
-static int 
+static int
 wcrxpn(struct zm_fileinfo *zi, char *rpn)
 {
     int c;
@@ -643,27 +643,32 @@ wcrxpn(struct zm_fileinfo *zi, char *rpn)
 
     READLINE_PF(1);
 
-et_tu:
-    Firstsec=true;
-    zi->eof_seen=false;
-    sendline(Crcflg?WANTCRC:NAK);
-    flushmo();
-    purgeline(0); /* Do read next time ... */
-    while ((c = wcgetsec(&Blklen, rpn, 100)) != 0) {
-        if (c == WCEOT) {
+    for (;;) {
+        bool got_wceot;
+        Firstsec=true;
+        zi->eof_seen=false;
+        sendline(Crcflg?WANTCRC:NAK);
+        flushmo();
+        purgeline(0); /* Do read next time ... */
+        got_wceot = false;
+        while ((c = wcgetsec(&Blklen, rpn, 100)) != 0) {
+            if (c != WCEOT)
+                return ERROR;
             zperr( _("Pathname fetch returned EOT"));
             stats_msg_out_of_sync();
             sendline(ACK);
             flushmo();
             purgeline(0);	/* Do read next time ... */
             READLINE_PF(1);
-            goto et_tu;
+            got_wceot = true;
+            break;
         }
-        return ERROR;
+        if (got_wceot)
+            continue;		/* retry the pathname fetch */
+        sendline(ACK);
+        flushmo();
+        return OK;
     }
-    sendline(ACK);
-    flushmo();
-    return OK;
 }
 
 /*
