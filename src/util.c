@@ -362,3 +362,17 @@ lrzsz_eta (long bps, size_t left, int *minleft, int *secleft)
 		*secleft = (int) ((left / (unsigned long) bps) % 60);
 	}
 }
+
+/* Last path component of PATH, or "no.name" when PATH is NULL; see util.h.
+ * This is the derivation the old DO_SYSLOG_FNAME/DO_SYSLOG macros performed
+ * inline (including the "no.name" fallback for a missing filename). */
+const char *
+lrzsz_basename (const char *path)
+{
+	const char *s;
+
+	if (!path)
+		return "no.name";
+	s = strrchr(path, '/');
+	return s ? s + 1 : path;
+}

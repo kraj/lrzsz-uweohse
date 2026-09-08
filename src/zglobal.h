@@ -229,6 +229,11 @@ unsigned long rclhdr (const unsigned char *hdr);
 const char * protname (void);
 LRZSZ_FORMAT_PRINTF(2,3) void lsyslog (int, const char *,...);
 
+/* gate + call lsyslog */
+#define DO_SYSLOG(...) do { \
+	if (enable_syslog) lsyslog(__VA_ARGS__); \
+} while (0)
+
 unsigned getspeed(speed_t code);
 
 const char * frameend_to_string(unsigned int type);

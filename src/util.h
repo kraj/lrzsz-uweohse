@@ -77,4 +77,9 @@ bool lrzsz_path_component_violation (const char *name, int restricted_level);
  * remaining. */
 void lrzsz_eta (long bps, size_t left, int *minleft, int *secleft);
 
+/* Last path component of PATH, or "no.name" when PATH is NULL. The returned
+ * pointer refers into PATH (no copy). Used for syslog lines, which lsyslog()
+ * sanitizes. */
+const char * lrzsz_basename (const char *path);
+
 #endif

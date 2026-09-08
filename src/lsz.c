@@ -78,21 +78,8 @@ static void saybibi (void);
 static int wcsend (int argc, char *argp[]);
 static int wcputsec (char *buf, int sectnum, size_t cseclen);
 
-#define DO_SYSLOG(message) do { \
-    if (enable_syslog) { \
-        const char *shortname; \
-        if (!zi->fname) \
-            shortname="no.name"; \
-		else { \
-            shortname=strrchr(zi->fname,'/'); \
-            if (!shortname) \
-                shortname=zi->fname; \
-            else \
-                shortname++; \
-		} \
-        lsyslog message ; \
-	 } \
-  } while(0)
+/* DO_SYSLOG is replaced by the shared variadic macro (zglobal.h) plus
+ * lrzsz_basename() (util.c) — same logged values, no `zi` coupling. */
 
 #define ZSDATA(x,y,z) \
 	do { if (Crc32t) {zsda32(x,y,z); } else {zsdata(x,y,z);}} while(0)
@@ -864,8 +851,8 @@ wctxpn(struct zm_fileinfo *zi)
 	if (!zmodem_requested)
 		if (getnak()) {
 			vfile("getnak failed");
-			DO_SYSLOG((LOG_INFO, "%s/%s: getnak failed",
-					   shortname,protname()));
+			DO_SYSLOG(LOG_INFO, "%s/%s: getnak failed",
+					   lrzsz_basename(zi->fname), protname());
 			return ERROR;
 		}
 
@@ -924,8 +911,8 @@ wctxpn(struct zm_fileinfo *zi)
 		return zsendfile(zi,txbuf, 1+strlen(p)+(p-txbuf));
 	if (wcputsec(txbuf, 0, 128)==ERROR) {
 		vfile("wcputsec failed");
-		DO_SYSLOG((LOG_INFO, "%s/%s: wcputsec failed",
-				   shortname,protname()));
+		DO_SYSLOG(LOG_INFO, "%s/%s: wcputsec failed",
+				   lrzsz_basename(zi->fname), protname());
 		return ERROR;
 	}
 	return OK;
@@ -1518,26 +1505,26 @@ again:
 		case ZRQINIT:  /* remote site is sender! */
 			if (Verbose)
 				vstringf(_("got ZRQINIT"));
-			DO_SYSLOG((LOG_INFO, "%s/%s: got ZRQINIT - sz talks to sz",
-					   shortname,protname()));
+			DO_SYSLOG(LOG_INFO, "%s/%s: got ZRQINIT - sz talks to sz",
+					   lrzsz_basename(zi->fname), protname());
 			return ERROR;
 		case ZCAN:
 			if (Verbose)
 				vstringf(_("got ZCAN"));
-			DO_SYSLOG((LOG_INFO, "%s/%s: got ZCAN - receiver canceled",
-					   shortname,protname()));
+			DO_SYSLOG(LOG_INFO, "%s/%s: got ZCAN - receiver canceled",
+					   lrzsz_basename(zi->fname), protname());
 			return ERROR;
 		case TIMEOUT:
-			DO_SYSLOG((LOG_INFO, "%s/%s: got TIMEOUT",
-					   shortname,protname()));
+			DO_SYSLOG(LOG_INFO, "%s/%s: got TIMEOUT",
+					   lrzsz_basename(zi->fname), protname());
 			return ERROR;
 		case ZABORT:
-			DO_SYSLOG((LOG_INFO, "%s/%s: got ZABORT",
-					   shortname,protname()));
+			DO_SYSLOG(LOG_INFO, "%s/%s: got ZABORT",
+					   lrzsz_basename(zi->fname), protname());
 			return ERROR;
 		case ZFIN:
-			DO_SYSLOG((LOG_INFO, "%s/%s: got ZFIN",
-					   shortname,protname()));
+			DO_SYSLOG(LOG_INFO, "%s/%s: got ZFIN",
+					   lrzsz_basename(zi->fname), protname());
 			return ERROR;
 		case ZCRC:
 			crc = 0xFFFFFFFFL;
@@ -1572,8 +1559,8 @@ again:
 			}
 
 			vfile("receiver skipped");
-			DO_SYSLOG((LOG_INFO, "%s/%s: receiver skipped",
-					   shortname, protname()));
+			DO_SYSLOG(LOG_INFO, "%s/%s: receiver skipped",
+					   lrzsz_basename(zi->fname), protname());
 			return ZSKIP;
 		case ZRPOS:
 			/*
@@ -1583,8 +1570,8 @@ again:
 			if (rxpos && fseeko(input_f, (off_t) rxpos, 0)) {
 				int er=errno;
 				vfile("fseeko failed: %s", strerror(er));
-				DO_SYSLOG((LOG_INFO, "%s/%s: fseeko failed: %s",
-						   shortname, protname(), strerror(er)));
+				DO_SYSLOG(LOG_INFO, "%s/%s: fseeko failed: %s",
+						   lrzsz_basename(zi->fname), protname(), strerror(er));
 				return ERROR;
 			}
 			if (rxpos)
@@ -1645,24 +1632,24 @@ zsendfdata (struct zm_fileinfo *zi)
 				fclose (input_f);
 				input_f=NULL;
 			}
-			DO_SYSLOG((LOG_INFO, "%s/%s: got %d",
-					   shortname, protname(), c));
+			DO_SYSLOG(LOG_INFO, "%s/%s: got %d",
+					   lrzsz_basename(zi->fname), protname(), c);
 			return ERROR;
 		case ZCAN:
 			if (input_f) {
 				fclose (input_f);
 				input_f=NULL;
 			}
-			DO_SYSLOG((LOG_INFO, "%s/%s: got ZCAN",
-					   shortname, protname()));
+			DO_SYSLOG(LOG_INFO, "%s/%s: got ZCAN",
+					   lrzsz_basename(zi->fname), protname());
 			return ERROR;
 		case ZSKIP:
 			if (input_f) {
 				fclose (input_f);
 				input_f=NULL;
 			}
-			DO_SYSLOG((LOG_INFO, "%s/%s: got ZSKIP",
-					   shortname, protname()));
+			DO_SYSLOG(LOG_INFO, "%s/%s: got ZSKIP",
+					   lrzsz_basename(zi->fname), protname());
 			return ZSKIP;
 		case ZACK:
 		case ZRPOS:
@@ -1770,8 +1757,8 @@ zsendfdata (struct zm_fileinfo *zi)
 								  last_bps, min_bps);
 								vstring("\r\n");
 							}
-							DO_SYSLOG((LOG_INFO, "%s/%s: bps rate low: %ld <%ld",
-									   shortname, protname(), last_bps, min_bps));
+							DO_SYSLOG(LOG_INFO, "%s/%s: bps rate low: %ld <%ld",
+									   lrzsz_basename(zi->fname), protname(), last_bps, min_bps);
 							return ERROR;
 						}
 					} else
@@ -1786,8 +1773,8 @@ zsendfdata (struct zm_fileinfo *zi)
 					vstring(_("zsendfdata: reached stop time"));
 					vstring("\r\n");
 				}
-				DO_SYSLOG((LOG_INFO, "%s/%s: reached stop time",
-						   shortname, protname()));
+				DO_SYSLOG(LOG_INFO, "%s/%s: reached stop time",
+						   lrzsz_basename(zi->fname), protname());
 				return ERROR;
 			}
 
@@ -1884,16 +1871,16 @@ zsendfdata (struct zm_fileinfo *zi)
 				fclose (input_f);
 				input_f=NULL;
 			}
-			DO_SYSLOG((LOG_INFO, "%s/%s: got ZSKIP",
-					   shortname, protname()));
+			DO_SYSLOG(LOG_INFO, "%s/%s: got ZSKIP",
+					   lrzsz_basename(zi->fname), protname());
 			return ZSKIP;
 		default:
 			if (input_f) {
 				fclose (input_f);
 				input_f=NULL;
 			}
-			DO_SYSLOG((LOG_INFO, "%s/%s: got %d",
-					   shortname, protname(), got));
+			DO_SYSLOG(LOG_INFO, "%s/%s: got %d",
+					   lrzsz_basename(zi->fname), protname(), got);
 			return ERROR;
 		}
 	}
