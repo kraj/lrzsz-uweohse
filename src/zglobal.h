@@ -26,6 +26,7 @@
 #include "config.h"
 #include <sys/types.h>
 
+#include <stdio.h> /* putchar, fflush, stdout: sendline/flushmo helpers */
 #include <stdarg.h>
 #include <stdbool.h>
 
@@ -156,9 +157,22 @@ extern bool zmodem_requested;
 
 void bibi (int n);
 
-#define sendline(c) do { putchar((c) & 0377); stat_for_file.net_bytes_out++; } while (0)
-#define xsendline(c) do { putchar(c) ; stat_for_file.net_bytes_out++; } while (0)
-#define flushmo() do { fflush(stdout); stat_for_file.net_write_ops++;} while(0)
+/* Output primitives for the protocol stream, including stat-accounting */
+static inline void sendline(int c)
+{
+	putchar((c) & 0377);
+	stat_for_file.net_bytes_out++;
+}
+static inline void xsendline(int c)
+{
+	putchar(c);
+	stat_for_file.net_bytes_out++;
+}
+static inline void flushmo(void)
+{
+	fflush(stdout);
+	stat_for_file.net_write_ops++;
+}
 
 /* zreadline.c */
 extern unsigned char *readline_ptr; /* pointer for removing chars from linbuf */
