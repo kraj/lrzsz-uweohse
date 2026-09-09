@@ -182,6 +182,11 @@ if you use lrz to receive files from not perfectly trustworthy senders.
 * lrz now reports the reason why a transfer was aborted at verbosity
   level 1, instead of 3. This now matches lsz.
 
+* ^C during a ZMODEM transfer no longer interrupts the sender in a
+  read via longjmp. lsz notices the ^C at the next loop checkpoint
+  and attempts the same resync as before. This removes one source
+  of undefined behaviour. 
+
 * the -U/--unrestrict option has been removed from both lrz and lsz.
   Rationale: Security-relevant options cannot be turned off: whoever 
   can add -U to a command line can equally well drop it, so the option 

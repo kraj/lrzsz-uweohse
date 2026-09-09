@@ -1761,6 +1761,31 @@ SEOF
     doit "$key-keep" "aborted transfer keeps the incomplete file with --keep-incomplete" \
         "$SZ -q -Z" "$RZ -q -Z --keep-incomplete -s +1" incomplete_keep_cmp $binary_1m
     FAULT=
+
+    #
+    # SIGINT during a ZMODEM send: the sender gets ^C mid-stream (a
+    # backgrounded sleeper signals it) while a throttled line keeps the
+    # transfer busy. lsz must resync with the receiver and complete the
+    # transfer anyway (the onintr/intrjmp machinery). Interrupt timing makes
+    # the counters nondeterministic, so this key must not be part of any
+    # journal-counter baseline.
+    #
+    key="zmodem-lsz-lrz-sigint"
+    mkdir "$testdir/$key"
+    cat > $testdir/run-sigint-sender.sh <<SEOF
+#! /bin/sh
+cd '$testdir/$key' || exit 1
+# ^C this sender ~2s into the transfer; exec keeps the pid stable, so the
+# subshell's parent ($PPID at its creation) is the future lsz process.
+( sleep 2 && kill -INT \$PPID ) &
+# ignore the arguments doit() appends; send the 1 MiB payload by basename
+exec $SZ -q -Z ../binary_1m
+SEOF
+    chmod +x $testdir/run-sigint-sender.sh
+    FAULT="$SIMU -s 1 -f 9999999999 -r 1m"
+    doit "$key" "^C mid-stream must resync and complete the transfer" \
+        "$testdir/run-sigint-sender.sh" "$RZ -q -Z" cmp $binary_1m
+    FAULT=
 }
 
 

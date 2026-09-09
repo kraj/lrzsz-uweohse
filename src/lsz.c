@@ -27,7 +27,6 @@
 #include <stdlib.h>
 #include <limits.h>
 #include <signal.h>
-#include <setjmp.h>
 #include <ctype.h>
 #include <errno.h>
 #include <getopt.h>
@@ -70,6 +69,8 @@ static int calc_blklen (long total_sent);
 static int sendzsinit (void);
 static int wctx (struct zm_fileinfo *);
 static int zsendfdata (struct zm_fileinfo *);
+static int ack_resync (struct zm_fileinfo *, int, bool, int *, int *);
+static int sigint_resync (struct zm_fileinfo *, int *, int *);
 static int getinsync (struct zm_fileinfo *, int flag);
 static void countem (int argc, char **argv);
 static void usage (int exitcode, const char *what);
@@ -148,7 +149,10 @@ static int error_count;
 
 int enable_syslog=true;
 
-static jmp_buf intrjmp;	/* For the interrupt on RX CAN */
+/* set by the SIGINT handler; zsendfdata() checks it at its loop
+ * checkpoints and attempts a receiver resync. sig_atomic_t + volatile:
+ * the only async-signal-safe way to communicate with the handler. */
+static volatile sig_atomic_t sigint_seen = 0;
 
 static long min_bps;
 static long min_bps_time;
@@ -192,13 +196,16 @@ bibi(int n)
 /* the cancel-handler installer is shared: see lrzsz_install_signal() in
  * util.c; lsz installs its own bibi_sighandler with it. */
 
-/* Called when ZMODEM gets an interrupt (^C) */
-LRZSZ_NORETURN static void
+/* Called when ZMODEM gets an interrupt (^C): record the request; the
+ * transfer loop checks sigint_seen at its (timeout-bounded) checkpoints
+ * and resyncs with the receiver there. No longjmp: the handler only
+ * touches a sig_atomic_t, so it is strictly async-signal-safe. */
+static void
 onintr(int n)
 {
-	signal(SIGINT, SIG_IGN);
 	(void) n; /* use it */
-	longjmp(intrjmp, -1);
+	sigint_seen = 1;
+	signal(SIGINT, onintr);
 }
 
 bool Zctlesc;	/* Encode control characters */
@@ -1583,62 +1590,26 @@ again:
 	}
 }
 
-/* Send the data in the file */
+/* The ACK/resync machinery of zsendfdata(): the verdict switch (former
+ * gotack) plus the pending-input drain (the former waitack/gotack block).
+ * SYNC_FIRST: run getinsync(zi,0) first (the former waitack entry, used
+ * after a ZCRCW subpacket and for the SIGINT resync); otherwise C is the
+ * caller's preset verdict byte (the former goto gotack sites). Returns
+ * ERROR / ZSKIP / OK for the caller to propagate, or 0 for "synced, keep
+ * going" — the caller then re-sends the ZDATA header (the old waitack
+ * fall-through to Normal flow did exactly that). */
 static int
-zsendfdata (struct zm_fileinfo *zi)
+ack_resync (struct zm_fileinfo *zi, int c, bool sync_first,
+             int *junkcountp, int *need_waitp)
 {
-	/* total_sent is the only state here that must persist across files:
-	 * it feeds calc_blklen()'s adaptive blocksize for the whole batch
-	 * (and must never shrink back for file 2). Everything below it is
-	 * per-file state.
-	 */
-	static long total_sent = 0;
-	int c;
-	int junkcount;				/* Counts garbage chars received by TX */
-	size_t last_txpos = 0;
-	long last_bps = 0;
-	long not_printed = 0;
-	double low_bps = 0;
-        int newcnt;
-	/* the first data subpacket after a ZRPOS must be ZCRCW
-	 * (zmodem-current.txt §5, sender-side error recovery). Without this
-	 * reset only the FIRST file of a batch started with ZCRCW (need_wait
-	 * was static and consumed by file 1); later files started with ZCRCG. */
-	/* volatile: modified and read across the setjmp(intrjmp)/longjmp pair;
-	 * without it gcc -Wclobbered is right to complain. */
-        volatile int need_wait = 1;
-
-	Lrxpos = 0;
-	junkcount = 0;
-	Beenhereb4 = 0;
-	last_bps = 0;
-	last_txpos = 0;
-	low_bps = 0;
-	not_printed = 0;
-
-	/* onintr() longjmps to intrjmp, which setjmp() below fills in.
-	 *
-	 * The three entry points into the ack/resync machinery below are:
-	 *  somemore — full restart (sender-initiated ZRPOS): re-executes the
-	 *             setjmp, re-arms the SIGINT handler, keeps the per-file
-	 *             counters (resume-in-place, like lrz's rzfile).
-	 *  waitack  — the mandatory ACK wait after a ZCRCW subpacket.
-	 *  gotack   — the verdict switch, re-entered from six sites with c
-	 *             preset; each maps to return / break into the data loop.
-	 * This deliberately stays goto-based: the reason the longjmp exists at
-	 * all (the SIGINT handler jumping out of stdio) is scheduled for
-	 * removal; after that, this whole block becomes a straight-line
-	 * function call and only then is a state-machine rewrite worth the
-	 * doing.
-         */
-  somemore:
-	if (setjmp (intrjmp)) {
-	    if (play_with_sigint)
-                signal (SIGINT, onintr);
-  waitack:
-            junkcount = 0;
-            c = getinsync (zi, 0);
-	  gotack:
+	for (;;) {
+		if (sync_first) {
+			/* the former waitack head: the receiver is asked for
+			 * its state before the verdict runs */
+			*junkcountp = 0;
+			c = getinsync (zi, 0);
+			sync_first = false;
+		}
 		switch (c) {
 		default:
 			if (input_f) {
@@ -1671,31 +1642,96 @@ zsendfdata (struct zm_fileinfo *zi)
 			return OK;
 		}
 
-		while (fd_readable (io_mode_fd)) {
-                        c=READLINE_PF(1);
-                        if (TIMEOUT == c || ERROR == c || RCDO == c) {
-                            goto gotack; /* does error handling */
-                        }
-
-			switch (c) {
-			case CAN:
-			case ZPAD:
-				c = getinsync (zi, 1);
-                                need_wait = 1;
-				goto gotack;
-			case XOFF:			/* Wait a while for an XON */
-			case XOFF | 0x80:
-				READLINE_PF (100);
-                        default:
-                                ;
+		/* drain pending receiver input; CAN/ZPAD and read errors
+		 * escalate back to the verdict switch (the former goto
+		 * gotack), junk counts the rest */
+		{
+			int reswitch = 0;
+			while (fd_readable (io_mode_fd)) {
+				c = READLINE_PF(1);
+				if (TIMEOUT == c || ERROR == c || RCDO == c) {
+					reswitch = 1;
+					break;
+				}
+				switch (c) {
+				case CAN:
+				case ZPAD:
+					c = getinsync (zi, 1);
+					*need_waitp = 1;
+					reswitch = 1;
+					break;
+				case XOFF:			/* Wait a while for an XON */
+				case XOFF | 0x80:
+					READLINE_PF (100);
+					/* FALLTHROUGH */
+				default:
+					++*junkcountp;
+				}
+				if (reswitch)
+					break;
 			}
+			if (reswitch)
+				continue;
+			return 0;
 		}
 	}
+}
 
-	/* Normal flow: setjmp has completed, so onintr may now be installed. */
+/* The SIGINT checkpoint (former onintr/intrjmp longjmp return path): the
+ * receiver is asked for its state and the verdict handled. Called at the
+ * data-loop checkpoints; every read in between is timeout-bounded, so the
+ * resync happens within at most one read timeout of the ^C. */
+static int
+sigint_resync (struct zm_fileinfo *zi, int *junkcountp, int *need_waitp)
+{
+	return ack_resync (zi, 0, true, junkcountp, need_waitp);
+}
+
+/* Send the data in the file */
+static int
+zsendfdata (struct zm_fileinfo *zi)
+{
+	/* total_sent is the only state here that must persist across files:
+	 * it feeds calc_blklen()'s adaptive blocksize for the whole batch
+	 * (and must never shrink back for file 2). Everything below it is
+	 * per-file state.
+	 */
+	static long total_sent = 0;
+	int c;
+	int junkcount;				/* Counts garbage chars received by TX */
+	size_t last_txpos = 0;
+	long last_bps = 0;
+	long not_printed = 0;
+	double low_bps = 0;
+        int newcnt;
+	int rc;
+	/* the first data subpacket after a ZRPOS must be ZCRCW
+	 * (zmodem-current.txt §5, sender-side error recovery). Without this
+	 * reset only the FIRST file of a batch started with ZCRCW (need_wait
+	 * was static and consumed by file 1); later files started with ZCRCG. */
+        int need_wait = 1;
+
+	Lrxpos = 0;
+	junkcount = 0;
+	Beenhereb4 = 0;
+	last_bps = 0;
+	last_txpos = 0;
+	low_bps = 0;
+	not_printed = 0;
+
+	/* the SIGINT handler is installed once, before the first data phase
+	 * (zsendfdata runs once per file); it only sets sigint_seen, and the
+	 * loop checkpoints below attempt the receiver resync when it is set.
+	 * The old longjmp-based version re-executed setjmp on the ZRPOS
+	 * restart and jumped out of stdio mid-read; both are gone. */
 	if (play_with_sigint)
 		signal (SIGINT, onintr);
 
+	/* the ZRPOS restart re-enters here (the former somemore label): the
+	 * ZDATA header is sent again, per-file counters keep their values
+	 * (resume-in-place). No setjmp remains — the SIGINT checkpoint in
+	 * the loop below handles the interrupt flag. */
+restart_data:
         newcnt = Rxbuflen;
 	Txwcnt = 0;
 	stohdr (zi->bytes_sent);
@@ -1705,6 +1741,17 @@ zsendfdata (struct zm_fileinfo *zi)
 		size_t n;
 		int e=0;
 		unsigned old = blklen;
+		/* the SIGINT checkpoint (former longjmp return path): the
+		 * flag is set by the handler during any of the timeout-
+		 * bounded reads below; the resync attempt happens here */
+		if (sigint_seen) {
+			sigint_seen = 0;
+			rc = sigint_resync (zi, &junkcount, &need_wait);
+			if (rc)
+				return rc;
+			goto restart_data;	/* re-send ZDATA like the old
+						   waitack fall-through */
+		}
 		blklen = calc_blklen (total_sent);
 		total_sent += blklen + OVERHEAD;
 		if (Verbose > 2 && blklen != old)
@@ -1779,14 +1826,26 @@ zsendfdata (struct zm_fileinfo *zi)
 			not_printed++;
 		ZSDATA (txbuf, n, e);
 		bytcnt = zi->bytes_sent += n;
-		if (e == ZCRCW)
-			goto waitack;
+		if (e == ZCRCW) {
+			/* the mandatory ACK wait (the former waitack entry) */
+			rc = ack_resync (zi, 0, true, &junkcount, &need_wait);
+			if (rc)
+				return rc;
+			goto restart_data;
+		}
 
 		fflush (stdout);
 		while (fd_readable (io_mode_fd)) {
                         c=READLINE_PF(1);
                         if (TIMEOUT == c || ERROR == c || RCDO == c) {
-                            goto gotack; /* does error handling */
+                            /* escalate to the verdict switch; after the
+                             * verdict the ZDATA header is re-sent (the old
+                             * goto gotack fell through to Normal flow) */
+                            rc = ack_resync (zi, c, false, &junkcount,
+                                             &need_wait);
+                            if (rc)
+                                return rc;
+                            goto restart_data;
                         }
 			switch (c) {
 			case CAN:
@@ -1796,7 +1855,16 @@ zsendfdata (struct zm_fileinfo *zi)
 					break;
 				/* zcrce - dinna wanna starta ping-pong game */
 				ZSDATA (txbuf, 0, ZCRCE);
-				goto gotack;
+				{
+					/* escalate to the verdict switch */
+					rc = ack_resync (zi, c, false,
+							 &junkcount,
+							 &need_wait);
+					if (rc)
+						return rc;
+					goto restart_data;
+				}
+				break;
 			case XOFF:			/* Wait a while for an XON */
 			case XOFF | 0x80:
 				READLINE_PF (100);
@@ -1810,8 +1878,9 @@ zsendfdata (struct zm_fileinfo *zi)
 		if (Txwindow && e != ZCRCE && e != ZCRCG) {
 			size_t tcount = 0;
 			int stuck_acks = 0;
+			int abandoned = 0;
 			size_t prev_lrxpos = Lrxpos;
-			while (zi->bytes_sent >= Lrxpos &&
+			while (!abandoned && zi->bytes_sent >= Lrxpos &&
 			       (tcount = zi->bytes_sent - Lrxpos) >= Txwindow) {
 				vfile ("%zu (%ld,%ld) window >= %u", tcount,
 					(long) zi->bytes_sent, (long) Lrxpos,
@@ -1822,21 +1891,40 @@ zsendfdata (struct zm_fileinfo *zi)
 				c = getinsync (zi, 1);
 				if (c != ZACK) {
 					ZSDATA (txbuf, 0, ZCRCE);
-					goto gotack;
+					/* escalate to the verdict switch; the
+					 * window loop is abandoned, as the
+					 * old goto gotack did */
+					abandoned = 1;
+					rc = ack_resync (zi, c, false,
+							 &junkcount,
+							 &need_wait);
+					if (rc)
+						return rc;
+					goto restart_data;
 				}
 				if (Lrxpos == prev_lrxpos) {
 					if (++stuck_acks > RETRYMAX) {
 						lrzsz_warning(0, _("receiver not advancing after %d ACKs"), stuck_acks);
 						ZSDATA (txbuf, 0, ZCRCE);
 						c = ERROR;
-						goto gotack;
+						/* escalate; the window loop is
+						 * abandoned (the old goto
+						 * gotack) */
+						abandoned = 1;
+						rc = ack_resync (zi, c, false,
+								 &junkcount,
+								 &need_wait);
+						if (rc)
+							return rc;
+						goto restart_data;
 					}
 				} else {
 					stuck_acks = 0;
 					prev_lrxpos = Lrxpos;
 				}
 			}
-			vfile ("window = %zu", tcount);
+			if (!abandoned)
+				vfile ("window = %zu", tcount);
 		}
 	} while (!zi->eof_seen);
 
@@ -1853,7 +1941,7 @@ zsendfdata (struct zm_fileinfo *zi)
 		case ZACK:
 			continue;
 		case ZRPOS:
-			goto somemore;
+			goto restart_data;
 		case ZRINIT:
 			return OK;
 		case ZSKIP:
@@ -2063,9 +2151,9 @@ static int
 getinsync(struct zm_fileinfo *zi, int flag)
 {
 	size_t rxpos;
+	int gotblock;
 
 	for (;;) {
-		int gotblock;
 		gotblock = zgethdr(Rxhdr, 0, &rxpos);
 		switch (gotblock) {
 		case ZCAN:
