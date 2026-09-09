@@ -644,6 +644,30 @@ zrdata(char *buf, int length, size_t *bytes_received)
 int
 zgethdr(unsigned char *hdr, int eflag, size_t *Rxpos)
 {
+	/* The byte-level resync parser is a state machine, was a goto hell:
+	 *   ST_GARBAGE  — read + classify a byte (former startover/again/agn2)
+	 *   ST_HUNT_CAN — CAN-hunt with eager 1-tenths-timeout reads (former gotcan)
+	 *   ST_ZPADS    — skip consecutive ZPADs via noxrd7() (former splat)
+	 *   ST_FRAME    — frame type read + ZBIN/ZBIN32/ZHEX dispatch
+	 *   ST_TAIL     — former fifi: common epilogue
+	 * reset_cancount: cancount resets only on the garbage-tail loop (the old
+	 *   goto startover), not when the CAN-hunt returns to the scan via TIMEOUT
+	 *   or more-CAN (the old goto again).
+         * have_byte: the CAN-hunt's default
+	 *   byte, the ST_ZPADS default and the ST_FRAME default flow directly into
+	 *   the garbage block with the byte already read (the old goto agn2).
+         *
+	 * rxpos/rclhdr and stats_msg_bytes(4) run only on the dispatched-header
+	 * arms (as in the original), NOT in the epilogue: error paths must leave
+	 * *Rxpos untouched and print rxpos=0.
+         *
+         * this is still not good, but much better.
+	 */
+	enum zgethdr_state { ST_GARBAGE, ST_HUNT_CAN, ST_ZPADS, ST_FRAME, ST_TAIL };
+	int state = ST_GARBAGE;
+	bool have_byte = false;
+	bool reset_cancount = true;
+
 	int c, cancount;
 	unsigned int max_garbage; /* Max bytes before start of frame */
 	size_t rxpos=0; /* keep gcc happy */
@@ -652,118 +676,177 @@ zgethdr(unsigned char *hdr, int eflag, size_t *Rxpos)
 	max_garbage = Zrwindow + Baudrate;
 	Rxframeind = Rxtype = 0;
 
-startover:
-	cancount = 5;
-again:
-	/* Return immediate ERROR if ZCRCW sequence seen */
-	switch (c = READLINE_PF(Rxtimeout)) {
-	case RCDO:
-	case TIMEOUT:
-		goto fifi;
-	case CAN:
-gotcan:
-		if (--cancount <= 0) {
-			c = ZCAN; goto fifi;
-		}
-		switch (c = READLINE_PF(1)) {
-		case TIMEOUT:
-			goto again;
-		case ZCRCW:
-			c = ERROR;
-			goto fifi;
-		case RCDO:
-			goto fifi;
-		default:
-			break;
-		case CAN:
-			if (--cancount <= 0) {
-				c = ZCAN; goto fifi;
+	while (state != ST_TAIL) {
+		switch (state) {
+		case ST_GARBAGE:
+			if (reset_cancount) {
+				cancount = 5;
+				reset_cancount = false;
 			}
-			goto again;
+			if (!have_byte) {
+				/* Return immediate ERROR if ZCRCW sequence seen */
+				c = READLINE_PF(Rxtimeout);
+				if (c == RCDO || c == TIMEOUT)
+					state = ST_TAIL;
+				if (state == ST_TAIL)
+					continue;
+			}
+			have_byte = false;
+			if (c == CAN) {
+				state = ST_HUNT_CAN;
+				continue;
+			}
+			if (c == ZPAD || c == (ZPAD|0x80)) {
+				/* This is what we want. */
+				state = ST_ZPADS;
+				continue;
+			}
+			/* garbage byte: count it, maybe display it */
+			garbage_count++;
+			if (Verbose > 2 && (garbage_count <= 3 || garbage_count % 1000 == 0))
+				vfile("zgethdr: garbage[%d]=0x%02x, max_garbage_left=%u",
+				      garbage_count, (unsigned int) (c & 0xff), max_garbage);
+			if ( --max_garbage == 0) {
+				if (Verbose > 2)
+					vfile("zgethdr: garbage count exceeded after %d bytes",
+					      garbage_count);
+				zperr(_("Garbage count exceeded"));
+				return(ERROR);
+			}
+			if (eflag && ((c &= 0x7f) & 0x60) && Verbose)
+				vchar(c);
+			else if (eflag > 1 && Verbose)
+				vchar(c);
+			reset_cancount = true;	/* the old goto startover */
+			continue;
+		case ST_HUNT_CAN:
+			if (--cancount <= 0) {
+				c = ZCAN;
+				state = ST_TAIL;
+				continue;
+			}
+			c = READLINE_PF(1);
+			if (c == TIMEOUT) {
+				/* the old goto again: an Rxtimeout read next, no reset */
+				state = ST_GARBAGE;
+				reset_cancount = false;
+				continue;
+			}
+			if (c == ZCRCW) {
+				/* fast error recovery */
+				c = ERROR;
+				state = ST_TAIL;
+				continue;
+			}
+			if (c == RCDO) {
+				state = ST_TAIL;
+				continue;
+			}
+			if (c == CAN) {
+				if (--cancount <= 0) {
+					c = ZCAN;
+					state = ST_TAIL;
+					continue;
+				}
+				/* the old goto again: back to the Rxtimeout read;
+				 * if that byte is a CAN too, we re-enter the hunt.
+				 * Reads alternate Rxtimeout/1 exactly as before. */
+				state = ST_GARBAGE;
+				reset_cancount = false;
+				continue;
+			}
+			/* the hunted byte is not a CAN: process it as garbage */
+			state = ST_GARBAGE;
+			reset_cancount = false;
+			have_byte = true;
+			continue;
+		case ST_ZPADS:
+			c = noxrd7();
+			if (c == ZPAD)
+				continue;		/* skip more ZPADs */
+			if (c == RCDO || c == TIMEOUT) {
+				state = ST_TAIL;
+				continue;
+			}
+			if (c == ZDLE) {
+				/* This is what we want. */
+				state = ST_FRAME;
+				continue;
+			}
+			state = ST_GARBAGE;		/* the old goto agn2 */
+			reset_cancount = false;
+			have_byte = true;
+			continue;
+		case ST_FRAME:
+			switch (c = noxrd7()) {
+			case RCDO:
+			case TIMEOUT:
+				state = ST_TAIL;
+				continue;
+			case ZBIN:
+				Rxframeind = ZBIN;
+				Crc32 = false;
+				c =  zrbhdr(hdr);
+				if (c==ERROR) {
+					stats_msg_invalid();
+				} else {
+					stats_msg_valid(0);
+				}
+				rxpos = rclhdr(hdr);
+				if (Rxpos)
+					*Rxpos = rxpos;
+				stats_msg_bytes(4);
+				state = ST_TAIL;
+				continue;
+			case ZBIN32:
+				Rxframeind = ZBIN32;
+				Crc32 = true;
+				c =  zrbhdr32(hdr);
+				if (c==ERROR) {
+					stats_msg_invalid();
+				} else {
+					stats_msg_valid(0);
+				}
+				rxpos = rclhdr(hdr);
+				if (Rxpos)
+					*Rxpos = rxpos;
+				stats_msg_bytes(4);
+				state = ST_TAIL;
+				continue;
+			case ZHEX:
+				Rxframeind = ZHEX;
+				Crc32 = false;
+				c =  zrhhdr(hdr);
+				if (c==ERROR) {
+					stats_msg_invalid();
+				} else {
+					stats_msg_valid(0);
+				}
+				rxpos = rclhdr(hdr);
+				if (Rxpos)
+					*Rxpos = rxpos;
+				stats_msg_bytes(4);
+				state = ST_TAIL;
+				continue;
+			case CAN:
+				state = ST_HUNT_CAN;	/* the old goto gotcan */
+				reset_cancount = false;
+				continue;
+			default:
+				stats_msg_format_error();
+				state = ST_GARBAGE;	/* the old goto agn2 */
+				reset_cancount = false;
+				have_byte = true;
+				continue;
+			}
+		default:
+			/* unreachable: state always holds one of the enum values */
+			state = ST_TAIL;
+			continue;
 		}
-	/* FALLTHROUGH */
-	default:
-	agn2:
-		garbage_count++;
-		if (Verbose > 2 && (garbage_count <= 3 || garbage_count % 1000 == 0))
-			vfile("zgethdr: garbage[%d]=0x%02x, max_garbage_left=%u",
-			      garbage_count, (unsigned int) (c & 0xff), max_garbage);
-		if ( --max_garbage == 0) {
-			if (Verbose > 2)
-				vfile("zgethdr: garbage count exceeded after %d bytes",
-				      garbage_count);
-			zperr(_("Garbage count exceeded"));
-			return(ERROR);
-		}
-		if (eflag && ((c &= 0x7f) & 0x60) && Verbose)
-			vchar(c);
-		else if (eflag > 1 && Verbose)
-			vchar(c);
-		goto startover;
-	case ZPAD|0x80:		/* This is what we want. */
-	case ZPAD:		/* This is what we want. */
-		break;
 	}
-	cancount = 5;
-splat:
-	switch (c = noxrd7()) {
-	case ZPAD:
-		goto splat;
-	case RCDO:
-	case TIMEOUT:
-		goto fifi;
-	default:
-		goto agn2;
-	case ZDLE:		/* This is what we want. */
-		break;
-	}
-
-	switch (c = noxrd7()) {
-	case RCDO:
-	case TIMEOUT:
-		goto fifi;
-	case ZBIN:
-		Rxframeind = ZBIN;
-                Crc32 = false;
-		c =  zrbhdr(hdr);
-                if (c==ERROR) {
-                    stats_msg_invalid();
-                } else {
-                    stats_msg_valid(0);
-                }
-		break;
-	case ZBIN32:
-                Rxframeind = ZBIN32;
-		Crc32 = true;
-		c =  zrbhdr32(hdr);
-                if (c==ERROR) {
-                    stats_msg_invalid();
-                } else {
-                    stats_msg_valid(0);
-                }
-		break;
-	case ZHEX:
-		Rxframeind = ZHEX;
-                Crc32 = false;
-		c =  zrhhdr(hdr);
-                if (c==ERROR) {
-                    stats_msg_invalid();
-                } else {
-                    stats_msg_valid(0);
-                }
-		break;
-	case CAN:
-		goto gotcan;
-	default:
-                stats_msg_format_error();
-		goto agn2;
-	}
-        rxpos = rclhdr(hdr);
-
-	if (Rxpos)
-		*Rxpos = rxpos;
-        stats_msg_bytes(4);
-fifi:
+	/* ex fifi label: the common epilogue. rxpos is 0 here unless a header
+	 * was dispatched (the success arms set it above). */
 	if (Verbose > 2)
 		vfile("zgethdr: returning %d (%s) after %d garbage bytes, rxpos=%lx, readline_left=%d",
 		      c, frametype_to_string(c),
