@@ -82,4 +82,21 @@ void lrzsz_eta (long bps, size_t left, int *minleft, int *secleft);
  * sanitizes. */
 const char * lrzsz_basename (const char *path);
 
+/* min_bps watchdog returns true, if the transfer should be aborted (last bps 
+ * was below min for at least the min seconds).
+ * returns false to keep going (and set or clear the low bps tracker).
+ * dbgname is the callers name.
+ * fname is the transferred file's name (both used in messages).
+ * Displays at Verbose>=1. */
+bool lrzsz_bps_watchdog (const char *dbgname, long last_bps, double d,
+                         long min_bps, double min_bps_time, double *low_bpsp,
+                         const char *fname);
+
+/* -s/--stop-at deadline check: true = abort the transfer (now has passed
+ * stop_time; the deadline is specified in wall-clock terms).
+ * dbgname / fname: see the watchdog above.
+ * Displays at Verbose>=1. */
+bool lrzsz_stop_time_reached (const char *dbgname, time_t now,
+                              time_t stop_time, const char *fname);
+
 #endif

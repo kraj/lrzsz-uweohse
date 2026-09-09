@@ -376,3 +376,45 @@ lrzsz_basename (const char *path)
 	s = strrchr(path, '/');
 	return s ? s + 1 : path;
 }
+
+/* min_bps watchdog; see util.h. The lrz/lsz copies were identical except
+ * the debug name, the display threshold (lrz Verbose>=3 via vfile, lsz
+ * Verbose>=1 via vstring) and cosmetic format drift (%lu vs %ld) — all
+ * unified here: one threshold (Verbose>=1), one type (long). */
+bool
+lrzsz_bps_watchdog (const char *dbgname, long last_bps, double d,
+                    long min_bps, double min_bps_time, double *low_bpsp,
+                    const char *fname)
+{
+	if (last_bps >= min_bps) {
+		*low_bpsp = 0;	/* recovered */
+		return false;
+	}
+	if (*low_bpsp == 0) {
+		*low_bpsp = d;	/* arm: first violation */
+		return false;
+	}
+	if (d - *low_bpsp < min_bps_time)
+		return false;	/* below min, but not yet for long enough */
+
+	if (Verbose)
+		vstringf(_("%s: bps rate %ld below min %ld\n"),
+			dbgname, last_bps, min_bps);
+	DO_SYSLOG(LOG_INFO, "%s/%s: bps rate low: %ld < %ld",
+		   lrzsz_basename(fname), protname(), last_bps, min_bps);
+	return true;
+}
+
+/* -s/--stop-at deadline check; see util.h. */
+bool
+lrzsz_stop_time_reached (const char *dbgname, time_t now, time_t stop_time,
+                         const char *fname)
+{
+	if (!stop_time || now < stop_time)
+		return false;
+	if (Verbose)
+		vstringf(_("%s: reached stop time\n"), dbgname);
+	DO_SYSLOG(LOG_INFO, "%s/%s: reached stop time",
+		   lrzsz_basename(fname), protname());
+	return true;
+}

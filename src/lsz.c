@@ -1760,36 +1760,13 @@ zsendfdata (struct zm_fileinfo *zi)
 			last_bps = (long) ((zi->bytes_sent / d));
 			lrzsz_eta(last_bps, zi->bytes_total - zi->bytes_sent,
 				&minleft, &secleft);
-			if (min_bps) {
-				if (low_bps) {
-					if (last_bps<min_bps) {
-						if (d-low_bps>=min_bps_time) {
-							/* too bad */
-							if (Verbose) {
-								vstringf(_("zsendfdata: bps rate %ld below min %ld"),
-								  last_bps, min_bps);
-								vstring("\r\n");
-							}
-							DO_SYSLOG(LOG_INFO, "%s/%s: bps rate low: %ld <%ld",
-									   lrzsz_basename(zi->fname), protname(), last_bps, min_bps);
-							return ERROR;
-						}
-					} else
-						low_bps=0;
-				} else if (last_bps < min_bps) {
-					low_bps=d;
-				}
-			}
-			if (stop_time && now>=stop_time) {
-				/* too bad */
-				if (Verbose) {
-					vstring(_("zsendfdata: reached stop time"));
-					vstring("\r\n");
-				}
-				DO_SYSLOG(LOG_INFO, "%s/%s: reached stop time",
-						   lrzsz_basename(zi->fname), protname());
+			if (lrzsz_bps_watchdog("zsendfdata", last_bps, d,
+					       min_bps, min_bps_time, &low_bps,
+					       zi->fname))
 				return ERROR;
-			}
+			if (lrzsz_stop_time_reached("zsendfdata", now,
+						    stop_time, zi->fname))
+				return ERROR;
 
 			if (Verbose > 1) {
 				vchar ('\r');

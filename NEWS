@@ -179,6 +179,9 @@ if you use lrz to receive files from not perfectly trustworthy senders.
   bps values or stall the min-bps abort. The -s/--stop-at deadline is
   intentionally still wall clock (it is specified in wall-clock terms).
 
+* lrz now reports the reason why a transfer was aborted at verbosity
+  level 1, instead of 3. This now matches lsz.
+
 * the -U/--unrestrict option has been removed from both lrz and lsz.
   Rationale: Security-relevant options cannot be turned off: whoever 
   can add -U to a command line can equally well drop it, so the option 

@@ -1863,31 +1863,13 @@ rzfile(struct zm_fileinfo *zi)
 					d=0.5; /* first call: zero elapsed */
 				last_bps=(unsigned long) (zi->bytes_received/d);
 				lrzsz_eta(last_bps, (size_t) R_BYTESLEFT(zi), &minleft, &secleft);
-				if (min_bps) {
-					if (low_bps) {
-						if (last_bps<min_bps) {
-							if (d-low_bps>=min_bps_time) {
-								/* too bad */
-								vfile(_("rzfile: bps rate %lu below min %lu"),
-									  last_bps, min_bps);
-								DO_SYSLOG(LOG_INFO, "%s/%s: bps rate low: %lu < %lu",
-										   lrzsz_basename(zi->fname), protname(), last_bps, min_bps);
-								return ERROR;
-							}
-						}
-						else
-							low_bps=0;
-					} else if (last_bps<min_bps) {
-						low_bps=d;
-					}
-				}
-				if (stop_time && now>=stop_time) {
-					/* too bad */
-					vfile(_("rzfile: reached stop time"));
-					DO_SYSLOG(LOG_INFO, "%s/%s: reached stop time",
-							   lrzsz_basename(zi->fname), protname());
+				if (lrzsz_bps_watchdog("rzfile", (long) last_bps, d,
+						       min_bps, min_bps_time,
+						       &low_bps, zi->fname))
 					return ERROR;
-				}
+				if (lrzsz_stop_time_reached("rzfile", now,
+							    stop_time, zi->fname))
+					return ERROR;
 
 				if (Verbose > 1) {
 					vstringf(_("\rBytes received: %7ld/%7ld   BPS:%-6lu ETA %02d:%02d  "),
