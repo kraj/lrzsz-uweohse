@@ -1608,7 +1608,6 @@ zsendfdata (struct zm_fileinfo *zi)
 	 * without it gcc -Wclobbered is right to complain. */
         volatile int need_wait = 1;
 
-
 	Lrxpos = 0;
 	junkcount = 0;
 	Beenhereb4 = 0;
@@ -1617,7 +1616,21 @@ zsendfdata (struct zm_fileinfo *zi)
 	low_bps = 0;
 	not_printed = 0;
 
-	/* onintr() longjmps to intrjmp, which setjmp() below fills in. */
+	/* onintr() longjmps to intrjmp, which setjmp() below fills in.
+	 *
+	 * The three entry points into the ack/resync machinery below are:
+	 *  somemore — full restart (sender-initiated ZRPOS): re-executes the
+	 *             setjmp, re-arms the SIGINT handler, keeps the per-file
+	 *             counters (resume-in-place, like lrz's rzfile).
+	 *  waitack  — the mandatory ACK wait after a ZCRCW subpacket.
+	 *  gotack   — the verdict switch, re-entered from six sites with c
+	 *             preset; each maps to return / break into the data loop.
+	 * This deliberately stays goto-based: the reason the longjmp exists at
+	 * all (the SIGINT handler jumping out of stdio) is scheduled for
+	 * removal; after that, this whole block becomes a straight-line
+	 * function call and only then is a state-machine rewrite worth the
+	 * doing.
+         */
   somemore:
 	if (setjmp (intrjmp)) {
 	    if (play_with_sigint)
