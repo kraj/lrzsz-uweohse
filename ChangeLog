@@ -1,10 +1,6 @@
-2026-08-10  gettextize  <bug-gnu-gettext@gnu.org>
+2026-08-26  Uwe Ohse <uwe@ohse.de>
 
-	* Makefile.am (SUBDIRS): Remove intl.
-	(ACLOCAL_AMFLAGS): New variable.
-	(EXTRA_DIST): Add m4/ChangeLog.
-	* configure.in (AC_CONFIG_FILES): Remove intl/Makefile.
-	(AC_OUTPUT): Remove command that created po/Makefile.
+	* i touched almost everything in the last two or three weeks.
 
 1998-06-15	Uwe Ohse  <uwe@ohse.de>
 
