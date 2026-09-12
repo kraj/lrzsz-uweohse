@@ -1,0 +1,21 @@
+Included in this directory are:
+
+- the original ZMODEM documentation: zmodem-forsberg.txt
+  It was written by the protocols inventor Chuck Forsberg, and last 
+  changed in 1988. It is partially out of date, but contains a wealth
+  of historical information, for example the considerations leading to
+  the protocol.
+
+- a shorter ZMODEM documentation: zmodem-zmtx-zmrx.txt
+  Written by Jacques Mattheij, the author of the zmtx-zmrx suite.
+  It was written in 1994, and is also out of date.
+
+- my own ZMODEM documentation: zmodem-current.txt
+  It was written in 2026.
+  I marked many features as deprecated, because they are either
+  obsolete or should not be used in todays environment. I also 
+  documented common extension.
+
+- zmodemsnif.txt, the only documentation of the ZMODEM sniffer i
+  use.
+
