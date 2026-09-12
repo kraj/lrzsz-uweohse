@@ -282,7 +282,7 @@ chkinvok (const char *s, char dir)
  * unbounded); the cap wins — it protects the time_t cast below, and
  * LONG_MAX seconds is beyond any practical stop time. */
 time_t
-lrzsz_parse_stop_time (const char *optarg, void (*die)(int, const char *))
+lrzsz_parse_stop_time (const char *myarg, void (*die)(int, const char *))
 {
 	struct tm *tm;
 	time_t t;
@@ -290,9 +290,9 @@ lrzsz_parse_stop_time (const char *optarg, void (*die)(int, const char *))
 	char *nex, *mstart;
 	time_t stop_time;
 
-	if (isdigit((unsigned char) (*optarg))) {
-		hh = strtoul (optarg, &nex, 10);
-		if (nex == optarg)
+	if (isdigit((unsigned char) (*myarg))) {
+		hh = strtoul (myarg, &nex, 10);
+		if (nex == myarg)
 			die(2, _("unparsable stop time: empty hour"));
 		if (hh > 23)
 			die(2, _("hour too large (0..23)"));
@@ -317,7 +317,7 @@ lrzsz_parse_stop_time (const char *optarg, void (*die)(int, const char *))
 			die(2, _("stop time too small"));
 	} else {
 		stop_time = time(0) + (time_t) lrzsz_strtoul(_("-s / --stop-at"),
-				optarg, NULL, 1, LONG_MAX);
+				myarg, NULL, 1, LONG_MAX);
 	}
 	return stop_time;
 }
