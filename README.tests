@@ -1,9 +1,3 @@
-From "ease of use" onwards:
-
-"make quickcheck"
-	will do a few quick checks.
-	This just covers basic xmodem and zmodem functionality.
-
 "make vcheck"
 	will do many more tests.
         this test suite is moderately complete. There are still some options
@@ -21,11 +15,13 @@ From "ease of use" onwards:
              configure && make clean && make
         is run.
 
-The checks will $TMP/testdir.lrzsz, and will not remove the directory
-afterwards. In it you will found, among things i didn't clean up:
+The checks will ./tests, and this directory will not be removed
+after the check.
+In it you will find, among things i didn't clean up:
 - passfail.log (shows all tests run with PASSED/FAILED info)
 - failures.log (shows all failed tests)
 - perf.log (performance data)
+- journal.log
 
 Note that the tests are run over a pipe and a named pipe. The performance
 values are in no way comparable to a real serial interface (or even a 
@@ -34,17 +30,29 @@ Having said that: in real life the number will change, but what is faster
 in the benchmark will most likely be faster over a real serial line.
 
 
-If you want to do compatibility checks:
-- if this condition is true, compatibility checks against zmtx-zmrx are
-  run:
-        test -x ~/bin/zmtx -a -x ~/bin/zmrx
+If you want to do compatibility checks, note this:
+    available="lrzsz"
+    if test -x ~/bin/lrzsz-0.12.21rc/lrz -a -x ~/bin/lrzsz-0.12.21rc/lsz ; then
+        available="$available lrzsz_old"
+    fi
+    if test -x ~/bin/crzsz/crz -a -x ~/bin/crzsz/csz ; then
+        available="$available crzsz"
+    fi
+    if test -x ~/bin/rzsz373/rz -a -x ~/bin/rzsz373/sz ; then
+        available="$available rzsz373"
+    fi
+    if test -x ~/bin/zmtx-zmrx-1.02/zmtx -a -x ~/bin/zmtx-zmrx-1.02/zmrx ; then
+        available="$available zmtxzmrx102"
+    fi
+    if test -x ~/bin/zmtx-zmrx-2.02/zmtx -a -x ~/bin/zmtx-zmrx-2.02/zmrx ; then
+        available="$available zmtxzmrx202"
+    fi
+    if test -x ~/bin/sexyz ; then
+        available="$available sexyz"
+    fi
 
-- if this condition is true, compatibility checks against lrzsz-0.12.21rc
-  are run:
-        test -x ~/bin/lrzsz-0.12.21rc/lrz -a -x ~/bin/lrzsz-0.12.21rc/lsz
+zmtx-zmrx-2.02 is easy to compile.
+sexyz is easy to compile.
+The other are mostly historic, anyway.
 
-- if this condition is true, compatibility checks against crzsz are run:
-        test -x ~/bin/crzsz/crz -a -x ~/bin/crzsz/csz
-  crzsz was the latest omen technology x/y/zmodem for unix.
-
-
+oh, yes… "make vcheck-zbenchmark" runs a benchmark.
