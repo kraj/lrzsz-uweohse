@@ -1,7 +1,8 @@
 SUBDIRS = lib src po man
-EXTRA_DIST = m4/ChangeLog  check.lrzsz COMPATABILITY README.cvs README.isdn4linux \
-	README.gettext rpmrc buildrpm fastcheck.sh README.tests \
-	beos-runpiped.c fastcheck.beos
+EXTRA_DIST = m4/ChangeLog check.lrzsz COMPATABILITY README.cvs README.isdn4linux \
+	README.tests \
+	doc/README doc/zmodem-forsberg.txt doc/zmodem-zmtx-zmrx.txt doc/zmodem-current.txt doc/zmodemsnif.txt
+
 PR=@PACKAGE@-@VERSION@
 DISTCLEANFILES=fastcheck.done stamp-h
 CLEAN_FILES=fastcheck.done
