@@ -1,4 +1,4 @@
-Version 0.13.0 -  August 2026, Uwe Ohse
+Version 0.13.0 -  September 2026, Uwe Ohse
 
 This is a security release. Two of the changes warrant an immediate update
 if you use lrz to receive files from not perfectly trustworthy senders.
@@ -118,6 +118,8 @@ if you use lrz to receive files from not perfectly trustworthy senders.
 * syslog support is now always compiled in. Earlier releases had 
   configure options to deselect it.
 
+* performance on bad lines is quite a bit better now.
+
 * a number of possible security problems have been fixed:
   - double fclose in lrz.
   - a write before a buffer in lrz (80s).
@@ -145,11 +147,13 @@ if you use lrz to receive files from not perfectly trustworthy senders.
 * speaking about tracing: included in the sources is zmodemsnif.c, a ZMODEM
   protocol sniffer / tracer. Documentation is in doc/zmodemsnif.txt.
 
-* compatibility tests were done against sexyz-3.3, lrzsz-0.12.21rc, 
-  crzsz-1.13, rzsz-3.73 and zmtx-zmrx-1.02.
+* compatibility tests were done against sexyz-3.5, lrzsz-0.12.21rc, 
+  crzsz-1.13, rzsz-3.73 and zmtx-zmrx-1.02 and -2.02
 
 * compile tested on debian linux, alpine linux and openbsd.
 * compile tested with gcc and clang.
+
+* included: ZMODEM specification / documentations. See doc/README
 
 Version 0.12.21rc - August 1999, Uwe Ohse
 
