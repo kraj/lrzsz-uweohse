@@ -3,7 +3,7 @@ COMMON_SOURCES=timing.c zperr.c zreadline.c crctab.c rbsb.c zm.c protname.c lsys
 lrz_SOURCES=lrz.c $(COMMON_SOURCES)
 lsz_SOURCES=lsz.c $(COMMON_SOURCES)
 noinst_HEADERS = timing.h zglobal.h zmodem.h stats.h util.h crctab.h
-noinst_PROGRAMS = zmodemsnif linesimulator timestamp
+noinst_PROGRAMS = zmodemsnif linesimulator timestamp zmodemfuzz
 
 LDADD = @LIBINTL@
 AM_CPPFLAGS = -I.. -I$(srcdir) -I$(top_srcdir)/src -DLOCALEDIR=\"$(localedir)\" -D_FORTIFY_SOURCE=2 -D_POSIX_C_SOURCE=@MIN_POSIX_C_STD@
@@ -37,6 +37,7 @@ uninstall-local:
 	rm -f $(DESTDIR)/$(bindir)/`echo lrx |sed -e '$(transform)'`
 
 TIDY_FILES = $(lrz_SOURCES) $(lsz_SOURCES) \
-	$(zmodemsnif_SOURCES) $(linesimulator_SOURCES) $(timestamp_SOURCES)
+	$(zmodemsnif_SOURCES) $(linesimulator_SOURCES) $(timestamp_SOURCES) \
+	$(zmodemfuzz_SOURCES)
 tidy: $(TIDY_FILES) $(noinst_HEADERS)
 	clang-tidy --checks='-clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling' $(TIDY_FILES) -- $(AM_CPPFLAGS) $(AM_CFLAGS)

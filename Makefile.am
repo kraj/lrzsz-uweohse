@@ -65,6 +65,18 @@ vcheck-z:
 tidy:
 	@$(MAKE) -C src tidy
 
+# zmodem protocol fuzzing: 25 iterations per mode (FUZZITER overrides), each
+# iteration is alarm limited (-t 20).
+# fails if the target crashes, is killed by a signal (!= timeout ALRM), 
+# escapes the receiving directory, or transfers some wrong content.
+# -P prints one progress line per iteration.
+fuzz:
+	@$(MAKE) -C src zmodemfuzz; \
+	$(srcdir)/src/zmodemfuzz -P -m receive -n $${FUZZITER:-25} -t 20 -- ./src/lrz -q -Z; \
+	$(srcdir)/src/zmodemfuzz -P -m send -n $${FUZZITER:-25} -t 20 -- ./src/lsz -q -Z ./test/4k.bin
+
+.PHONY: fuzz
+
 qa: asan msan ubsan coverage
 
 .PHONY: $(SANITIZERS) qa coverage

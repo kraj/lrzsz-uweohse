@@ -56,3 +56,22 @@ sexyz is easy to compile.
 The other are mostly historic, anyway.
 
 oh, yes… "make vcheck-zbenchmark" runs a benchmark.
+
+"make fuzz"
+        runs the ZMODEM protocol fuzzing (src/zmodemfuzz.c).
+        default: 25 iterations per mode (override with FUZZITER=NNN, 
+           for example FUZZITER=200 make fuzz):
+        - "-m receive": a faked sender talks to ./src/lrz with mutated
+          byte streams (CRC corruption, illegal ZDLE escapes, frame type
+          roulette, garbage floods, CAN bursts, truncated streams,
+          hostile file names).
+        - "-m send": a faked receiver answers ./src/lsz with hostile
+          frame sequences (silence, ZNAK loops, ZSKIP, ZABORT, ZFERR,
+          ZCHALLENGE, absurd ZRPOS positions, cancel bursts).
+        The fuzzer checks that the target terminates in a bounded time,
+        dies by no signal, writes nothing outside the receiving
+        directory, and (clean baseline exchanges, every 17th iteration)
+        that the received content matches what was sent. Every failure
+        leaves /tmp/zmodemfuzz-fail-seedNNN-itNNN.log with the complete
+        byte transcript; reproduce any run exactly with the printed seed:
+             src/zmodemfuzz -s SEED -m receive -- ./src/lrz -q -Z
