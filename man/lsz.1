@@ -615,8 +615,17 @@ prints a warning when sending files larger than 2 GiB; use
 .B -q
 to suppress it.
 .SH "HISTORICAL NOTES"
-The following options and features have been removed and are no longer
-functional. Using the options prints an error message and exits.
+When a receiver ends the session with a ZABORT frame (or ZFERR, which
+the ZMODEM documentation defines as equivalent),
+.B lsz
+replies with the ZFIN sequence the documentation requires and then ends
+the session cleanly. Older lsz versions, as well as OMEN-derived senders 
+answered with the cancel sequence instead. The outcome (transfer aborted, 
+exit status 0x80) is the same, so this only matters to peers that inspect 
+the reply.
+.TP
+The following options and features have been removed and are 
+no longer functional. Using the options prints an error message and exits.
 .TP
 .B "-S, --timesync"
 Time synchronization.

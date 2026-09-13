@@ -129,6 +129,10 @@ static int Cmdack1;		/* Rx ACKs command, then do it */
 static int Exitcode;
 static size_t Lastsync;		/* Last offset to which we got a ZRPOS */
 static int Beenhereb4;		/* How many times we've been ZRPOS'd same place */
+/* set when an abort arm has answered a receiver's ZABORT/ZFERR with the
+ * spec-required ZFIN sequence (zmodem-current.txt §4): the session is then
+ * already ended cleanly, and main() must not append a cancel sequence */
+static bool replied_abort=false;
 
 bool no_timeout=false;
 static size_t max_blklen=1024;
@@ -604,17 +608,23 @@ main(int argc, char **argv)
 	}
 	fflush(stdout);
 
+	/* the session is already over when a receiver's ZABORT/ZFERR was
+	 * answered with the ZFIN sequence (see replied_abort): appending a
+	 * cancel sequence there would contradict that reply */
+#define END_WITH_CANCEL() do { Exitcode=0x80; \
+		if (!replied_abort) canit(STDOUT_FILENO); } while (0)
+
 	if (Cmdstr) {
 		if (getzrxinit()) {
-			Exitcode=0x80; canit(STDOUT_FILENO);
+			END_WITH_CANCEL();
 		}
 		else if (zsendcmd(Cmdstr, strlen(Cmdstr)+1)) {
-			Exitcode=0x80; canit(STDOUT_FILENO);
+			END_WITH_CANCEL();
 		}
 	} else if (wcsend(npats, patts)==ERROR) {
-		Exitcode=0x80;
-		canit(STDOUT_FILENO);
+		END_WITH_CANCEL();
 	}
+#undef END_WITH_CANCEL
 	fflush(stdout);
 	io_mode(io_mode_fd,0);
 	if (Exitcode)
@@ -1392,6 +1402,19 @@ getzrxinit(void)
 			if (timeouts++==0)
 				continue; /* force one other ZRQINIT to be sent */
 			return ERROR;
+		case ZABORT:
+		case ZFERR:
+			/* the receiver aborted during the handshake; ZFERR is
+			 * spec'd as equivalent to ZABORT (§4). NAKing an
+			 * aborting receiver would loop forever here — reply
+			 * with the ZFIN sequence the spec requires (§4). */
+			if (gotblock == ZABORT)
+				stats_cancel();
+			else
+				stats_file_error();
+			replied_abort = true;
+			saybibi();
+			return ERROR;
 		case ZRQINIT:
 			if (Rxhdr[ZF0] == ZCOMMAND)
 				continue;
@@ -1514,12 +1537,29 @@ again:
 					   lrzsz_basename(zi->fname), protname());
 			return ERROR;
 		case ZABORT:
-			DO_SYSLOG(LOG_INFO, "%s/%s: got ZABORT",
-					   lrzsz_basename(zi->fname), protname());
+		case ZFERR:
+			/* the receiver aborted during the file-header phase;
+			 * ZFERR is spec'd as equivalent to ZABORT
+			 * (zmodem-current.txt §4). Don't resend the ZFILE
+			 * against a receiver that just gave up — reply with
+			 * the ZFIN sequence the spec requires (§4). */
+			if (gotblock == ZABORT)
+				stats_cancel();
+			else
+				stats_file_error();
+			DO_SYSLOG(LOG_INFO, "%s/%s: got %s - receiver aborted",
+				   lrzsz_basename(zi->fname), protname(),
+				   gotblock == ZABORT ? "ZABORT" : "ZFERR");
+			replied_abort = true;
+			if (input_f) {
+				fclose(input_f);
+				input_f=NULL;
+			}
+			saybibi();
 			return ERROR;
 		case ZFIN:
 			DO_SYSLOG(LOG_INFO, "%s/%s: got ZFIN",
-					   lrzsz_basename(zi->fname), protname());
+				   lrzsz_basename(zi->fname), protname());
 			return ERROR;
 		case ZCRC:
 			crc = 0xFFFFFFFFL;
@@ -2144,7 +2184,23 @@ getinsync(struct zm_fileinfo *zi, int flag)
 		case TIMEOUT:
 			return ERROR;
 		case ZABORT:
-			stats_cancel();
+		case ZFERR:
+			/* the receiver reported a fatal file error (ZFERR is
+			 * spec'd as equivalent to ZABORT, zmodem-current.txt
+			 * §4) and wants the transfer ended — reply with the
+			 * ZFIN sequence the spec requires (§4), not with
+			 * retries or a cancel sequence. ZABORT: user cancel;
+			 * ZFERR: receiver file error. */
+			if (gotblock == ZABORT)
+				stats_cancel();
+			else
+				stats_file_error();
+			replied_abort = true;
+			if (input_f) {
+				fclose (input_f);
+				input_f=NULL;
+			}
+			saybibi();
 			return ERROR;
 		case ZRPOS:
 			/*  If sending to a buffered modem, you
@@ -2200,7 +2256,13 @@ getinsync(struct zm_fileinfo *zi, int flag)
 }
 
 
-/* Say "bibi" to the receiver, try to do it cleanly */
+/* Say "bibi" to the receiver, try to do it cleanly. Two roles: the normal
+ * end-of-batch close (zmodem_requested path), and the reply to a receiver
+ * that aborted with ZABORT/ZFERR — the spec requires the sender to respond
+ * with a ZFIN sequence there (zmodem-current.txt §4, "The sender responds
+ * with a ZFIN sequence"), the historical OMEN cancel reply deviated from
+ * that. A receiver that has died answers with RCDO/nothing: bounded, so we
+ * don't loop forever on a dead line. */
 static void
 saybibi(void)
 {
@@ -2213,6 +2275,7 @@ saybibi(void)
 			sendline('O');
 			flushmo();
 		case ZCAN:
+		case RCDO:
 		case TIMEOUT:
 			return;
                 default:
@@ -2249,7 +2312,18 @@ listen:
 				return ERROR;
 			continue;
 		case ZCAN:
+			return ERROR;
 		case ZABORT:
+		case ZFERR:
+			/* ZFERR is specified as equivalent to ZABORT
+			 * (zmodem-current.txt §4): the receiver reported a
+			 * fatal file error. Do not retry the command against
+			 * a dead filesystem. Reply with the ZFIN sequence the
+			 * spec requires for ZABORT (§4). */
+			stats_cancel();
+			replied_abort = true;
+			saybibi();
+			return ERROR;
 		case ZFIN:
 		case ZSKIP:
 		case ZRPOS:

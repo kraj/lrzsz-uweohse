@@ -259,6 +259,23 @@ if you use lrz to receive files from not perfectly trustworthy senders.
 * speaking about tracing: included in the sources is zmodemsnif.c, a ZMODEM
   protocol sniffer / tracer. Documentation is in doc/zmodemsnif.txt.
 
+* lsz now answers a receiver's ZABORT frame (and ZFERR, which the ZMODEM
+  documentation defines as equivalent) with the ZFIN sequence that the
+  documentation requires, followed by the usual clean end-of-session
+  handshake. Formerly lsz answered with the cancel sequence, as the OMEN
+  ZMODEM implementations also did. 
+  The result is the same, but peers expecting the documented reply now 
+  get it.
+  Also a receiver that dies instead of answering no longer stalls the 
+  closing handshake.
+
+* lsz now answers ZABORT/ZFERR in every phase of the session instead of
+  retrying: during the handshake, during the file header exchange (where
+  a retry against a receiver with a failing filesystem is pointless),
+  during the data phase, and in remote command mode (where a receiver
+  that aborted would previously have been sent the command up to 20
+  times). ZABORT is counted as a user cancel, ZFERR as a file error.
+
 * compatibility tests were done against sexyz-3.5, lrzsz-0.12.21rc, 
   crzsz-1.13, rzsz-3.73 and zmtx-zmrx-1.02 and -2.02
 
