@@ -18,7 +18,6 @@ const char * lrzsz_progname;
 
 unsigned int debugmode=0;
 
-/* --debug parser; see util.h. */
 struct debug_name {
 	const char *name;
 	unsigned int mask;
