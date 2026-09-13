@@ -197,6 +197,10 @@ doit() {
         TRACE_SZ="strace -vs 1280 -Ttt -fo $TRACEFILE_SZ"
         TRACE_RZ="strace -vs 1280 -Ttt -fo $TRACEFILE_RZ"
     fi
+    if test -n "$KTRACE" ; then
+        TRACE_SZ="ktrace -f $TRACEFILE_SZ"
+        TRACE_RZ="ktrace -f $TRACEFILE_RZ"
+    fi
 #rz="$rz -vvvv";
     echo "$doit_key - $title" >>$runlog
     echo "pid: $$" >>$runlog
@@ -258,6 +262,11 @@ doit() {
             done
             dur=$(echo "$end - $start" | bc)
             durshort=$(echo "scale=3; $end - $start" | bc)
+            if test "$dur" = "0" ; then
+                # bc cannot divide by zero; clamp to half a second.
+                dur=0.5
+                durshort=0.5
+            fi
             bps=$(echo "scale=2; $bytes / $dur" | bc)
             mbps=$(echo "scale=1; $bps / 1000000.0" | bc)
             if test "$mbps" = "0" ; then
@@ -1764,10 +1773,11 @@ SEOF
 
     #
     # SIGINT during a ZMODEM send: the sender gets ^C mid-stream (a
-    # backgrounded sleeper signals it) while a throttled line keeps the
-    # transfer busy. lsz must resync with the receiver and complete the
-    # transfer anyway (the onintr/intrjmp machinery). Interrupt timing makes
-    # the counters nondeterministic, so this key must not be part of any
+    # backgrounded waiter signals it as soon as the data phase is truly
+    # underway) while a throttled line keeps the transfer busy. lsz must
+    # resync with the receiver and complete the transfer anyway (the
+    # onintr/intrjmp machinery). Interrupt timing makes the counters
+    # nondeterministic, so this key must not be part of any
     # journal-counter baseline.
     #
     key="zmodem-lsz-lrz-sigint"
@@ -1775,9 +1785,19 @@ SEOF
     cat > $testdir/run-sigint-sender.sh <<SEOF
 #! /bin/sh
 cd '$testdir/$key' || exit 1
-# ^C this sender ~2s into the transfer; exec keeps the pid stable, so the
-# subshell's parent ($PPID at its creation) is the future lsz process.
-( sleep 2 && kill -INT \$PPID ) &
+rm -f binary_1m
+# ^C this sender once the data phase is truly underway: the receiver has
+# written at least one byte to the partial file, which can only happen
+# after lsz entered zsendfdata() and installed the resync SIGINT handler.
+# A fixed sleep could fire during negotiation, where lsz still runs the
+# fatal bibi handler and dies (observed on OpenBSD). Bounded to ~8s so a
+# dead peer cannot stall the test.
+( n=0
+  while test \$n -lt 40 && test ! -s binary_1m ; do
+      sleep 0.2
+      n=\`expr \$n + 1\`
+  done
+  kill -INT \$PPID ) &
 # ignore the arguments doit() appends; send the 1 MiB payload by basename
 exec $SZ -q -Z ../binary_1m
 SEOF
