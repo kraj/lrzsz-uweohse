@@ -328,13 +328,13 @@ incomplete_keep_cmp() {
         echo "-- file is complete; the abort never happened"
         return 1
     fi
-    _orig_size=$(stat -c %s "$1")
-    _part_size=$(stat -c %s "$2")
+    _orig_size=$(expr "$(wc -c <"$1")" + 0)
+    _part_size=$(expr "$(wc -c <"$2")" + 0)
     if test "$_part_size" -ge "$_orig_size" ; then
         echo "-- partial ($_part_size) is not smaller than original ($_orig_size)"
         return 1
     fi
-    head -c "$_part_size" "$1" | cmp -s - "$2" || {
+    dd if="$1" ibs="$_part_size" count=1 2>&5 | cmp -s - "$2" || {
         echo "-- partial file is not a prefix of the original"
         return 1
     }
