@@ -55,19 +55,6 @@ zpfatal(const char *fmt, ...)
 	fprintf(stderr,": %s\n",strerror(err));
 }
 
-void 
-vfile(const char *format, ...)
-{
-    va_list ap;
-
-	if (Verbose < 3)
-		return;
-    va_start(ap, format);
-    vfprintf(stderr,format, ap);
-    va_end(ap);
-    putc('\n',stderr);
-}
-
 void
 vstringf(const char *format, ...)
 {

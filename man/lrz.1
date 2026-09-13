@@ -353,10 +353,24 @@ if you want failed transfers to leave the partial file in place.
 prints out version number.
 .TP
 .B "-v, --verbose"
-Verbose
-causes a list of file
-names to be appended to stderr.
-More v's generate more output.
+Verbose output to stderr. With one
+.BR v ,
+a summary (file names, transfer result, error events) is printed. With two
+.BR v s,
+progress reports are also shown. More
+.BR v s
+are accepted but have no effect. Since version 0.13 detailed protocol debugging 
+is available with 
+.B \-\-debug
+instead.
+.TP
+.B "\-\-debug=MODULES"
+Enable debug output for the comma separated list of MODULES on stderr.
+Known modules: "protocol" (ZMODEM frame state machine), "readline" (line
+reader: select/read calls, timeouts, hex dump), "transfer" (file transfer
+state machine), "windowhandling" (adaptive block length and window
+logic, ZMODEM sender only), "tty" (terminal mode changes). The special
+name "all" enables all.
 .TP
 .B "-wN, --windowsize N"
 Set window size to N.

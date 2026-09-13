@@ -38,9 +38,6 @@
 #define getopt_long(argc,argv,str,longopts,longind) getopt(argc,argv,str)
 #endif
 
-#define DEBUG_WINDOWHANDLING 1
-static int debugmode=0;
-
 
 unsigned int Baudrate=2400;	/* Default, should be set by first mode() call */
 static unsigned int Txwindow;	/* Control the size of the transmitted window */
@@ -264,6 +261,7 @@ static struct option const long_options[] =
   {"journal", required_argument, NULL, 'J'},
   {"delay-startup", required_argument, NULL, 4},
   {"no-unixmode", no_argument, NULL, 8},
+  {"debug", required_argument, NULL, 9},
   {NULL, 0, NULL, 0}
 };
 #endif
@@ -466,6 +464,10 @@ main(int argc, char **argv)
                         startup_delay = (unsigned int) lrzsz_strtoul( "--delay-startup", optarg, NULL, 1, 0);
 			break;
 		case 8: no_unixmode=1; break;
+		case 9:
+			if (!lrzsz_parse_debug(optarg))
+				usage(2, _("bad --debug argument"));
+			break;
 		default:
 			usage (2,NULL);
 			break;
@@ -515,7 +517,7 @@ main(int argc, char **argv)
 		if (Verbose == 0)
 			Verbose = 2;
 	}
-	vfile("%s %s\n", lrzsz_progname, VERSION);
+	DPRINTF(DEBUG_TRANSFER, "%s %s\n", lrzsz_progname, VERSION);
 
         {
             struct timespec start_timespec;
@@ -841,7 +843,7 @@ wctxpn(struct zm_fileinfo *zi)
 	}
 	if (!zmodem_requested)
 		if (getnak()) {
-			vfile("getnak failed");
+			DPRINTF(DEBUG_TRANSFER, "getnak failed\n");
 			DO_SYSLOG(LOG_INFO, "%s/%s: getnak failed",
 					   lrzsz_basename(zi->fname), protname());
 			return ERROR;
@@ -901,7 +903,7 @@ wctxpn(struct zm_fileinfo *zi)
 	if (zmodem_requested)
 		return zsendfile(zi,txbuf, 1+strlen(p)+(p-txbuf));
 	if (wcputsec(txbuf, 0, 128)==ERROR) {
-		vfile("wcputsec failed");
+		DPRINTF(DEBUG_TRANSFER, "wcputsec failed\n");
 		DO_SYSLOG(LOG_INFO, "%s/%s: wcputsec failed",
 				   lrzsz_basename(zi->fname), protname());
 		return ERROR;
@@ -972,7 +974,7 @@ wctx(struct zm_fileinfo *zi)
 	int sectnum, attempts, firstch;
 
 	firstsec=true;  thisblklen = blklen;
-	vfile("wctx:file length=%ld", (long) zi->bytes_total);
+	DPRINTF(DEBUG_TRANSFER, "wctx:file length=%ld\n", (long) zi->bytes_total);
 
 	while ((firstch=READLINE_PF(Rxtimeout))!=NAK && firstch != WANTCRC
 	  && firstch != WANTG && firstch!=TIMEOUT && firstch!=CAN
@@ -1259,7 +1261,9 @@ usage(int exitcode, const char *what)
 "  -s, --stop-at {HH:MM|+N}    stop transmission at HH:MM or in N seconds\n"
 /* -S was timesync */
 "  -u, --unlink                unlink file after transmission\n"
-"  -v, --verbose               be verbose, provide debugging information\n"
+"  -v, --verbose               be verbose (twice: also show progress)\n"
+"  --debug=MODULES             comma separated list: protocol, readline,\n"
+"                              transfer, windowhandling, tty, all\n"
 "  -V, --version               show version information\n"
 "  -w, --windowsize N          Window is N bytes (Z)\n"
 "  -X, --xmodem                use XMODEM protocol\n"
@@ -1332,7 +1336,7 @@ getzrxinit(void)
 			Rxbuflen = (0xff & Rxhdr[ZP0])+((0xff & Rxhdr[ZP1])<<8);
 			if ( !(Rxflags & CANFDX))
 				Txwindow = 0;
-			vfile("Rxbuflen=%u Tframlen=%u", Rxbuflen, Tframlen);
+			DPRINTF(DEBUG_WINDOWHANDLING, "Rxbuflen=%u Tframlen=%u\n", Rxbuflen, Tframlen);
 			if ( play_with_sigint)
 				signal(SIGINT, SIG_IGN);
 
@@ -1341,7 +1345,7 @@ getzrxinit(void)
 			/* Override to force shorter frame length */
 			if (Tframlen && Rxbuflen > Tframlen)
 				Rxbuflen = Tframlen;
-			vfile("Rxbuflen=%u", Rxbuflen);
+			DPRINTF(DEBUG_WINDOWHANDLING, "Rxbuflen=%u\n", Rxbuflen);
 
 			/*
 			 * If input is not a regular file, force ACK's to
@@ -1376,8 +1380,8 @@ getzrxinit(void)
 				blklen = Rxbuflen;
 			if (blkopt && blklen > blkopt)
 				blklen = blkopt;
-			vfile("Rxbuflen=%u blklen=%lu", Rxbuflen, blklen);
-			vfile("Txwindow = %u Txwspac = %u", Txwindow, Txwspac);
+			DPRINTF(DEBUG_WINDOWHANDLING, "Rxbuflen=%u blklen=%lu\n", Rxbuflen, blklen);
+			DPRINTF(DEBUG_WINDOWHANDLING, "Txwindow = %u Txwspac = %u\n", Txwindow, Txwspac);
 			Rxtimeout=old_timeout;
                         if (debugmode & DEBUG_WINDOWHANDLING) {
                             fprintf(stderr,"after ZRINIT: Rxbuflen=%u,Txwindow=%u,Txwspac=%u\n",Rxbuflen,Txwindow,Txwspac);
@@ -1549,7 +1553,7 @@ again:
 				input_f=NULL;
 			}
 
-			vfile("receiver skipped");
+			DPRINTF(DEBUG_TRANSFER, "receiver skipped\n");
 			DO_SYSLOG(LOG_INFO, "%s/%s: receiver skipped",
 					   lrzsz_basename(zi->fname), protname());
 			return ZSKIP;
@@ -1560,7 +1564,7 @@ again:
 			 */
 			if (rxpos && fseeko(input_f, (off_t) rxpos, 0)) {
 				int er=errno;
-				vfile("fseeko failed: %s", strerror(er));
+				DPRINTF(DEBUG_TRANSFER, "fseeko failed: %s\n", strerror(er));
 				DO_SYSLOG(LOG_INFO, "%s/%s: fseeko failed: %s",
 						   lrzsz_basename(zi->fname), protname(), strerror(er));
 				return ERROR;
@@ -1724,7 +1728,7 @@ restart_data:
 	do {
 		size_t n;
 		int e=0;
-		unsigned old = blklen;
+		unsigned long old = blklen;
 		/* the SIGINT checkpoint (former longjmp return path): the
 		 * flag is set by the handler during any of the timeout-
 		 * bounded reads below; the resync attempt happens here */
@@ -1738,44 +1742,40 @@ restart_data:
 		}
 		blklen = calc_blklen (total_sent);
 		total_sent += blklen + OVERHEAD;
-		if (Verbose > 2 && blklen != old)
-			vstringf (_("blklen now %lu\n"), blklen);
+		if (blklen != old)
+			DPRINTF(DEBUG_WINDOWHANDLING, "zsendfdata: blklen changed %lu -> %lu\n",
+				(unsigned long) old, (unsigned long) blklen);
 		{
 			n = zfilbuf (zi);
                 }
 		if (zi->eof_seen) {
 			e = ZCRCE;
-			if (Verbose>3)
-				vstring("e=ZCRCE/eof seen");
+			DPRINTF(DEBUG_WINDOWHANDLING, "e=ZCRCE/eof seen\n");
 		} else if (junkcount > 3) {
 			e = ZCRCW;
-			if (Verbose>3)
-				vstring("e=ZCRCW/junkcount > 3");
+			DPRINTF(DEBUG_WINDOWHANDLING, "e=ZCRCW/junkcount > 3\n");
 		} else if (bytcnt == Lastsync) {
 			e = ZCRCW;
-			if (Verbose>3)
-				vstringf("e=ZCRCW/bytcnt == Lastsync == %lu",
-					(unsigned long) Lastsync);
+			DPRINTF(DEBUG_WINDOWHANDLING,
+				"e=ZCRCW/bytcnt == Lastsync == %lu\n",
+				(unsigned long) Lastsync);
                 /* segmented streaming. note: newcnt is reset to Rxbuflen in the goto jungle. */
                 } else if (Rxbuflen && (newcnt -= n) <= 0) {
                         e = ZCRCW;
-                        if (Verbose>3)
-                                vstringf("e=ZCRCW/Rxbuflen(newcnt=%lu,n=%lu, Rxbuflen=%lu)",
-                                        (unsigned long) newcnt,(unsigned long) n, (unsigned long) Rxbuflen);
+                        DPRINTF(DEBUG_WINDOWHANDLING,
+                                "e=ZCRCW/Rxbuflen(newcnt=%lu,n=%lu, Rxbuflen=%lu)\n",
+                                (unsigned long) newcnt,(unsigned long) n, (unsigned long) Rxbuflen);
 		} else if (Txwindow && (Txwcnt += n) >= Txwspac) {
 			Txwcnt = 0;
 			e = ZCRCQ;
-			if (Verbose>3)
-				vstring("e=ZCRCQ/Window");
+			DPRINTF(DEBUG_WINDOWHANDLING, "e=ZCRCQ/Window\n");
 		} else if (need_wait) {
 			e = ZCRCW;
                         need_wait = 0;
-			if (Verbose>3)
-				vstring("e=ZCRCW/need_wait");
+			DPRINTF(DEBUG_WINDOWHANDLING, "e=ZCRCW/need_wait\n");
 		} else {
 			e = ZCRCG;
-			if (Verbose>3)
-				vstring("e=ZCRCG");
+			DPRINTF(DEBUG_WINDOWHANDLING, "e=ZCRCG\n");
 		}
 		if ((Verbose > 1 || min_bps || stop_time)
 			&& (not_printed > (min_bps ? 3 : 7)
@@ -1866,7 +1866,8 @@ restart_data:
 			size_t prev_lrxpos = Lrxpos;
 			while (!abandoned && zi->bytes_sent >= Lrxpos &&
 			       (tcount = zi->bytes_sent - Lrxpos) >= Txwindow) {
-				vfile ("%zu (%ld,%ld) window >= %u", tcount,
+				DPRINTF(DEBUG_WINDOWHANDLING,
+					"%zu (%ld,%ld) window >= %u\n", tcount,
 					(long) zi->bytes_sent, (long) Lrxpos,
 					Txwindow);
 				if (e != ZCRCQ) {
@@ -1907,8 +1908,8 @@ restart_data:
 					prev_lrxpos = Lrxpos;
 				}
 			}
-			if (!abandoned)
-				vfile ("window = %zu", tcount);
+			DPRINTF(DEBUG_WINDOWHANDLING, "window = %zu\n",
+				tcount);
 		}
 	} while (!zi->eof_seen);
 
@@ -2034,9 +2035,9 @@ calc_blklen_worker(long total_sent)
 				last_blklen = 32;
 			else if (last_blklen > 512)
 				last_blklen=512;
-			if (Verbose > 3)
-				vstringf(_("calc_blklen: reduced to %d due to error\n"),
-					last_blklen);
+			DPRINTF(DEBUG_WINDOWHANDLING,
+				"calc_blklen: reduced to %d due to error\n",
+				last_blklen);
 		}
 		last_error_count=error_count;
 		last_bytes_per_error=0; /* force recalc */
@@ -2066,21 +2067,20 @@ calc_blklen_worker(long total_sent)
 		d=this_bytes_per_error-last_bytes_per_error;
 	if (d<4)
 	{
-		if (Verbose > 3)
-		{
-			vstringf(_("calc_blklen: returned old value %d due to low bpe diff\n"),
-				last_blklen);
-			vstringf(_("calc_blklen: old %ld, new %ld, d %ld\n"),
-				last_bytes_per_error,this_bytes_per_error,d );
-		}
+		DPRINTF(DEBUG_WINDOWHANDLING,
+			"calc_blklen: returned old value %d due to low bpe diff\n",
+			last_blklen);
+		DPRINTF(DEBUG_WINDOWHANDLING,
+			"calc_blklen: old %ld, new %ld, d %ld\n",
+			last_bytes_per_error, this_bytes_per_error, d);
 		return last_blklen;
 	}
 	last_bytes_per_error=this_bytes_per_error;
 
 calcit:
-	if (Verbose > 3)
-		vstringf(_("calc_blklen: calc total_bytes=%ld, bpe=%ld, ec=%ld\n"),
-			total_bytes,this_bytes_per_error,(long) error_count);
+	DPRINTF(DEBUG_WINDOWHANDLING,
+		"calc_blklen: calc total_bytes=%ld, bpe=%ld, ec=%ld\n",
+		total_bytes, this_bytes_per_error, (long) error_count);
 	for (i=32;i<=max_blklen;i*=2) {
 		long ok; /* some many ok blocks do we need */
 		long failed; /* and that's the number of blocks not transmitted ok */
@@ -2089,9 +2089,9 @@ calcit:
 		failed=((long) i + OVERHEAD) * ok / this_bytes_per_error;
 		transmitted=total_bytes + ok * OVERHEAD
 			+ failed * ((long) i+OVERHEAD+OVER_ERR);
-		if (Verbose > 4)
-			vstringf(_("calc_blklen: blklen %u, ok %ld, failed %ld -> %lu\n"),
-				i,ok,failed,transmitted);
+		DPRINTF(DEBUG_WINDOWHANDLING,
+			"calc_blklen: blklen %u, ok %ld, failed %ld -> %lu\n",
+			i, ok, failed, transmitted);
 		if (transmitted < best_bytes || !best_bytes)
 		{
 			best_bytes=transmitted;
@@ -2101,9 +2101,8 @@ calcit:
 	if (best_size > 2*last_blklen)
 		best_size=2*last_blklen;
 	last_blklen=best_size;
-	if (Verbose > 3)
-		vstringf(_("calc_blklen: returned %d as best\n"),
-			last_blklen);
+	DPRINTF(DEBUG_WINDOWHANDLING, "calc_blklen: returned %d as best\n",
+		last_blklen);
 	return last_blklen;
 }
 
@@ -2113,7 +2112,7 @@ calc_blklen(long total_sent) {
     unsigned int old_Txwindow=Txwindow;
     static int last_blklen;
     int ret=calc_blklen_worker(total_sent);
-    if (debugmode && DEBUG_WINDOWHANDLING) {
+    if (debugmode & DEBUG_WINDOWHANDLING) {
         if (old_Rxbuflen!=Rxbuflen) {
             fprintf(stderr,"calc_blklen changed Rxbuflen from %u to %u\n",old_Rxbuflen,Rxbuflen);
         }
@@ -2264,7 +2263,7 @@ listen:
 			saybibi();
 			return OK;
 		case ZRQINIT:
-			vfile(_("got a ZRQINIT packet: the other side is trying to send, too"));
+			DPRINTF(DEBUG_TRANSFER, _("got a ZRQINIT packet: the other side is trying to send, too\n"));
 			if (++errors > 20)
 				return ERROR;
 		}
@@ -2280,9 +2279,7 @@ countem (int argc, char **argv)
 
 	for (Totalleft = 0, Filesleft = 0; --argc >= 0; ++argv) {
 		f.st_size = -1;
-		if (Verbose > 2) {
-			vstringf ("\nCountem: %03d %s ", argc, *argv);
-		}
+		DPRINTF(DEBUG_TRANSFER, "\nCountem: %03d %s ", argc, *argv);
 		if (access (*argv, R_OK) >= 0 && stat (*argv, &f) >= 0) {
 			if (!S_ISDIR(f.st_mode) && !S_ISBLK(f.st_mode)) {
 				++Filesleft;
@@ -2292,12 +2289,10 @@ countem (int argc, char **argv)
 			++Filesleft;
 			Totalleft += DEFBYTL;
 		}
-		if (Verbose > 2)
-			vstringf (" %ld", (long) f.st_size);
+		DPRINTF(DEBUG_TRANSFER, " %ld", (long) f.st_size);
 	}
-	if (Verbose > 2)
-		vstringf (_("\ncountem: Total %d %ld\n"),
-				 Filesleft, Totalleft);
+	DPRINTF(DEBUG_TRANSFER, "\ncountem: Total %d %ld\n",
+			 Filesleft, Totalleft);
 	calc_blklen (Totalleft);
 }
 

@@ -158,7 +158,7 @@ io_mode(int fd, int n)
 	static int did0 = 0;
 	static int have_oldtty = false;
 
-	vfile("mode:%d", n);
+	DPRINTF(DEBUG_TTY, "mode:%d\n", n);
 
 	if(!did0) {
 		did0 = 1;
@@ -168,7 +168,7 @@ io_mode(int fd, int n)
 			/* not a terminal (pipe, pty master...): tcgetattr can
 			 * never succeed on this fd. Don't retry it forever. */
 			did0 = 2;
-			vfile("tcgetattr failed: not a tty");
+			DPRINTF(DEBUG_TTY, "tcgetattr failed: not a tty\n");
 		} else {
 			/* transient failure (e.g. EINTR): don't latch did0 and
 			 * don't change the line now, so the next call can still
@@ -202,7 +202,7 @@ io_mode(int fd, int n)
 		tty.c_cc[VTIME] = 1; /* or in this many tenths of seconds */
 
 		if (tcsetattr(fd,TCSADRAIN,&tty) < 0)
-			vfile("tcsetattr failed: %s", strerror(errno));
+			DPRINTF(DEBUG_TTY, "tcsetattr failed: %s\n", strerror(errno));
 
 		return OK;
 	case 1:
@@ -237,7 +237,7 @@ io_mode(int fd, int n)
 		tty.c_cc[VMIN] = 1; /* This many chars satisfies reads */
 		tty.c_cc[VTIME] = 1;	/* or in this many tenths of seconds */
 		if (tcsetattr(fd,TCSADRAIN,&tty) < 0)
-			vfile("tcsetattr failed: %s", strerror(errno));
+			DPRINTF(DEBUG_TTY, "tcsetattr failed: %s\n", strerror(errno));
 		Baudrate = getspeed(cfgetospeed(&tty));
 		return OK;
 	case 0:

@@ -16,6 +16,53 @@
 
 const char * lrzsz_progname;
 
+unsigned int debugmode=0;
+
+/* --debug parser; see util.h. */
+struct debug_name {
+	const char *name;
+	unsigned int mask;
+};
+
+bool
+lrzsz_parse_debug (const char *spec)
+{
+	static const struct debug_name names[] = {
+		{ "protocol",       DEBUG_PROTOCOL },
+		{ "readline",       DEBUG_READLINE },
+		{ "transfer",       DEBUG_TRANSFER },
+		{ "windowhandling", DEBUG_WINDOWHANDLING },
+		{ "tty",            DEBUG_TTY },
+		{ "all",            DEBUG_ALL },
+	};
+	const char *p = spec;
+
+	if (!spec || !*spec)
+		return false;
+	while (*p) {
+		const char *end = strchr(p, ',');
+		size_t len = end ? (size_t)(end - p) : strlen(p);
+		unsigned int i;
+		while (*p == ' ')
+			p++, len--;
+		for (i = 0; i < sizeof(names) / sizeof(names[0]); i++) {
+			if (strlen(names[i].name) == len
+			    && strncmp(p, names[i].name, len) == 0)
+				break;
+		}
+		if (i == sizeof(names) / sizeof(names[0])) {
+			lrzsz_warning(0, _("unknown debug module '%.*s'"),
+				(int) len, p);
+			return false;
+		}
+		debugmode |= names[i].mask;
+		if (!end)
+			break;
+		p = end + 1;
+	}
+	return true;
+}
+
 void
 lrzsz_set_progname (const char * str, const char *who)
 {
@@ -378,9 +425,8 @@ lrzsz_basename (const char *path)
 }
 
 /* min_bps watchdog; see util.h. The lrz/lsz copies were identical except
- * the debug name, the display threshold (lrz Verbose>=3 via vfile, lsz
- * Verbose>=1 via vstring) and cosmetic format drift (%lu vs %ld) — all
- * unified here: one threshold (Verbose>=1), one type (long). */
+ * the debug name and cosmetic format drift (%lu vs %ld) — both unified
+ * here: one display threshold (Verbose>=1), one type (long). */
 bool
 lrzsz_bps_watchdog (const char *dbgname, long last_bps, double d,
                     long min_bps, double min_bps_time, double *low_bpsp,

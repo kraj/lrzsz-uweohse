@@ -203,6 +203,7 @@ static struct option const long_options[] =
 	{"o-sync", no_argument, NULL, 5},
 	{"o_sync", no_argument, NULL, 5},
 	{"keep-incomplete", no_argument, NULL, 6},
+	{"debug", required_argument, NULL, 7},
 	{NULL,0,NULL,0}
 };
 #endif
@@ -361,6 +362,10 @@ main(int argc, char *argv[])
 		case 6:
 			keep_incomplete=true;
 			break;
+		case 7:
+			if (!lrzsz_parse_debug(optarg))
+				usage(2, _("bad --debug argument"));
+			break;
 		default:
 			usage(2,NULL);
 		}
@@ -391,7 +396,7 @@ main(int argc, char *argv[])
 			Verbose = 2;
 	}
 
-	vfile("%s %s\n", lrzsz_progname, VERSION);
+	DPRINTF(DEBUG_TRANSFER, "%s %s\n", lrzsz_progname, VERSION);
 
         {
             struct timespec start_timespec;
@@ -487,7 +492,9 @@ usage(int exitcode, const char *what)
 "      --syslog[=off]          turn syslog on or off, if possible\n"
 "  -t, --timeout N             set timeout to N tenths of a second\n"
 "  -u, --keep-uppercase        keep upper case filenames\n"
-"  -v, --verbose               be verbose, provide debugging information\n"
+"  -v, --verbose               be verbose (twice: also show progress)\n"
+"  --debug=MODULES             comma separated list: protocol, readline,\n"
+"                              transfer, windowhandling, tty, all\n"
 "  -V, --version               show version\n"
 "  -w, --windowsize N          Window is N bytes (Z)\n"
 "  -X  --xmodem                use XMODEM protocol\n"
@@ -1150,10 +1157,8 @@ procheader(char *name, struct zm_fileinfo *zi)
     name_static=xstrdup(name);
     zi->fname=name_static;
 
-    if (Verbose>2) {
-        vstringf(_("zmanag=%d, Lzmanag=%d\n"),zmanag,Lzmanag);
-        vstringf(_("zconv=%d\n"),zconv);
-    }
+    DPRINTF(DEBUG_TRANSFER, "zmanag=%d, Lzmanag=%d\n", zmanag, Lzmanag);
+    DPRINTF(DEBUG_TRANSFER, "zconv=%d\n", zconv);
 
     /* set default parameters and overrides */
     openmode = "w";
@@ -1772,14 +1777,14 @@ rzfile(struct zm_fileinfo *zi)
 			default:
 				DO_SYSLOG(LOG_INFO, "%s/%s: error: zgethdr returned %d", lrzsz_basename(zi->fname),
 					   protname(), c);
-				vfile("rzfile: zgethdr returned %d", c);
+				DPRINTF(DEBUG_TRANSFER, "rzfile: zgethdr returned %d\n", c);
 				return ERROR;
 			case ZNAK:
 			case TIMEOUT:
 				if ( --n < 0) {
 					DO_SYSLOG(LOG_INFO, "%s/%s: error: zgethdr returned %s", lrzsz_basename(zi->fname),
 						   protname(), c == ZNAK ? "ZNAK" : "TIMEOUT");
-					vfile("rzfile: zgethdr returned %d", c);
+					DPRINTF(DEBUG_TRANSFER, "rzfile: zgethdr returned %d\n", c);
 					return ERROR;
 				}
                                 /* traditionally we fell through to the ZFILE block and did an ZRDATA,
@@ -1806,16 +1811,16 @@ rzfile(struct zm_fileinfo *zi)
 					tryzhdrtype = ZFERR;
 					DO_SYSLOG(LOG_INFO, "%s/%s: error: closeit return <>0",
 							   lrzsz_basename(zi->fname), protname());
-					vfile("rzfile: closeit returned <> 0");
+					DPRINTF(DEBUG_TRANSFER, "rzfile: closeit returned <> 0\n");
 					return ERROR;
 				}
-				vfile("rzfile: normal EOF");
+				DPRINTF(DEBUG_TRANSFER, "rzfile: normal EOF\n");
 				return c;
 			case ERROR:	/* Too much garbage in header search error */
 				if ( --n < 0) {
 					DO_SYSLOG(LOG_INFO, "%s/%s: error: zgethdr returned %d",
 						   lrzsz_basename(zi->fname), protname(), c);
-					vfile("rzfile: zgethdr returned %d", c);
+					DPRINTF(DEBUG_TRANSFER, "rzfile: zgethdr returned %d\n", c);
 					return ERROR;
 				}
 				zmputs(Attn);
@@ -1825,12 +1830,12 @@ rzfile(struct zm_fileinfo *zi)
 				closeit(zi);
 				DO_SYSLOG(LOG_INFO, "%s/%s: error: sender skipped",
 						   lrzsz_basename(zi->fname), protname());
-				vfile("rzfile: Sender SKIPPED file");
+				DPRINTF(DEBUG_TRANSFER, "rzfile: Sender SKIPPED file\n");
 				return c;
 			case ZDATA:
 				if (rclhdr(Rxhdr) != (unsigned long) zi->bytes_received) {
 					if ( --n < 0) {
-						vfile("rzfile: out of sync");
+						DPRINTF(DEBUG_TRANSFER, "rzfile: out of sync\n");
 						DO_SYSLOG(LOG_INFO, "%s/%s: error: out of sync",
 						   lrzsz_basename(zi->fname), protname());
 						return ERROR;
@@ -1883,13 +1888,13 @@ rzfile(struct zm_fileinfo *zi)
 			switch (c = zrdata(secbuf, LRZSZ_MAX_SUBPACKET_LEN, &bytes_in_block))
 			{
 			case ZCAN:
-				vfile("rzfile: zrdata returned %d", c);
+				DPRINTF(DEBUG_TRANSFER, "rzfile: zrdata returned %d\n", c);
 				DO_SYSLOG(LOG_INFO, "%s/%s: zrdata returned ZCAN",
 						   lrzsz_basename(zi->fname), protname());
 				return ERROR;
 			case ERROR:	/* CRC error */
 				if ( --n < 0) {
-					vfile("rzfile: zgethdr returned %d", c);
+					DPRINTF(DEBUG_TRANSFER, "rzfile: zgethdr returned %d\n", c);
 					DO_SYSLOG(LOG_INFO, "%s/%s: zrdata returned ERROR",
 							   lrzsz_basename(zi->fname), protname());
 					return ERROR;
@@ -1901,7 +1906,7 @@ rzfile(struct zm_fileinfo *zi)
 				if ( --n < 0) {
 					DO_SYSLOG(LOG_INFO, "%s/%s: zrdata returned TIMEOUT",
 							   lrzsz_basename(zi->fname), protname());
-					vfile("rzfile: zgethdr returned %d", c);
+					DPRINTF(DEBUG_TRANSFER, "rzfile: zgethdr returned %d\n", c);
 					return ERROR;
 				}
 				state = ST_ZRPOS;
@@ -1910,7 +1915,7 @@ rzfile(struct zm_fileinfo *zi)
 				n = 20;
 				putsec(zi, secbuf, bytes_in_block);
 				zi->bytes_received += bytes_in_block;
-				vfile("GOTCRCW: bytes_received=%ld, block=%zu, readline_left=%d",
+				DPRINTF(DEBUG_TRANSFER, "GOTCRCW: bytes_received=%ld, block=%zu, readline_left=%d\n",
 				      (long)zi->bytes_received, bytes_in_block, readline_left);
 				stohdr(zi->bytes_received);
 				zshhdr(ZACK | 0x80, Txhdr);
@@ -1920,7 +1925,7 @@ rzfile(struct zm_fileinfo *zi)
 				n = 20;
 				putsec(zi, secbuf, bytes_in_block);
 				zi->bytes_received += bytes_in_block;
-				vfile("GOTCRCQ: bytes_received=%ld, block=%zu, readline_left=%d",
+				DPRINTF(DEBUG_TRANSFER, "GOTCRCQ: bytes_received=%ld, block=%zu, readline_left=%d\n",
 				      (long)zi->bytes_received, bytes_in_block, readline_left);
 				stohdr(zi->bytes_received);
 				zshhdr(ZACK, Txhdr);
@@ -1936,7 +1941,7 @@ rzfile(struct zm_fileinfo *zi)
 				n = 20;
 				putsec(zi, secbuf, bytes_in_block);
 				zi->bytes_received += bytes_in_block;
-				vfile("GOTCRCE: bytes_received=%ld, block=%zu, readline_left=%d",
+				DPRINTF(DEBUG_TRANSFER, "GOTCRCE: bytes_received=%ld, block=%zu, readline_left=%d\n",
 				      (long)zi->bytes_received, bytes_in_block, readline_left);
 				state = ST_HDR;
 				continue;
@@ -2059,7 +2064,7 @@ ackbibi(void)
 {
 	int n;
 
-	vfile("ackbibi:");
+	DPRINTF(DEBUG_TRANSFER, "ackbibi:");
 	stohdr(0L);
 	for (n=3; --n>=0; ) {
 		purgeline(0);
@@ -2067,7 +2072,7 @@ ackbibi(void)
 		switch (READLINE_PF(100)) {
 		case 'O':
 			READLINE_PF(1);	/* Discard 2nd 'O' */
-			vfile("ackbibi complete");
+			DPRINTF(DEBUG_TRANSFER, "ackbibi complete\n");
 			return;
 		case RCDO:
 			return;

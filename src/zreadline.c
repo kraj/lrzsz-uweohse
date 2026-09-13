@@ -53,9 +53,8 @@ readline_internal(unsigned int timeout)
 	struct timeval *tvp;
 	int rc;
 
-	if (Verbose > 5)
-		vstringf("Calling read: timeout=%u/10s  readnum=%lu ",
-		  timeout, readline_readnum);
+	DPRINTF(DEBUG_READLINE, "Calling read: timeout=%u/10s  readnum=%lu ",
+	  timeout, readline_readnum);
 
 	if (no_timeout) {
 		tvp = NULL;
@@ -71,8 +70,8 @@ readline_internal(unsigned int timeout)
 	if (rc < 0) {
 		if (errno == EINTR)
 			return TIMEOUT;
-		if (Verbose > 5)
-			vstringf("select error: errno=%d:%s\n", errno, strerror(errno));
+		if (debugmode & DEBUG_READLINE)
+			DPRINTF(DEBUG_READLINE, "select error: errno=%d:%s\n", errno, strerror(errno));
 		stats_net_error();
 		return ERROR;
 	}
@@ -82,11 +81,11 @@ readline_internal(unsigned int timeout)
 	readline_ptr=readline_buffer;
 	readline_left=read(readline_fd, readline_ptr, readline_readnum);
 	stats_net_read(readline_left);
-	if (Verbose > 5) {
-		vstringf("Read returned %d bytes\n", readline_left);
+	if (debugmode & DEBUG_READLINE) {
+		DPRINTF(DEBUG_READLINE, "Read returned %d bytes\n", readline_left);
 		if (readline_left==-1)
-			vstringf("errno=%d:%s\n", errno,strerror(errno));
-		if (Verbose > 9 && readline_left>0) {
+			DPRINTF(DEBUG_READLINE, "errno=%d:%s\n", errno,strerror(errno));
+		if (readline_left>0) {
 			int i,j;
 			j=readline_left > 48 ? 48 : readline_left;
 			vstring("    ");
@@ -100,16 +99,16 @@ readline_internal(unsigned int timeout)
 	}
 	if (readline_left == 0) {
 		/* EOF: carrier lost, peer closed the line */
-		if (Verbose > 5)
-			vstringf("read: EOF on the line\n");
+		if (debugmode & DEBUG_READLINE)
+			DPRINTF(DEBUG_READLINE, "read: EOF on the line\n");
 		stats_net_error();
 		return RCDO;
 	}
 	if (readline_left < 0) {
 		if (errno == EINTR)
 			return TIMEOUT;
-		if (Verbose > 5)
-			vstringf("read error: errno=%d:%s\n", errno, strerror(errno));
+		if (debugmode & DEBUG_READLINE)
+			DPRINTF(DEBUG_READLINE, "read error: errno=%d:%s\n", errno, strerror(errno));
 		stats_net_error();
 		return ERROR;
 	}

@@ -154,7 +154,7 @@ zgethex(void)
 	int c;
 
 	c = zgeth1();
-	VPRINTF(9, "zgethex: %02X", (unsigned int) c);
+	DPRINTF(DEBUG_PROTOCOL, "zgethex: %02X", (unsigned int) c);
 	return c;
 }
 
@@ -256,7 +256,7 @@ zdlread2(int c)
 		 * non-Esc8 peers. */
 		if ((c & 0x60) == 0x40 || ((c ^ 0x40) & 0x80))
 			return (c ^ 0x40);
-		VPRINTF(2, _("Bad escape sequence 0x%x"), (unsigned int) c);
+		zperr(_("Bad escape sequence 0x%x"), (unsigned int) c);
 		return ERROR;
 	}
 }
@@ -349,7 +349,7 @@ zsbhdr(int type, unsigned char *hdr)
 	int n;
 	unsigned short crc;
 
-	VPRINTF(3, "zsbhdr: %s %lx", frametype_to_string(type), rclhdr(hdr));
+	DPRINTF(DEBUG_PROTOCOL, "zsbhdr: %s %lx", frametype_to_string(type), rclhdr(hdr));
 	if (type == ZDATA)
 		for (n = Znulls; --n >=0; )
 			xsendline(0);
@@ -405,7 +405,7 @@ zshhdr(int type, unsigned char *hdr)
 	unsigned char s[30];
 	size_t len;
 
-	VPRINTF(3, "zshhdr: %s %lx", frametype_to_string(type & 0x7f), rclhdr(hdr));
+	DPRINTF(DEBUG_PROTOCOL, "zshhdr: %s %lx", frametype_to_string(type & 0x7f), rclhdr(hdr));
 	s[0]=ZPAD;
 	s[1]=ZPAD;
 	s[2]=ZDLE;
@@ -460,7 +460,7 @@ zsdata(const char *buf, size_t length, int frameend)
 {
 	unsigned short crc;
 
-	VPRINTF(3, "zsdata: %lu %s", (unsigned long) length,
+	DPRINTF(DEBUG_PROTOCOL, "zsdata: %lu %s", (unsigned long) length,
 		Zendnames[(frameend-ZCRCE)&3]);
 	crc = 0;
 
@@ -486,7 +486,7 @@ zsda32(const char *buf, size_t length, int frameend)
 	int c;
 	unsigned long crc;
 	int i;
-	VPRINTF(3, "zsdat32: %lu %s", length, Zendnames[(frameend-ZCRCE)&3]);
+	DPRINTF(DEBUG_PROTOCOL, "zsdat32: %lu %s", length, Zendnames[(frameend-ZCRCE)&3]);
 
 	crc = 0xFFFFFFFFL;
         stats_msg_valid(length);
@@ -592,10 +592,10 @@ crcfoo:
                                         stats_msg_valid(0);
 					*bytes_received = length - (end - buf);
 					if (crc32)
-						VPRINTF(3, "zrdat32: %lu %s", (unsigned long) *bytes_received,
+						DPRINTF(DEBUG_PROTOCOL, "zrdat32: %lu %s", (unsigned long) *bytes_received,
 							Zendnames[(d-GOTCRCE)&3]);
 					else
-						VPRINTF(3, "zrdata: %lu  %s", (unsigned long) (*bytes_received),
+						DPRINTF(DEBUG_PROTOCOL, "zrdata: %lu  %s", (unsigned long) (*bytes_received),
 								Zendnames[(d-GOTCRCE)&3]);
 					return d;
 				}
@@ -703,19 +703,22 @@ zgethdr(unsigned char *hdr, int eflag, size_t *Rxpos)
 			}
 			/* garbage byte: count it, maybe display it */
 			garbage_count++;
-			if (Verbose > 2 && (garbage_count <= 3 || garbage_count % 1000 == 0))
-				vfile("zgethdr: garbage[%d]=0x%02x, max_garbage_left=%u",
-				      garbage_count, (unsigned int) (c & 0xff), max_garbage);
+			if ((debugmode & DEBUG_PROTOCOL)
+			    && (garbage_count <= 3 || garbage_count % 1000 == 0))
+				DPRINTF(DEBUG_PROTOCOL,
+					"zgethdr: garbage[%d]=0x%02x, max_garbage_left=%u",
+					garbage_count, (unsigned int) (c & 0xff), max_garbage);
 			if ( --max_garbage == 0) {
-				if (Verbose > 2)
-					vfile("zgethdr: garbage count exceeded after %d bytes",
-					      garbage_count);
+				if (debugmode & DEBUG_PROTOCOL)
+					DPRINTF(DEBUG_PROTOCOL,
+						"zgethdr: garbage count exceeded after %d bytes",
+						garbage_count);
 				zperr(_("Garbage count exceeded"));
 				return(ERROR);
 			}
-			if (eflag && ((c &= 0x7f) & 0x60) && Verbose)
+			if (eflag && ((c &= 0x7f) & 0x60) && (debugmode & DEBUG_PROTOCOL))
 				vchar(c);
-			else if (eflag > 1 && Verbose)
+			else if (eflag > 1 && (debugmode & DEBUG_PROTOCOL))
 				vchar(c);
 			reset_cancount = true;	/* the old goto startover */
 			continue;
@@ -847,10 +850,10 @@ zgethdr(unsigned char *hdr, int eflag, size_t *Rxpos)
 	}
 	/* ex fifi label: the common epilogue. rxpos is 0 here unless a header
 	 * was dispatched (the success arms set it above). */
-	if (Verbose > 2)
-		vfile("zgethdr: returning %d (%s) after %d garbage bytes, rxpos=%lx, readline_left=%d",
-		      c, frametype_to_string(c),
-		      garbage_count, (unsigned long)rxpos, readline_left);
+	DPRINTF(DEBUG_PROTOCOL,
+		"zgethdr: returning %d (%s) after %d garbage bytes, rxpos=%lx, readline_left=%d",
+		c, frametype_to_string(c),
+		garbage_count, (unsigned long)rxpos, readline_left);
         /* error accounting */
 	switch (c) {
 	case GOTCAN:
@@ -877,7 +880,7 @@ zgethdr(unsigned char *hdr, int eflag, size_t *Rxpos)
 	zperr(_("Got %s"), frametype_to_string(c));
 	/* FALLTHROUGH */
     default:
-		VPRINTF(3, "zgethdr: %s %lx", frametype_to_string(c), (unsigned long) rxpos);
+		DPRINTF(DEBUG_PROTOCOL, "zgethdr: %s %lx", frametype_to_string(c), (unsigned long) rxpos);
 	}
 	return c;
 }
@@ -997,7 +1000,7 @@ zputhex(unsigned int c, unsigned char *pos)
 {
 	static char	digits[]	= "0123456789abcdef";
 
-	VPRINTF(9, "zputhex: %02X", c);
+	DPRINTF(DEBUG_PROTOCOL, "zputhex: %02X", c);
 	pos[0]=digits[(c&0xF0)>>4];
 	pos[1]=digits[c&0x0F];
 }

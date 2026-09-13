@@ -99,4 +99,10 @@ bool lrzsz_bps_watchdog (const char *dbgname, long last_bps, double d,
 bool lrzsz_stop_time_reached (const char *dbgname, time_t now,
                               time_t stop_time, const char *fname);
 
+/* Parse a --debug argument: a comma separated list of module names
+ * (protocol, readline, transfer, windowhandling, tty) or "all"; the bits
+ * are ORed into the global debugmode. Returns false for an unknown name
+ * (after warning to stderr); the caller should exit with a usage error. */
+bool lrzsz_parse_debug (const char *spec);
+
 #endif

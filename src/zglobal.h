@@ -191,13 +191,23 @@ extern unsigned int Baudrate;
 
 LRZSZ_FORMAT_PRINTF(1,2) void zperr (const char *fmt, ...);
 LRZSZ_FORMAT_PRINTF(1,2) void zpfatal (const char *fmt, ...);
-LRZSZ_FORMAT_PRINTF(1,2) void vfile (const char *format, ...);
 #define vchar(x) putc(x,stderr)
 #define vstring(x) fputs(x,stderr)
 
 LRZSZ_FORMAT_PRINTF(1,2) void vstringf (const char *format, ...);
-#define VPRINTF(level, ...) do {if ((Verbose)>=(level)) \
-	vstringf(__VA_ARGS__) ; } while(0)
+
+/* Debug modules, selected with --debug=NAME[,NAME...] (see util.c).
+ * DPRINTF prints to stderr when any of the modules in mask is enabled. */
+#define DEBUG_PROTOCOL        0x01  /* ZMODEM frame state machine (zm.c) */
+#define DEBUG_READLINE        0x02  /* line reader: select/read/timeouts/hex (zreadline.c) */
+#define DEBUG_TRANSFER        0x04  /* file transfer state machine (lrz.c/lsz.c) */
+#define DEBUG_WINDOWHANDLING  0x08  /* adaptive blklen/window (lsz.c) */
+#define DEBUG_TTY             0x10  /* tty setup (rbsb.c) */
+#define DEBUG_ALL (DEBUG_PROTOCOL|DEBUG_READLINE|DEBUG_TRANSFER|DEBUG_WINDOWHANDLING|DEBUG_TTY)
+
+extern unsigned int debugmode;
+#define DPRINTF(mask, ...) do { if ((debugmode) & (mask)) \
+	vstringf(__VA_ARGS__); } while (0)
 
 /* rbsb.c */
 int from_cu (void);
