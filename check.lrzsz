@@ -187,7 +187,9 @@ doit() {
         MYSNIF=""
     fi
     TIMEOUT=""
-    if type "timeout" >/dev/null ; then
+    if test -n "$TIMEOUT_FLAGS" && type "timeout" >/dev/null ; then
+        TIMEOUT="timeout $TIMEOUT_FLAGS 35 ";
+    elif type "timeout" >/dev/null ; then
         TIMEOUT="timeout 35 ";
     fi
     
@@ -1780,32 +1782,47 @@ SEOF
     # nondeterministic, so this key must not be part of any
     # journal-counter baseline.
     #
+    # The waiter signals the sender via a pid file, not $PPID: shells do
+    # not re-evaluate $PPID inside a subshell (dash on Linux, OpenBSD ksh,
+    # bash), so there it still holds the *script's* parent — here the
+    # timeout(1) wrapper. Signaling that wrapper had wildly different
+    # results: GNU timeout happens to forward a caught SIGINT to the child
+    # (which made Linux pass by accident), while OpenBSD's timeout does
+    # setpgid(0,0) + killpg with SIGTERM, killing the transfer via the
+    # bibi handler. The sender runs under "timeout --foreground" so a
+    # stray signal is forwarded to the child instead of a process group
+    # kill; the long option is spelled out because GNU coreutils uses -f
+    # for --kill-after.
+    #
     key="zmodem-lsz-lrz-sigint"
     mkdir "$testdir/$key"
     cat > $testdir/run-sigint-sender.sh <<SEOF
 #! /bin/sh
 cd '$testdir/$key' || exit 1
 rm -f binary_1m
-# ^C this sender once the data phase is truly underway: the receiver has
+# \$\$ is this script's pid, which becomes the lsz pid via exec below.
+echo \$\$ >.lsz-pid
+# ^C the sender once the data phase is truly underway: the receiver has
 # written at least one byte to the partial file, which can only happen
 # after lsz entered zsendfdata() and installed the resync SIGINT handler.
-# A fixed sleep could fire during negotiation, where lsz still runs the
-# fatal bibi handler and dies (observed on OpenBSD). Bounded to ~8s so a
-# dead peer cannot stall the test.
+# Bounded to ~8s so a dead peer cannot stall the test.
 ( n=0
   while test \$n -lt 40 && test ! -s binary_1m ; do
       sleep 0.2
       n=\`expr \$n + 1\`
   done
-  kill -INT \$PPID ) &
+  read -r pid <.lsz-pid
+  kill -INT \$pid ) &
 # ignore the arguments doit() appends; send the 1 MiB payload by basename
 exec $SZ -q -Z ../binary_1m
 SEOF
     chmod +x $testdir/run-sigint-sender.sh
     FAULT="$SIMU -s 1 -f 9999999999 -r 1m"
+    TIMEOUT_FLAGS="--foreground"
     doit "$key" "^C mid-stream must resync and complete the transfer" \
         "$testdir/run-sigint-sender.sh" "$RZ -q -Z" cmp $binary_1m
     FAULT=
+    TIMEOUT_FLAGS=""
 }
 
 
