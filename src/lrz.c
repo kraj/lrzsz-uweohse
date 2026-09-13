@@ -76,7 +76,7 @@ bool zmodem_requested=false;
 
 static char *secbuf;
 
-#if defined(F_GETFD) && defined(F_SETFD) && defined(O_SYNC)
+#ifdef O_SYNC
 static int o_sync = 0;
 #endif
 static int rzfiles (struct zm_fileinfo *);
@@ -352,7 +352,7 @@ main(int argc, char *argv[])
                         startup_delay = (unsigned int) lrzsz_strtoul( "--delay-startup", optarg, NULL, 0, 0);
 			break;
 		case 5:
-#if defined(F_GETFD) && defined(F_SETFD) && defined(O_SYNC)
+#ifdef O_SYNC
 			o_sync=1;
 #else
 			lrzsz_warning(0, _("O_SYNC not supported by the kernel"));
@@ -1413,7 +1413,7 @@ setup_output_buffer(struct zm_fileinfo *zi, FILE *fp)
 {
         static char *s=NULL;
         static size_t last_length=0;
-#if defined(F_GETFL) && defined(F_SETFL) && defined(O_SYNC)
+#ifdef O_SYNC
         if (o_sync) {
                 int oldflags;
                 oldflags = fcntl (fileno(fp), F_GETFL, 0);
@@ -2032,11 +2032,7 @@ closeit(struct zm_fileinfo *zi)
 		timep.modtime = zi->modtime;
 		utime(Pathname, &timep);
 	}
-#ifdef S_ISREG
- 	if (S_ISREG(zi->mode)) {
-#else
-	if ((zi->mode&S_IFMT) == S_IFREG) {
-#endif
+	if (S_ISREG(zi->mode)) {
 		/* we must not make this program executable if running
 		 * under rsh, because the user might have uploaded an
 		 * unrestricted shell.

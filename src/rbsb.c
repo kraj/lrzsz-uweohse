@@ -35,14 +35,6 @@
 #include <sys/ioctl.h>
 #endif
 
-#ifdef MAJOR_IN_MKDEV
-#include <sys/mkdev.h>
-#else
-# ifdef MAJOR_IN_SYSMACROS
-# include <sys/sysmacros.h>
-# endif
-#endif
-
 static const struct {
 	unsigned baudr;
 	speed_t speedcode;
@@ -131,33 +123,19 @@ getspeed(speed_t code)
  *  different line
  */
 bool Fromcu;		/* Were called from cu or yam */
-int 
+int
 from_cu(void)
 {
 	struct stat a, b;
-#if defined(makedev)
-	dev_t help=makedev(0,0);
-#else
-	dev_t help=0;
-#endif
 
 	/* in case fstat fails */
-	a.st_rdev=b.st_rdev=a.st_dev=b.st_dev=help;
+	a.st_rdev=b.st_rdev=a.st_dev=b.st_dev=0;
 
 	fstat(1, &a); fstat(2, &b);
 
-#if defined(major) && defined(minor)
-	if (major(a.st_rdev) != major(b.st_rdev) 
-		|| minor(a.st_rdev) != minor(b.st_rdev))
-		Fromcu=1;
-	else if (major(a.st_dev) != major(b.st_dev) 
-		|| minor(a.st_dev) != minor(b.st_dev))
-		Fromcu=1;
-	else
-		Fromcu=0;
-#else
+	/* check only for device equality only. decomposing into major/minor 
+         * like before seems useless. */
 	Fromcu = (a.st_rdev != b.st_rdev) || (a.st_dev != b.st_dev);
-#endif
 	return Fromcu;
 }
 
