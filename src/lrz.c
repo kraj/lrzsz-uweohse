@@ -615,7 +615,7 @@ fubar:
 
         if (Pathname && keep_incomplete) {
             /* the partial file is kept for later --resume; the message may
-             * name a file never created (error before open) — harmless */
+             * name a file never created (error before open) - harmless */
             vstringf(_("\r\n%s: %s kept (incomplete).\r\n"),
                 lrzsz_progname, Pathname);
         } else if (Pathname) {
