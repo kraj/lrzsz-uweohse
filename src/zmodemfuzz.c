@@ -375,6 +375,7 @@ static int target_argc;
 static long seed = 0;
 static long iterations = 200;
 static long start_iteration = 0;
+static long current_iteration; /* for helpers outside the main loop */
 static int alarm_seconds = 25;
 static int do_selftest = 0;
 static int keep_dirs = 0;
@@ -486,7 +487,14 @@ spawn_target(void)
 		int i;
 		signal(SIGALRM, SIG_DFL);
 		alarm((unsigned)alarm_seconds);
-		if (chdir(recvdir) != 0)
+		/* receive mode: the child must chdir into the receiving
+		 * directory so received files land there (and the escape
+		 * canaries around it are meaningful).
+		 * send mode: the target only READS files (its file
+		 * arguments are relative to the caller's cwd) and writes
+		 * nothing to disk, so keep the caller's cwd — otherwise
+		 * relative file arguments like ./test/4k.bin break. */
+		if (mode_receive && chdir(recvdir) != 0)
 			_exit(126);
 		if (mem_limit
 		    && setrlimit(RLIMIT_AS,
@@ -524,8 +532,10 @@ spawn_target(void)
 static void
 close_pipes(void)
 {
+	if (to_target[1] >= 0)
+		close(to_target[1]);
+	to_target[1] = -1;
 	close(to_target[0]);
-	close(to_target[1]);
 	close(from_target[0]);
 	close(from_target[1]);
 	close(target_stderr[0]);
@@ -772,9 +782,22 @@ fail(const char *what, long it, int exitcode)
 	fprintf(stderr, "FAIL iter %ld: %s (exit %d, transcript: %s)\n",
 		it, what, exitcode, path);
 	if (stderr_len) {
+		/* full stderr next to the fail transcript (the on-stderr
+		 * excerpt stays capped at 800 bytes) */
+		char spath[768];
+		FILE *f;
 		fprintf(stderr, "  target stderr: %.*s\n",
 			(int)(stderr_len < 800 ? stderr_len : 800),
 			stderr_capture);
+		snprintf(spath, sizeof spath,
+			 "/tmp/zmodemfuzz-fail-seed%ld-it%ld.stderr",
+			 seed, it);
+		f = fopen(spath, "wb");
+		if (f) {
+			fwrite(stderr_capture, 1, stderr_len, f);
+			fclose(f);
+			fprintf(stderr, "  full target stderr: %s\n", spath);
+		}
 	}
 }
 
@@ -1057,12 +1080,166 @@ build_zfile_data(unsigned char *dst, size_t dstcap, const char *name,
 /* one clean transfer exchange against lrz; every parameter can be
  * corrupted per the mutation matrix. Returns 0 = ok. */
 
+/* --- mutation parameters (bounded corruption, deterministic) --- */
+
+/* per-iteration mutation parameters, drawn from the main xorshift
+ * stream so -s/-S stay deterministic. draw_mut_params() is the SINGLE
+ * source of the draw sequence: both fuzz_receive_iter() and
+ * fast_forward_rng() call it, which keeps the mirror exact by
+ * construction. */
+struct mut_params {
+	int n_flips;		/* M_BYTEFLIP: number of bit flips */
+	int flip_off;		/* M_BYTEFLIP: first flip position */
+	int flip_bit;		/* M_BYTEFLIP: bit index (0..7) */
+	int crc_n;		/* M_CRC16/32: CRC bytes to corrupt */
+	int crc_off;		/* M_CRC16/32: offset of the CRC byte */
+	int frame_type;		/* M_FRAMETYPE: substitute frame type */
+	int frame_off;		/* M_FRAMETYPE: position to substitute */
+	int ill_n;		/* M_ZDLE_ILL: illegal escapes to inject */
+	int ill_off;		/* M_ZDLE_ILL: injection offset */
+	int pos_mode;		/* M_POSITION: 0=0, 1=max, 2=pos-1, 3=pos+1 */
+	int flags_bits;		/* M_FLAGS: bits to XOR into flag bytes */
+	int flags_off;		/* M_FLAGS: position to corrupt */
+	int garb_n;		/* M_GARBAGE: noise bytes to inject */
+	int garb_off;		/* M_GARBAGE: injection offset */
+	unsigned char garb[64];	/* M_GARBAGE: the noise bytes themselves */
+	int can_n;		/* M_CANCAN: CAN bytes to inject */
+	int can_off;		/* M_CANCAN: injection offset */
+	int trunc_stop;		/* M_TRUNC: stop after this many subpackets */
+	int eof_after_zfile;	/* M_EOF: drop the line after ZRPOS */
+};
+
+static struct mut_params mut;
+
+/* Draw all bounded mutation parameters for one iteration. `mc` selects
+ * which fields are actually consumed; the draws happen in a fixed order
+ * so the sequence is reproducible regardless of how the consumer uses
+ * the values. */
+static void
+draw_mut_params(enum mclass mc)
+{
+	mut.n_flips = (mc == M_BYTEFLIP) ? 1 + (int)rng_below(8) : 0;
+	mut.flip_off = (int)rng_below(256);
+	mut.flip_bit = (int)rng_below(8);
+	mut.crc_n = (mc == M_CRC16 || mc == M_CRC32) ? 1 + (int)rng_below(2)
+	    : 0;
+	mut.crc_off = (int)rng_below(64);
+	mut.frame_type = (mc == M_FRAMETYPE) ? (int)rng_below(32) : 0;
+	mut.frame_off = (int)rng_below(32);
+	mut.ill_n = (mc == M_ZDLE_ILL) ? 1 + (int)rng_below(4) : 0;
+	mut.ill_off = (int)rng_below(128);
+	mut.pos_mode = (mc == M_POSITION) ? (int)rng_below(4) : -1;
+	mut.flags_bits = (mc == M_FLAGS) ? (int)(rng_next() & 0xff) : 0;
+	mut.flags_off = (int)rng_below(48);
+	mut.garb_n = (mc == M_GARBAGE) ? 1 + (int)rng_below(64) : 0;
+	mut.garb_off = (int)rng_below(512);
+	{
+		int k;
+		for (k = 0; k < mut.garb_n && k < 64; k++)
+			mut.garb[k] = (unsigned char)rng_next();
+	}
+	mut.can_n = (mc == M_CANCAN) ? 2 + (int)rng_below(8) : 0;
+	mut.can_off = (int)rng_below(128);
+	mut.trunc_stop = (mc == M_TRUNC) ? (int)rng_below(9) : -1;
+	mut.eof_after_zfile = (mc == M_EOF) ? 1 : 0;
+}
+
+/* inject n bytes at offset off into the built frame (clamped); used by
+ * M_GARBAGE and M_CANCAN */
+static void
+inject_bytes(size_t off, const unsigned char *bytes, size_t n)
+{
+	size_t i;
+	if (off > outpos)
+		off = outpos;
+	if (n > sizeof outbuf - outpos)
+		n = sizeof outbuf - outpos > n ? n : 0;
+	if (n == 0)
+		return;
+	memmove(outbuf + off + n, outbuf + off, outpos - off);
+	for (i = 0; i < n; i++)
+		outbuf[off + i] = bytes[i];
+	outpos += n;
+}
+
+/* mutate the freshly built frame in outbuf[0..outpos) according to the
+ * drawn parameters, then send it. Clean classes pass through untouched.
+ * Mutations only apply to data-path frames (ZDATA header, subpackets,
+ * ZEOF): corrupting the handshake frames wedges the session state machine
+ * (the receiver ZNAKs forever) instead of exercising the data path, which
+ * is what the bounded classes are for. Session-level mutations (M_TRUNC,
+ * M_EOF, M_NAME) act on the exchange, not on these frames. */
+static void
+mut_send(enum mclass mc, int data_frame)
+{
+	int i;
+
+	if (!data_frame || mc == M_NONE || mc == M_NAME || mc == M_CRCMODE
+	    || mc == M_TRUNC || mc == M_EOF) {
+		send_bytes(outbuf, outpos);
+		return;
+	}
+
+	if (mc == M_BYTEFLIP) {
+		for (i = 0; i < mut.n_flips; i++) {
+			size_t off = (size_t)mut.flip_off + (size_t)i * 7;
+			if (outpos == 0)
+				break;
+			off %= outpos;
+			outbuf[off] ^= (unsigned char)(1 << mut.flip_bit);
+		}
+	} else if (mc == M_CRC16 || mc == M_CRC32) {
+		/* corrupt the trailing CRC bytes of the frame: they sit
+		 * right before the ZDLE+terminator pair (2 bytes), i.e. at
+		 * outpos-4 .. outpos-3 (16-bit) or outpos-6..-3 (32-bit) */
+		for (i = 0; i < mut.crc_n; i++) {
+			size_t off = outpos >= 6
+			    ? outpos - 4 - (size_t)i : 0;
+			outbuf[off] ^= 0xa5;
+		}
+	} else if (mc == M_FRAMETYPE) {
+		/* the frame-type byte is the first byte after the ZDLE+ind
+		 * pair (outbuf[3] for binary, hex digit pair start for hex);
+		 * simplest reliable target: XOR a few bytes near the front */
+		size_t off = (size_t)mut.frame_off % (outpos ? outpos : 1);
+		outbuf[off] ^= (unsigned char)(mut.frame_type & 0x1f);
+	} else if (mc == M_ZDLE_ILL) {
+		unsigned char ill[4];
+		for (i = 0; i < mut.ill_n && i < 4; i++)
+			ill[i] = ZDLE;
+		inject_bytes((size_t)mut.ill_off, ill, (size_t)(i ? i : 1));
+	} else if (mc == M_FLAGS) {
+		size_t off = (size_t)mut.flags_off % (outpos ? outpos : 1);
+		outbuf[off] ^= (unsigned char)mut.flags_bits;
+	} else if (mc == M_GARBAGE) {
+		/* mut.garb[] was drawn in draw_mut_params(): rng draws must
+		 * never happen at send time or -S fast-forward desyncs */
+		inject_bytes((size_t)mut.garb_off, mut.garb, (size_t)mut.garb_n);
+	} else if (mc == M_CANCAN) {
+		unsigned char cans[9];
+		for (i = 0; i < mut.can_n && i < 9; i++)
+			cans[i] = CAN;
+		inject_bytes((size_t)mut.can_off, cans, (size_t)i);
+	} else if (mc == M_POSITION) {
+		/* corrupt a position byte inside a data header: the four
+		 * position bytes of binary headers live at outbuf[5..8] */
+		if (outpos >= 9) {
+			size_t off = 5 + (size_t)(mut.pos_mode & 3) % 4;
+			static const unsigned char pm[4] =
+			    { 0x00, 0xff, 0xfe, 0x7f };
+			outbuf[off] = pm[mut.pos_mode & 3];
+		}
+	}
+	send_bytes(outbuf, outpos);
+}
+
 /* fast-forward the PRNG over iterations 0..it-1 without running the
  * target: replay exactly the draws a real run made, so iteration `it`
  * starts with the identical rng_state and behaves byte-for-byte like
  * it did in the original run. Mirrors the main loop's per-iteration
  * draw order: build_payload(), mutation class, optional hostile-name
- * pick, then fuzz_receive_iter()'s payload length and payload bytes. */
+ * pick, then fuzz_receive_iter()'s payload length and payload bytes
+ * plus draw_mut_params(). */
 static void
 fast_forward_rng(long it)
 {
@@ -1078,6 +1255,7 @@ fast_forward_rng(long it)
 			(void)rng_below(N_HOSTILE);
 		build_payload(); /* fuzz_receive_iter()'s own call */
 		payload_len = 1 + rng_below(20000);
+		draw_mut_params((enum mclass)mc);
 		{
 			size_t k;
 			for (k = 0; k < payload_len; k++)
@@ -1103,6 +1281,7 @@ fuzz_receive_iter(int it, enum mclass mc, int *exitcode)
 	 * transfer hard to establish; corrupted-CRC scenarios do not
 	 * need a working CRC32 either, so it is never negotiated here */
 	crc32 = 0;
+	draw_mut_params(mc);
 	{
 		size_t i;
 		for (i = 0; i < payload_len; i++)
@@ -1121,7 +1300,7 @@ fuzz_receive_iter(int it, enum mclass mc, int *exitcode)
 			out_reset();
 			build_hexhdr(ZRQINIT, hdr);
 			tr_mark("> ZRQINIT try %d", tries);
-			send_bytes(outbuf, outpos);
+			mut_send(mc, 0);
 			rp_init(&rp);
 			if (read_frame(&rp, &fb, 2000) && fb.type == ZRINIT) {
 				got_zrinit = 1;
@@ -1137,7 +1316,7 @@ fuzz_receive_iter(int it, enum mclass mc, int *exitcode)
 		}
 
 		/* 3. ZFILE with (possibly hostile) name */
-			tr_mark("# entering ZFILE phase");
+			tr_mark("# entering ZFILE phase (class=%d)", (int)mc);
 		{
 			unsigned char zdata[1200];
 			size_t zlen;
@@ -1170,11 +1349,18 @@ fuzz_receive_iter(int it, enum mclass mc, int *exitcode)
 			}
 			tr_mark("> ZFILE name=%s len=%lu crc32=%d",
 				name, (unsigned long)payload_len, crc32);
-			send_bytes(outbuf, outpos);
+			mut_send(mc, 0);
 
 			/* expect ZRPOS (or ZCRC first) */
 			rp_init(&rp);
 			{
+				/* junk frames (ZNAK etc.) tolerated up to 3
+				 * times per exchange: the counter MUST be
+				 * per-iteration — a function-static leaked
+				 * across iterations and permanently broke
+				 * the exchange wait after 3 junk frames
+				 * had accumulated in earlier iterations */
+				int znaks = 0;
 				while (read_frame(&rp, &fb, 2500)) {
 					if (fb.type == ZRPOS)
 						break;
@@ -1196,7 +1382,7 @@ fuzz_receive_iter(int it, enum mclass mc, int *exitcode)
 						chdr[3] = (crc >> 24) & 0xff;
 						out_reset();
 						build_hexhdr(ZCRC, chdr);
-						send_bytes(outbuf, outpos);
+						mut_send(mc, 0);
 						continue;
 					}
 					if (fb.type == ZCAN || fb.type == ZSKIP
@@ -1204,13 +1390,18 @@ fuzz_receive_iter(int it, enum mclass mc, int *exitcode)
 					    || fb.type == ZFERR) {
 						goto finish;
 					}
-					/* ZNAK etc: resend ZFILE up to 3 times */
-					{
-						static int znaks;
-						if (++znaks > 3)
-							break;
-					}
+					if (++znaks > 3)
+						break;
 				}
+			}
+			/* M_EOF: premature line drop right after the file
+			 * offer was acknowledged — the receiver sees the
+			 * carrier go away mid-session */
+			if (mut.eof_after_zfile) {
+				tr_mark("# dropping the line (M_EOF)");
+				close(to_target[1]);
+				to_target[1] = -1;
+				target_dead = 1;
 			}
 		}
 
@@ -1232,7 +1423,7 @@ fuzz_receive_iter(int it, enum mclass mc, int *exitcode)
 				build_binhdr32(ZDATA, hdr);
 			else
 				build_binhdr16(ZDATA, hdr, ctlesc);
-			send_bytes(outbuf, outpos);
+			mut_send(mc, 1);
 			tr_mark("> ZDATA pos=0 (single header)");
 			while (off < payload_len && !done) {
 				size_t chunk = payload_len - off;
@@ -1261,13 +1452,27 @@ fuzz_receive_iter(int it, enum mclass mc, int *exitcode)
 				tr_mark("> subpacket pos=%lu chunk=%lu term=%c",
 					(unsigned long)off,
 					(unsigned long)chunk, term);
-				send_bytes(outbuf, outpos);
+				mut_send(mc, 1);
 				off += chunk;
+				/* M_TRUNC: cut the stream after a bounded
+				 * number of subpackets — the receiver is
+				 * left waiting for data that never comes */
+				if (mut.trunc_stop >= 0
+				    && (int)(off / 1024) >= mut.trunc_stop) {
+					tr_mark("# truncating stream after "
+						"%d subpackets",
+						mut.trunc_stop);
+					sent_pos = off;
+					goto after_data;
+				}
 			}
 			sent_pos = payload_len;
 		}
-
-		/* 5. ZEOF */
+after_data:
+		/* 5. ZEOF (skipped after M_TRUNC: the receiver is left
+		 * hanging mid-stream — that is the mutation) */
+		if (mut.trunc_stop >= 0)
+			goto finish;
 		{
 			unsigned char hdr[4];
 			hdr[0] = sent_pos & 0xff;
@@ -1277,7 +1482,7 @@ fuzz_receive_iter(int it, enum mclass mc, int *exitcode)
 			out_reset();
 			build_hexhdr(ZEOF, hdr);
 			tr_mark("> ZEOF pos=%lu", (unsigned long)sent_pos);
-			send_bytes(outbuf, outpos);
+			mut_send(mc, 1);
 		}
 
 		/* 6. wait for ZRINIT (next file) or ZFIN/skip, then ZFIN */
@@ -1317,7 +1522,7 @@ fuzz_receive_iter(int it, enum mclass mc, int *exitcode)
 				out_reset();
 				build_hexhdr(ZFIN, hdr);
 				tr_mark("> ZFIN (final)");
-				send_bytes(outbuf, outpos);
+				mut_send(mc, 0);
 				/* complete the close handshake: the receiver
 				 * answers ZFIN, then expects the "OO" —
 				 * without it it lingers in bounded retries */
@@ -1334,7 +1539,6 @@ fuzz_receive_iter(int it, enum mclass mc, int *exitcode)
 	}
 finish:
 	(void)it;
-	(void)mc;
 	(void)exitcode;
 	return 0;
 }
@@ -1575,6 +1779,21 @@ teardown_iteration(void)
 		fclose(transcript);
 		transcript = NULL;
 	}
+	/* persist the target's stderr next to the transcript; with -k it
+	 * stays in the working dir, otherwise it is deleted again with
+	 * the dir below (failures copy it to /tmp first, see fail()) */
+	if (stderr_len) {
+		char sp[1100];
+		FILE *f;
+		snprintf(sp, sizeof sp,
+			 "%s/target-stderr-%ld-it%ld.log",
+			 fuzzdir, seed, current_iteration);
+		f = fopen(sp, "wb");
+		if (f) {
+			fwrite(stderr_capture, 1, stderr_len, f);
+			fclose(f);
+		}
+	}
 	if (keep_dirs)
 		return; /* debugging: keep the working tree */
 	snprintf(cmd, sizeof cmd, "rm -rf %s", fuzzdir);
@@ -1667,10 +1886,16 @@ usage(void)
 "  -n N        iterations (default 200; FUZZITER overrides when -n is absent)\n"
 "  -S N        fast-forward to iteration N: replay the PRNG draws of\n"
 "              iterations 0..N-1 without running the target, then run\n"
-"              iterations N..N-1+(-n N) (receive mode only)\n"
-"  -t SEC      per-iteration timeout in seconds (default 20)\n"
+"              iterations N..N-1+(-n N) (receive mode only). NOTE: the\n"
+"              draw sequence is only stable within one binary — changes\n"
+"              to the mutation code invalidate older seeds' offsets\n"
+"  -t SEC      per-iteration timeout in seconds (default 20). Keep this\n"
+"              at 8s or more for exploratory runs: the receiver has a\n"
+"              fixed 10s internal retry wait, and smaller values cut\n"
+"              recovery paths short and make clean baselines flaky.\n"
+"              Small values (1-5s) are fine for targeted -S replays.\n"
 "  -k          keep the per-iteration working directory (debugging)\n"
-"  -P, --progress  print a progress line after every iteration\n"
+"  -P, --progress  print a progress line (with elapsed ms) per iteration\n"
 "  --selftest  run the clean-baseline exchange only\n");
 	exit(2);
 }
@@ -1726,14 +1951,18 @@ main(int argc, char *argv[])
 	/* the child chdir()s to the receiving directory: make every target
 	 * argument that names an executable a path relative to OUR cwd, so
 	 * relative invocations keep working (this covers nested execs like
-	 * zmodemsnif lrz) */
+	 * zmodemsnif lrz). This matters because the child chdirs into the
+	 * working directory before exec. Absolute paths (leading '/') must
+	 * NOT be touched: rewriting "/bin/true" produced
+	 * "<cwd>//bin/true" and a confusing exit 127. */
 	{
 		static char abspath[68][4096];
 		char cwd[2048];
 		int ai;
 		if (getcwd(cwd, sizeof cwd) != NULL) {
 			for (ai = 0; ai < target_argc; ai++) {
-				if (target_argv[ai][0] == '-')
+				if (target_argv[ai][0] == '-'
+				    || target_argv[ai][0] == '/')
 					continue;
 				if (access(target_argv[ai], X_OK) != 0)
 					continue;
@@ -1784,8 +2013,12 @@ main(int argc, char *argv[])
 		for (it = start_iteration; it < iterations; it++) {
 			int exitcode = 0;
 			const char *bad;
+			struct timespec ts_start;
+			struct timespec ts_end;
+			current_iteration = it;
 			setup_iteration();
 			build_payload();
+			clock_gettime(CLOCK_MONOTONIC, &ts_start);
 			if (pipe(to_target) < 0 || pipe(from_target) < 0
 			    || pipe(target_stderr) < 0)
 				die("pipe: %s", strerror(errno));
@@ -1854,13 +2087,24 @@ main(int argc, char *argv[])
 			}
 			close_pipes();
 			teardown_iteration();
-			if (show_progress) {
-				fprintf(stderr,
-					"zmodemfuzz: %ld/%ld iters, %d failures\n",
-					it + 1, iterations, failures);
-			} else if ((it % 20) == 19) {
-				fprintf(stderr, "zmodemfuzz: %ld/%ld iters, %d failures\n",
-					it + 1, iterations, failures);
+			clock_gettime(CLOCK_MONOTONIC, &ts_end);
+			{
+				long ms = (ts_end.tv_sec - ts_start.tv_sec)
+				    * 1000L
+				    + (ts_end.tv_nsec - ts_start.tv_nsec)
+				    / 1000000L;
+				if (show_progress) {
+					fprintf(stderr,
+						"zmodemfuzz: %ld/%ld iters, "
+						"%d failures, %ld ms\n",
+						it + 1, iterations, failures,
+						ms);
+				} else if ((it % 20) == 19) {
+					fprintf(stderr,
+						"zmodemfuzz: %ld/%ld iters, "
+						"%d failures\n",
+						it + 1, iterations, failures);
+				}
 			}
 		}
 		fprintf(stderr, "zmodemfuzz: done, %ld iterations, %d failures\n",
