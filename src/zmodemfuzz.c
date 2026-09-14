@@ -1047,6 +1047,18 @@ enum mclass {
 	N_MCLASS
 };
 
+/* --- per-class run statistics (for the end-of-run summary) --- */
+struct class_stats {
+	long count;
+	long total_ms;
+	long max_ms;
+	long hangs; /* target waited until the alarm */
+	long fails;
+};
+static struct class_stats rx_stats[N_MCLASS];   /* receive mode: class */
+static struct class_stats tx_stats[12];         /* send mode: choice */
+static int send_choice = -1;
+
 /* build one ZFILE metadata subpacket around `name` */
 static size_t
 build_zfile_data(unsigned char *dst, size_t dstcap, const char *name,
@@ -1551,6 +1563,11 @@ fuzz_send_iter(void)
 	struct rparser rp;
 	struct framebuf fb;
 	int crc32 = 0;
+	/* byte-level mutation class for the receiver's own frames: the
+	 * mirror of receive mode. The 12-way choice below still decides
+	 * the session-level behavior; mc corrupts the answer frames. */
+	enum mclass mc = (enum mclass)(rng_below(N_MCLASS - 1) + 1);
+	draw_mut_params(mc);
 
 	/* wait for the first ZRQINIT */
 	rp_init(&rp);
@@ -1565,7 +1582,7 @@ fuzz_send_iter(void)
 		out_reset();
 		build_hexhdr(ZRINIT, hdr);
 		tr_mark("< ZRINIT (hostile receiver ready)");
-		send_bytes(outbuf, outpos);
+		send_bytes(outbuf, outpos); /* session init: never mutated */
 		rp_init(&rp);
 		if (read_frame(&rp, &fb, 5000)) {
 			if (fb.type == ZFILE || fb.type == ZSINIT)
@@ -1575,6 +1592,7 @@ fuzz_send_iter(void)
 	/* now ZFILE arrived: decide hostile answer */
 	{
 		unsigned int choice = rng_below(12);
+		send_choice = (int)choice;
 		switch (choice) {
 		case 0: /* never respond: lsz must hit its retry bounds */
 			drain_target();
@@ -1585,7 +1603,7 @@ fuzz_send_iter(void)
 				unsigned char h[4] = { 0, 0, 0, 0 };
 				out_reset();
 				build_hexhdr(ZNAK, h);
-				send_bytes(outbuf, outpos);
+				mut_send(mc, 1);
 				read_frame(&rp, &fb, 2000);
 			}
 			break;
@@ -1595,7 +1613,7 @@ fuzz_send_iter(void)
 			out_reset();
 			build_hexhdr(ZSKIP, h);
 			tr_mark("< ZSKIP");
-			send_bytes(outbuf, outpos);
+			mut_send(mc, 1);
 			read_frame(&rp, &fb, 3000);
 			break;
 		}
@@ -1604,13 +1622,13 @@ fuzz_send_iter(void)
 			out_reset();
 			build_hexhdr(ZABORT, h);
 			tr_mark("< ZABORT");
-			send_bytes(outbuf, outpos);
+			mut_send(mc, 1);
 			read_frame(&rp, &fb, 5000);
 			{
 				unsigned char h2[4] = { 0, 0, 0, 0 };
 				out_reset();
 				build_hexhdr(ZFIN, h2);
-				send_bytes(outbuf, outpos);
+				mut_send(mc, 1);
 			}
 			break;
 		}
@@ -1619,13 +1637,13 @@ fuzz_send_iter(void)
 			out_reset();
 			build_hexhdr(ZFERR, h);
 			tr_mark("< ZFERR");
-			send_bytes(outbuf, outpos);
+			mut_send(mc, 1);
 			read_frame(&rp, &fb, 5000);
 			{
 				unsigned char h2[4] = { 0, 0, 0, 0 };
 				out_reset();
 				build_hexhdr(ZFIN, h2);
-				send_bytes(outbuf, outpos);
+				mut_send(mc, 1);
 			}
 			break;
 		}
@@ -1633,13 +1651,13 @@ fuzz_send_iter(void)
 			unsigned char h[4] = { 0, 0, 0, 0 };
 			out_reset();
 			build_hexhdr(ZCRC, h);
-			send_bytes(outbuf, outpos);
+			mut_send(mc, 1);
 			read_frame(&rp, &fb, 3000);
 			{
 				unsigned char h2[4] = { 0, 0, 0, 0 };
 				out_reset();
 				build_hexhdr(ZSKIP, h2);
-				send_bytes(outbuf, outpos);
+				mut_send(mc, 1);
 			}
 			break;
 		}
@@ -1648,7 +1666,7 @@ fuzz_send_iter(void)
 			out_reset();
 			build_hexhdr(ZCHALLENGE, h);
 			tr_mark("< ZCHALLENGE (protocol-hostile)");
-			send_bytes(outbuf, outpos);
+			mut_send(mc, 1);
 			read_frame(&rp, &fb, 2000);
 			break;
 		}
@@ -1657,7 +1675,7 @@ fuzz_send_iter(void)
 			out_reset();
 			build_hexhdr(ZRPOS, h);
 			tr_mark("< ZRPOS 0x7fffffff");
-			send_bytes(outbuf, outpos);
+			mut_send(mc, 1);
 			read_frame(&rp, &fb, 3000);
 			break;
 		}
@@ -1677,7 +1695,7 @@ fuzz_send_iter(void)
 						       CANFDX | CANOVIO };
 				out_reset();
 				build_hexhdr(ZRINIT, h);
-				send_bytes(outbuf, outpos);
+				mut_send(mc, 1);
 				read_frame(&rp, &fb, 1000);
 			}
 			break;
@@ -1687,7 +1705,7 @@ fuzz_send_iter(void)
 			out_reset();
 			build_hexhdr(ZFIN, h);
 			tr_mark("< ZFIN (receiver quits)");
-			send_bytes(outbuf, outpos);
+			mut_send(mc, 1);
 			read_frame(&rp, &fb, 3000);
 			break;
 		}
@@ -1695,13 +1713,13 @@ fuzz_send_iter(void)
 			unsigned char h[4] = { 0, 0, 0, 0 };
 			out_reset();
 			build_hexhdr(ZRPOS, h);
-			send_bytes(outbuf, outpos);
+			mut_send(mc, 1);
 			read_frame(&rp, &fb, 3000);
 			{
 				unsigned char h2[4] = { 0, 0, 0, 0 };
 				out_reset();
 				build_hexhdr(ZSKIP, h2);
-				send_bytes(outbuf, outpos);
+				mut_send(mc, 1);
 				read_frame(&rp, &fb, 3000);
 			}
 			break;
@@ -2012,9 +2030,12 @@ main(int argc, char *argv[])
 		}
 		for (it = start_iteration; it < iterations; it++) {
 			int exitcode = 0;
-			const char *bad;
+			const char *bad = NULL;
 			struct timespec ts_start;
 			struct timespec ts_end;
+			struct class_stats *st = NULL;
+			int hang;
+			long ms;
 			current_iteration = it;
 			setup_iteration();
 			build_payload();
@@ -2032,24 +2053,30 @@ main(int argc, char *argv[])
 			target_dead = 0;
 			to_target_buf.len = 0;
 			if (mode_receive) {
-				if (do_selftest)
+				if (do_selftest) {
+					send_choice = -1;
 					selftest_receive(it, &exitcode);
-				else {
+				} else {
 					enum mclass mc =
 					    (enum mclass)(rng_below(N_MCLASS - 1) + 1);
 					if (it % 17 == 0)
 						mc = M_NONE; /* keep a clean baseline */
 					fuzz_receive_iter(it, mc, &exitcode);
+					st = &rx_stats[mc];
 				}
 			} else {
 				fuzz_send_iter();
 				exitcode = 0;
+				st = &tx_stats[send_choice >= 0
+					       && send_choice < 12
+					       ? send_choice : 0];
 			}
 			{
 				int w = wait_target(&exitcode);
 				int clean = (mode_receive
 					     && (it % 17 == 0 || do_selftest));
-				if (w < 0) {
+				hang = (w < 0);
+				if (hang) {
 					/* hang: for mutation iterations an
 					 * exchange that deliberately breaks
 					 * mid-stream can leave the receiver
@@ -2088,27 +2115,88 @@ main(int argc, char *argv[])
 			close_pipes();
 			teardown_iteration();
 			clock_gettime(CLOCK_MONOTONIC, &ts_end);
-			{
-				long ms = (ts_end.tv_sec - ts_start.tv_sec)
-				    * 1000L
-				    + (ts_end.tv_nsec - ts_start.tv_nsec)
-				    / 1000000L;
-				if (show_progress) {
-					fprintf(stderr,
-						"zmodemfuzz: %ld/%ld iters, "
-						"%d failures, %ld ms\n",
-						it + 1, iterations, failures,
-						ms);
-				} else if ((it % 20) == 19) {
-					fprintf(stderr,
-						"zmodemfuzz: %ld/%ld iters, "
-						"%d failures\n",
-						it + 1, iterations, failures);
-				}
+			ms = (ts_end.tv_sec - ts_start.tv_sec)
+			    * 1000L
+			    + (ts_end.tv_nsec - ts_start.tv_nsec)
+			    / 1000000L;
+			/* per-class statistics (selftest runs are skipped:
+			 * they have no class) */
+			if (st) {
+				st->count++;
+				st->total_ms += ms;
+				if (ms > st->max_ms)
+					st->max_ms = ms;
+				if (hang)
+					st->hangs++;
+				if (bad)
+					st->fails++;
+			}
+			if (show_progress) {
+				fprintf(stderr,
+					"zmodemfuzz: %ld/%ld iters, "
+					"%d failures, %ld ms\n",
+					it + 1, iterations, failures,
+					ms);
+			} else if ((it % 20) == 19) {
+				fprintf(stderr,
+					"zmodemfuzz: %ld/%ld iters, "
+					"%d failures\n",
+					it + 1, iterations, failures);
 			}
 		}
 		fprintf(stderr, "zmodemfuzz: done, %ld iterations, %d failures\n",
 			iterations - start_iteration, failures);
+		/* per-class summary: one row per mutation class (receive
+		 * mode) or hostile choice (send mode) */
+		{
+			const char *names[N_MCLASS] = {
+				"NONE", "BYTEFLIP", "CRC16", "CRC32",
+				"CRCMODE", "FRAMETYPE", "ZDLE_ILL",
+				"POSITION", "FLAGS", "GARBAGE", "CANCAN",
+				"TRUNC", "EOF", "NAME"
+			};
+			const char *choice_names[12] = {
+				"silence", "ZNAK", "ZSKIP", "ZABORT",
+				"ZFERR", "ZCRC+skip", "ZCHALLENGE",
+				"ZRPOS-max", "CAN*9", "ZRINIT-storm",
+				"ZFIN", "ZRPOS-0+skip"
+			};
+			long ci;
+			fprintf(stderr, "zmodemfuzz: class summary "
+				"(count, avg ms, max ms, hangs, fails)\n");
+			if (mode_receive) {
+				for (ci = 0; ci < N_MCLASS; ci++) {
+					if (!rx_stats[ci].count)
+						continue;
+					fprintf(stderr,
+						"  %-9s %6ld %7ld %7ld"
+						" %5ld %5ld\n",
+						names[ci],
+						rx_stats[ci].count,
+						rx_stats[ci].total_ms
+						    / rx_stats[ci].count,
+						rx_stats[ci].max_ms,
+						rx_stats[ci].hangs,
+						rx_stats[ci].fails);
+				}
+			} else {
+				for (ci = 0; ci < 12; ci++) {
+					if (!tx_stats[ci].count)
+						continue;
+					fprintf(stderr,
+						"  choice %2ld %-15s"
+						" %6ld %7ld %7ld"
+						" %5ld %5ld\n",
+						ci, choice_names[ci],
+						tx_stats[ci].count,
+						tx_stats[ci].total_ms
+						/ tx_stats[ci].count,
+						tx_stats[ci].max_ms,
+						tx_stats[ci].hangs,
+						tx_stats[ci].fails);
+				}
+			}
+		}
 		return failures ? 1 : 0;
 	}
 }
