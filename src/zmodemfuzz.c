@@ -374,6 +374,7 @@ static char *target_argv[64];
 static int target_argc;
 static long seed = 0;
 static long iterations = 200;
+static long start_iteration = 0;
 static int alarm_seconds = 25;
 static int do_selftest = 0;
 static int keep_dirs = 0;
@@ -658,8 +659,10 @@ static void
 send_bytes(const unsigned char *b, size_t n)
 {
 	size_t off = 0;
-	if (target_dead)
+	if (target_dead) {
+		tr_mark("# dropped %zu bytes: target already gone", n);
 		return;
+	}
 	tr_buf(0, b, n);
 	if (getenv("ZFUZZ_DEBUG")) {
 		fprintf(stderr, "send %zu bytes:", n);
@@ -1053,6 +1056,36 @@ build_zfile_data(unsigned char *dst, size_t dstcap, const char *name,
 
 /* one clean transfer exchange against lrz; every parameter can be
  * corrupted per the mutation matrix. Returns 0 = ok. */
+
+/* fast-forward the PRNG over iterations 0..it-1 without running the
+ * target: replay exactly the draws a real run made, so iteration `it`
+ * starts with the identical rng_state and behaves byte-for-byte like
+ * it did in the original run. Mirrors the main loop's per-iteration
+ * draw order: build_payload(), mutation class, optional hostile-name
+ * pick, then fuzz_receive_iter()'s payload length and payload bytes. */
+static void
+fast_forward_rng(long it)
+{
+	long i;
+
+	for (i = 0; i < it; i++) {
+		unsigned int mc;
+		build_payload(); /* main loop's per-iteration draw */
+		mc = rng_below(N_MCLASS - 1) + 1;
+		if (i % 17 == 0)
+			mc = M_NONE;
+		if ((enum mclass)mc == M_NAME)
+			(void)rng_below(N_HOSTILE);
+		build_payload(); /* fuzz_receive_iter()'s own call */
+		payload_len = 1 + rng_below(20000);
+		{
+			size_t k;
+			for (k = 0; k < payload_len; k++)
+				(void)rng_next();
+		}
+	}
+}
+
 static int
 fuzz_receive_iter(int it, enum mclass mc, int *exitcode)
 {
@@ -1560,8 +1593,13 @@ check_invariants(int exitcode, int hang)
 		snprintf(reason, sizeof reason, "death by signal %d", -exitcode);
 		return reason;
 	}
-	/* exitcode 0/1/128+ are fine; anything else is suspicious */
-	if (exitcode != 0 && exitcode != 1 && exitcode < 0x80) {
+	/* exitcode 0/1/127/128+ are fine; anything else is suspicious.
+	 * 127 is lrz's Security-Violation outcome: checkpath() rejects a
+	 * hostile name (e.g. the M_NAME class sends "..") with
+	 * bibi(-1) → fatal_error(128 + -1, ...) → exit(127). That is a
+	 * correct, intended rejection, not a fuzzer finding. */
+	if (exitcode != 0 && exitcode != 1 && exitcode != 127
+	    && exitcode < 0x80) {
 		snprintf(reason, sizeof reason, "odd exit code %d", exitcode);
 		return reason;
 	}
@@ -1622,11 +1660,14 @@ static void
 usage(void)
 {
 	fprintf(stderr,
-"Usage: zmodemfuzz -m receive|send [-s SEED] [-n N] [-t SEC] [--] TARGET [args...]\n"
+"Usage: zmodemfuzz -m receive|send [-s SEED] [-n N] [-S N] [-t SEC] [--] TARGET [args...]\n"
 "  -m receive  target is a receiver (lrz); fuzzer plays a mutating sender\n"
 "  -m send     target is a sender (lsz); fuzzer plays a hostile receiver\n"
 "  -s SEED     deterministic PRNG seed (default: time-based)\n"
 "  -n N        iterations (default 200; FUZZITER overrides when -n is absent)\n"
+"  -S N        fast-forward to iteration N: replay the PRNG draws of\n"
+"              iterations 0..N-1 without running the target, then run\n"
+"              iterations N..N-1+(-n N) (receive mode only)\n"
 "  -t SEC      per-iteration timeout in seconds (default 20)\n"
 "  -k          keep the per-iteration working directory (debugging)\n"
 "  -P, --progress  print a progress line after every iteration\n"
@@ -1656,6 +1697,8 @@ main(int argc, char *argv[])
 			seed = strtol(argv[++i], NULL, 0);
 		} else if (!strcmp(argv[i], "-n") && i + 1 < argc) {
 			iterations = strtol(argv[++i], NULL, 0);
+		} else if (!strcmp(argv[i], "-S") && i + 1 < argc) {
+			start_iteration = strtol(argv[++i], NULL, 0);
 		} else if (!strcmp(argv[i], "-t") && i + 1 < argc) {
 			alarm_seconds = atoi(argv[++i]);
 		} else if (!strcmp(argv[i], "--selftest")) {
@@ -1724,7 +1767,21 @@ main(int argc, char *argv[])
 	{
 		long it;
 		int failures = 0;
-		for (it = 0; it < iterations; it++) {
+		if (start_iteration > 0) {
+			if (!mode_receive) {
+				/* send mode's rng stream depends on what the
+				 * target does (fuzz_send_iter draws only
+				 * after exchanges happened), so it cannot be
+				 * replayed blind */
+				die("-S needs -m receive");
+			}
+			if (start_iteration >= iterations)
+				iterations = start_iteration + 1;
+			fast_forward_rng(start_iteration);
+			tr_mark("# fast-forwarded rng to iteration %ld",
+				start_iteration);
+		}
+		for (it = start_iteration; it < iterations; it++) {
 			int exitcode = 0;
 			const char *bad;
 			setup_iteration();
@@ -1735,6 +1792,12 @@ main(int argc, char *argv[])
 			spawn_target();
 			stderr_len = 0;
 			rxbuf_reset();
+			/* a previous iteration's EPIPE may have poisoned the
+			 * write path: clear the flag and any bytes that were
+			 * buffered when the old target went away, so the new
+			 * target starts with a clean output stream */
+			target_dead = 0;
+			to_target_buf.len = 0;
 			if (mode_receive) {
 				if (do_selftest)
 					selftest_receive(it, &exitcode);
@@ -1801,7 +1864,7 @@ main(int argc, char *argv[])
 			}
 		}
 		fprintf(stderr, "zmodemfuzz: done, %ld iterations, %d failures\n",
-			iterations, failures);
+			iterations - start_iteration, failures);
 		return failures ? 1 : 0;
 	}
 }
