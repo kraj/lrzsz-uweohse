@@ -95,6 +95,10 @@
 #define XOFF    ('s' & 0x1f)
 #define CAN     0x18
 
+/* the receiver-side subpacket cap (mirrors LRZSZ_MAX_SUBPACKET_LEN;
+ * other zmodem implementations accept up to 64k) */
+#define SUBPKT_MAX 8192
+
 /* --- CRC --- */
 
 static unsigned short crctab[256];
@@ -163,7 +167,7 @@ rng_below(unsigned int n)
 
 /* --- frame output buffer --- */
 
-static unsigned char outbuf[65536];
+static unsigned char outbuf[262144];
 static size_t outpos;
 
 static void
@@ -391,9 +395,10 @@ static char canary_pristine[768];
 static char canary2[768];       /* subdir-symlink canary target */
 static char canary2_pristine[768];
 
-static unsigned char payload[65536];
+static unsigned char payload[131072];
 static size_t payload_len;
 static char payload_name[128];
+static int longpkt_done;	/* M_LONGPACKET: exchange ran to completion */
 
 static void
 build_payload(void)
@@ -1044,6 +1049,7 @@ enum mclass {
 	M_TRUNC,         /* truncate the stream at a random point */
 	M_EOF,           /* premature close */
 	M_NAME,          /* hostile filename */
+	M_LONGPACKET,    /* oversized/large data subpackets */
 	N_MCLASS
 };
 
@@ -1058,6 +1064,7 @@ struct class_stats {
 static struct class_stats rx_stats[N_MCLASS];   /* receive mode: class */
 static struct class_stats tx_stats[12];         /* send mode: choice */
 static int send_choice = -1;
+static enum mclass mc_current = M_NONE; /* class of the running iteration */
 
 /* build one ZFILE metadata subpacket around `name` */
 static size_t
@@ -1119,6 +1126,7 @@ struct mut_params {
 	int can_off;		/* M_CANCAN: injection offset */
 	int trunc_stop;		/* M_TRUNC: stop after this many subpackets */
 	int eof_after_zfile;	/* M_EOF: drop the line after ZRPOS */
+	unsigned int sub_chunk;	/* M_LONGPACKET: subpacket size to send */
 };
 
 static struct mut_params mut;
@@ -1154,6 +1162,12 @@ draw_mut_params(enum mclass mc)
 	mut.can_off = (int)rng_below(128);
 	mut.trunc_stop = (mc == M_TRUNC) ? (int)rng_below(9) : -1;
 	mut.eof_after_zfile = (mc == M_EOF) ? 1 : 0;
+	mut.sub_chunk = 0;
+	if (mc == M_LONGPACKET) {
+		static const unsigned int sizes[5] =
+		    { SUBPKT_MAX, SUBPKT_MAX + 1, 16384, 32768, 65536 };
+		mut.sub_chunk = sizes[rng_below(5)];
+	}
 }
 
 /* inject n bytes at offset off into the built frame (clamped); used by
@@ -1187,7 +1201,7 @@ mut_send(enum mclass mc, int data_frame)
 	int i;
 
 	if (!data_frame || mc == M_NONE || mc == M_NAME || mc == M_CRCMODE
-	    || mc == M_TRUNC || mc == M_EOF) {
+	    || mc == M_TRUNC || mc == M_EOF || mc == M_LONGPACKET) {
 		send_bytes(outbuf, outpos);
 		return;
 	}
@@ -1268,6 +1282,11 @@ fast_forward_rng(long it)
 		build_payload(); /* fuzz_receive_iter()'s own call */
 		payload_len = 1 + rng_below(20000);
 		draw_mut_params((enum mclass)mc);
+		if ((enum mclass)mc == M_LONGPACKET && mut.sub_chunk)
+			/* keep the mirror identical to fuzz_receive_iter():
+			 * one conditional draw for the extra payload len */
+			payload_len = mut.sub_chunk + 1024
+			    + rng_below(8192);
 		{
 			size_t k;
 			for (k = 0; k < payload_len; k++)
@@ -1285,15 +1304,19 @@ fuzz_receive_iter(int it, enum mclass mc, int *exitcode)
 	int crc32 = 0;
 	int ctlesc = 0;
 	unsigned long sent_pos = 0;
+	mc_current = mc;
 	build_payload();
 	snprintf(payload_name, sizeof payload_name, "%s", name);
 	payload_len = 1 + rng_below(20000);
-	/* the clean baseline uses 16-bit CRC everywhere: the CRC32
-	 * subpacket path has escape subtleties that make even a correct
-	 * transfer hard to establish; corrupted-CRC scenarios do not
-	 * need a working CRC32 either, so it is never negotiated here */
-	crc32 = 0;
+	/* the clean baseline uses 16-bit CRC everywhere; M_CRCMODE
+	 * negotiates 32-bit CRC and sends CRC32-protected frames (lrz
+	 * advertises CANFC32 in every ZRINIT). The old "escape
+	 * subtleties" concern is obsolete: append_data32/build_binhdr32
+	 * escape control bytes and CRC bytes like lrz expects. */
+	crc32 = (mc == M_CRCMODE);
 	draw_mut_params(mc);
+	if (mc == M_LONGPACKET && mut.sub_chunk)
+		payload_len = mut.sub_chunk + 1024 + rng_below(8192);
 	{
 		size_t i;
 		for (i = 0; i < payload_len; i++)
@@ -1340,13 +1363,13 @@ fuzz_receive_iter(int it, enum mclass mc, int *exitcode)
 			hdr[2] = 0;
 			hdr[3] = ZCBIN;
 			out_reset();
-			if (crc32 && mc != M_CRCMODE)
+			if (crc32)
 				build_binhdr32(ZFILE, hdr);
 			else
 				build_binhdr16(ZFILE, hdr, ctlesc);
 			{
 				size_t npos = outpos;
-				if (crc32 && mc != M_CRCMODE)
+				if (crc32)
 					outpos = append_data32(outbuf,
 							       sizeof outbuf,
 							       npos, zdata,
@@ -1421,11 +1444,18 @@ fuzz_receive_iter(int it, enum mclass mc, int *exitcode)
 		 * ZCRCG-terminated subpacket the receiver expects the next
 		 * subpacket to continue within the same frame (no new
 		 * header), so all chunks stream here under a single header
-		 * until the final ZCRCE. */
+		 * until the final ZCRCE. M_LONGPACKET sends one oversized
+		 * subpacket (up to 64k, sizes other implementations accept)
+		 * and then resyncs like a real sender: on lrz's ZRPOS it
+		 * resumes from the acknowledged offset with legal 1024-byte
+		 * subpackets. */
 		{
 			size_t off = 0;
 			int done = 0;
 			unsigned char hdr[4];
+			size_t cap = (mc == M_LONGPACKET && mut.sub_chunk)
+			    ? mut.sub_chunk : 1024;
+			longpkt_done = 0;
 			hdr[0] = 0;
 			hdr[1] = 0;
 			hdr[2] = 0;
@@ -1437,11 +1467,14 @@ fuzz_receive_iter(int it, enum mclass mc, int *exitcode)
 				build_binhdr16(ZDATA, hdr, ctlesc);
 			mut_send(mc, 1);
 			tr_mark("> ZDATA pos=0 (single header)");
+			if (mc == M_LONGPACKET && mut.sub_chunk)
+				tr_mark("# long-packet size=%u",
+					mut.sub_chunk);
 			while (off < payload_len && !done) {
 				size_t chunk = payload_len - off;
 				int term;
-				if (chunk > 1024)
-					chunk = 1024;
+				if (chunk > cap)
+					chunk = cap;
 				if (off + chunk >= payload_len) {
 					term = ZCRCE;
 					done = 1;
@@ -1466,6 +1499,53 @@ fuzz_receive_iter(int it, enum mclass mc, int *exitcode)
 					(unsigned long)chunk, term);
 				mut_send(mc, 1);
 				off += chunk;
+				/* M_LONGPACKET: the receiver rejects a
+				 * subpacket larger than its 8192-byte
+				 * buffer ("Data subpacket too long") and
+				 * drops into its error-resync loop, which
+				 * repositions the stream via ZRPOS. Behave
+				 * like a real sender: honor the ZRPOS and
+				 * continue from the acknowledged offset. */
+				if (cap > SUBPKT_MAX && off < payload_len) {
+					size_t resume_pos;
+					int got;
+					tr_mark("# long-packet: sent %lu-byte"
+						" subpacket (> %d)",
+						(unsigned long)chunk,
+						SUBPKT_MAX);
+					rp_init(&rp);
+					got = read_frame(&rp, &fb, 3000);
+					if (!got || fb.type != ZRPOS) {
+						tr_mark("# long-packet: no "
+							"ZRPOS, abandoning");
+						goto finish;
+					}
+					resume_pos = (size_t)fb.hdr[0]
+					    | ((size_t)fb.hdr[1] << 8)
+					    | ((size_t)fb.hdr[2] << 16)
+					    | ((size_t)fb.hdr[3] << 24);
+					if (resume_pos > off)
+						resume_pos = off;
+					tr_mark("# long-packet: resync at "
+						"pos=%lu",
+						(unsigned long)resume_pos);
+					hdr[0] = resume_pos & 0xff;
+					hdr[1] = (resume_pos >> 8) & 0xff;
+					hdr[2] = (resume_pos >> 16) & 0xff;
+					hdr[3] = (resume_pos >> 24) & 0xff;
+					out_reset();
+					if (crc32)
+						build_binhdr32(ZDATA, hdr);
+					else
+						build_binhdr16(ZDATA, hdr,
+							       ctlesc);
+					mut_send(mc, 1);
+					tr_mark("> ZDATA pos=%lu (resync)",
+						(unsigned long)resume_pos);
+					off = resume_pos;
+					cap = 1024;
+					continue;
+				}
 				/* M_TRUNC: cut the stream after a bounded
 				 * number of subpackets — the receiver is
 				 * left waiting for data that never comes */
@@ -1479,12 +1559,26 @@ fuzz_receive_iter(int it, enum mclass mc, int *exitcode)
 				}
 			}
 			sent_pos = payload_len;
+			if (mc == M_LONGPACKET && mut.sub_chunk)
+				longpkt_done = 1;
 		}
 after_data:
 		/* 5. ZEOF (skipped after M_TRUNC: the receiver is left
-		 * hanging mid-stream — that is the mutation) */
-		if (mut.trunc_stop >= 0)
+		 * hanging mid-stream — that is the mutation). The cut is
+		 * followed by a CAN burst so the receiver cancels the
+		 * file promptly instead of waiting out its full 10s
+		 * Rxtimeout retries: the mid-stream interruption (and the
+		 * resulting partial write) is the mutation, and the
+		 * bounded cancel keeps the iteration fast. */
+		if (mut.trunc_stop >= 0) {
+			/* six CANs: lrz's cancount needs five consecutive
+			 * CANs to trigger zcancel */
+			unsigned char cans[6] =
+			    { CAN, CAN, CAN, CAN, CAN, CAN };
+			tr_mark("# truncated mid-stream: cancelling");
+			send_bytes(cans, sizeof cans);
 			goto finish;
+		}
 		{
 			unsigned char hdr[4];
 			hdr[0] = sent_pos & 0xff;
@@ -1511,8 +1605,10 @@ after_data:
 					final = 1;
 					break;
 				case ZRPOS:
-					/* resume request: we could replay;
-					 * for fuzz purposes just abort */
+					/* resume request after an M_LONGPACKET
+					 * resync was already honored above;
+					 * here it means an error loop we do
+					 * not replay — just abort */
 					final = 1;
 					break;
 				case ZFIN:
@@ -1553,6 +1649,17 @@ finish:
 	(void)it;
 	(void)exitcode;
 	return 0;
+}
+
+/* main-loop hook: an M_LONGPACKET exchange that ran to completion sends
+ * only clean frames after the oversized one, so the received file must
+ * match byte for byte — the resync path is where resume-position bugs
+ * would live. */
+static int
+longpkt_completed(void)
+{
+	return mc_current == M_LONGPACKET && mut.sub_chunk != 0
+	    && longpkt_done;
 }
 
 /* --- phase 2: fuzz-send (target = lsz; we are the receiver) --- */
@@ -1851,9 +1958,9 @@ check_invariants(int exitcode, int hang)
  * directory (lrz may rename hostile names) must match the payload byte
  * for byte */
 static const char *
-check_received(void)
+	check_received(void)
 {
-	static unsigned char buf[70000];
+	static unsigned char buf[131072];
 	DIR *d;
 	struct dirent *e;
 
@@ -2063,6 +2170,18 @@ main(int argc, char *argv[])
 						mc = M_NONE; /* keep a clean baseline */
 					fuzz_receive_iter(it, mc, &exitcode);
 					st = &rx_stats[mc];
+					/* the harness has finished its part
+					 * of the exchange; the target may
+					 * still linger (e.g. waiting for
+					 * the next ZRQINIT after a ZSKIP
+					 * or for a sender that never
+					 * resumes). Close the write end so
+					 * the target sees EOF and exits
+					 * instead of burning the alarm. */
+					if (to_target[1] >= 0) {
+						close(to_target[1]);
+						to_target[1] = -1;
+					}
 				}
 			} else {
 				fuzz_send_iter();
@@ -2096,20 +2215,22 @@ main(int argc, char *argv[])
 					}
 				} else {
 					bad = check_invariants(exitcode, 0);
-					if (bad && exitcode == -14)
-						/* the child's alarm fired: a
-						 * mutation (or, in send mode,
-						 * every iteration is one)
-						 * broke the exchange mid-stream
-						 * by design and the target
-						 * waited — expected */
-						bad = NULL;
-					if (!bad && clean)
-						bad = check_received();
-					if (bad) {
-						fail(bad, it, exitcode);
-						failures++;
-					}
+	if (bad && exitcode == -14)
+		/* the child's alarm fired: a
+		 * mutation (or, in send mode,
+		 * every iteration is one)
+		 * broke the exchange mid-stream
+		 * by design and the target
+		 * waited — expected */
+		bad = NULL;
+	if (!bad && clean)
+		bad = check_received();
+	if (!bad && !clean && longpkt_completed())
+		bad = check_received();
+	if (bad) {
+		fail(bad, it, exitcode);
+		failures++;
+	}
 				}
 			}
 			close_pipes();
@@ -2153,7 +2274,7 @@ main(int argc, char *argv[])
 				"NONE", "BYTEFLIP", "CRC16", "CRC32",
 				"CRCMODE", "FRAMETYPE", "ZDLE_ILL",
 				"POSITION", "FLAGS", "GARBAGE", "CANCAN",
-				"TRUNC", "EOF", "NAME"
+				"TRUNC", "EOF", "NAME", "LONGPKT"
 			};
 			const char *choice_names[12] = {
 				"silence", "ZNAK", "ZSKIP", "ZABORT",
