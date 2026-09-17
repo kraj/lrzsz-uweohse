@@ -464,14 +464,42 @@ static int target_stderr[2];
 static volatile sig_atomic_t alarm_fired;
 static unsigned long mem_limit = 256UL * 1024 * 1024;
 
-/* run a shell command, discarding its status (mkdir/ln/rm plumbing) */
+/* run a shell command, discarding its status (mkdir/ln/rm plumbing).
+ * system() is deliberately NOT used: its /bin/sh child resets signal
+ * dispositions and glibc's save/restore dance around SIGALRM made a
+ * pending harness alarm lethal (observed against targets that ignore
+ * reads, e.g. zmtx-zmrx-1.02: harness killed by its own SIGALRM).
+ * Here the child gets a known-clean signal state; the parent's
+ * on_alarm stays installed and the target-kill alarm semantics in
+ * wait_target() are untouched. */
 static void
 run_cmd(const char *cmd)
 {
-	int rc = system(cmd);
-	/* status is deliberately ignored: the plumbing (mkdir/ln/rm) is
-	 * best-effort; failures surface as invariant violations instead */
-	(void)rc;
+	pid_t pid = fork();
+
+	if (pid < 0)
+		die("fork: %s", strerror(errno));
+	if (pid == 0) {
+		/* plumbing child: default dispositions, no alarm — the
+		 * harness's wait_target() deadline must not be shortened
+		 * by an alarm armed in the forked shell */
+		signal(SIGALRM, SIG_DFL);
+		alarm(0);
+		execl("/bin/sh", "sh", "-c", cmd, (char *)NULL);
+		_exit(127);
+	}
+	{
+		int status;
+		pid_t r;
+		do {
+			r = waitpid(pid, &status, 0);
+		} while (r < 0 && errno == EINTR);
+		/* status is deliberately ignored: the plumbing (mkdir/ln/
+		 * rm) is best-effort; failures surface as invariant
+		 * violations instead */
+		(void)r;
+		(void)status;
+	}
 }
 
 static void
@@ -479,17 +507,33 @@ on_alarm(int sig)
 {
 	(void)sig;
 	alarm_fired = 1;
+	/* nothing must rely on the main loop checking the flag: kill the
+	 * wedged target immediately so wait_target() reaps it; the flag
+	 * stays set for the deadline bookkeeping */
+	if (target_pid > 0)
+		kill(target_pid, SIGKILL);
 }
 
 static void
 spawn_target(void)
 {
+	/* a leftover alarm from a previous iteration's early exit (target
+	 * died / receiver aborted) must not fire mid-iteration where no
+	 * alarm_fired check exists */
+	alarm(0);
 	target_pid = fork();
 	if (target_pid < 0)
 		die("fork: %s", strerror(errno));
 	if (target_pid == 0) {
 		char *argv[68];
 		int i;
+		sigset_t alrm;
+		/* the parent keeps SIGALRM blocked between waits so a
+		 * stray alarm cannot kill the harness; the child must
+		 * receive it default-style (its own bounded alarm) */
+		sigemptyset(&alrm);
+		sigaddset(&alrm, SIGALRM);
+		sigprocmask(SIG_UNBLOCK, &alrm, NULL);
 		signal(SIGALRM, SIG_DFL);
 		alarm((unsigned)alarm_seconds);
 		/* receive mode: the child must chdir into the receiving
@@ -705,16 +749,35 @@ wait_target(int *exitcode)
 {
 	int status = 0;
 	pid_t r;
+	sigset_t alrm, oldmask;
 
 	alarm_fired = 0;
+	/* The alarm must fire *here*, not while the target-side plumbing
+	 * or a mutation step blocks it: a deferred SIGALRM would otherwise
+	 * be delivered at an arbitrary later sigprocmask restore (observed
+	 * killing the harness itself against targets that ignore reads,
+	 * e.g. zmtx-zmrx-1.02). Arming happens BEFORE unblocking so no
+	 * alarm can slip through. */
+	sigemptyset(&alrm);
+	sigaddset(&alrm, SIGALRM);
+	sigprocmask(SIG_UNBLOCK, &alrm, &oldmask);
 	alarm((unsigned)(alarm_seconds + 5));
 	for (;;) {
 		r = waitpid(target_pid, &status, WNOHANG);
 		if (r == target_pid)
 			break;
 		if (r < 0) {
-			if (errno == EINTR)
+			if (errno == EINTR) {
+				/* interrupted: alarm may have fired, fall
+				 * through to the alarm_fired check below */
+				if (alarm_fired)
+					break;
 				continue;
+			}
+			/* early out must not leak an armed alarm or an
+			 * unblocked mask into the rest of the iteration */
+			alarm(0);
+			sigprocmask(SIG_BLOCK, &alrm, NULL);
 			return -1;
 		}
 		if (alarm_fired)
@@ -722,6 +785,9 @@ wait_target(int *exitcode)
 		drain_target();
 	}
 	alarm(0);
+	/* re-block: the rest of the iteration (mutation sends, plumbing)
+	 * must not lose the harness to a stray SIGALRM */
+	sigprocmask(SIG_BLOCK, &alrm, NULL);
 	if (alarm_fired) {
 		kill(target_pid, SIGKILL);
 		waitpid(target_pid, &status, 0);
@@ -1060,11 +1126,13 @@ struct class_stats {
 	long max_ms;
 	long hangs; /* target waited until the alarm */
 	long fails;
+	long crc32; /* iterations that negotiated 32-bit CRC (receive mode) */
 };
 static struct class_stats rx_stats[N_MCLASS];   /* receive mode: class */
 static struct class_stats tx_stats[12];         /* send mode: choice */
 static int send_choice = -1;
 static enum mclass mc_current = M_NONE; /* class of the running iteration */
+static int iter_crc32; /* iteration negotiated 32-bit CRC (receive mode) */
 
 /* build one ZFILE metadata subpacket around `name` */
 static size_t
@@ -1085,13 +1153,19 @@ build_zfile_data(unsigned char *dst, size_t dstcap, const char *name,
 		size_t ml = strlen(meta);
 		size_t pos = 0;
 		size_t i;
-		if (nl + ml + 2 > dstcap)
+		/* nl + NUL + ml + trailing NUL (+ terminator added by the
+		 * append layer) must fit; the trailing NUL is required by
+		 * receivers that validate the last block byte (zmrx-2.02
+		 * ZNAKs the ZFILE without it — the bug behind its
+		 * "odd exit code 4" run) */
+		if (nl + ml + 3 > dstcap)
 			return 0;
 		for (i = 0; i < nl; i++)
 			dst[pos++] = (unsigned char)name[i];
 		dst[pos++] = 0;
 		for (i = 0; i < ml; i++)
 			dst[pos++] = (unsigned char)meta[i];
+		dst[pos++] = 0;
 		return pos;
 	}
 }
@@ -1314,6 +1388,7 @@ fuzz_receive_iter(int it, enum mclass mc, int *exitcode)
 	 * subtleties" concern is obsolete: append_data32/build_binhdr32
 	 * escape control bytes and CRC bytes like lrz expects. */
 	crc32 = (mc == M_CRCMODE);
+	iter_crc32 = crc32;
 	draw_mut_params(mc);
 	if (mc == M_LONGPACKET && mut.sub_chunk)
 		payload_len = mut.sub_chunk + 1024 + rng_below(8192);
@@ -1446,12 +1521,17 @@ fuzz_receive_iter(int it, enum mclass mc, int *exitcode)
 		 * header), so all chunks stream here under a single header
 		 * until the final ZCRCE. M_LONGPACKET sends one oversized
 		 * subpacket (up to 64k, sizes other implementations accept)
-		 * and then resyncs like a real sender: on lrz's ZRPOS it
-		 * resumes from the acknowledged offset with legal 1024-byte
-		 * subpackets. */
+		 * and then resyncs like a real sender: on the receiver's
+		 * ZRPOS it resumes from the acknowledged offset with legal
+		 * 1024-byte subpackets. Receivers with a smaller subpacket
+		 * limit (e.g. crzsz: 1024) reject even "legal" chunks; the
+		 * post-stream drain below honors their (repeated) ZRPOS
+		 * requests and re-streams the remainder from the requested
+		 * offset, as many times as they ask — bounded. */
 		{
 			size_t off = 0;
 			int done = 0;
+			int resyncs = 0;
 			unsigned char hdr[4];
 			size_t cap = (mc == M_LONGPACKET && mut.sub_chunk)
 			    ? mut.sub_chunk : 1024;
@@ -1500,51 +1580,63 @@ fuzz_receive_iter(int it, enum mclass mc, int *exitcode)
 				mut_send(mc, 1);
 				off += chunk;
 				/* M_LONGPACKET: the receiver rejects a
-				 * subpacket larger than its 8192-byte
-				 * buffer ("Data subpacket too long") and
-				 * drops into its error-resync loop, which
-				 * repositions the stream via ZRPOS. Behave
-				 * like a real sender: honor the ZRPOS and
-				 * continue from the acknowledged offset. */
-				if (cap > SUBPKT_MAX && off < payload_len) {
+				 * subpacket larger than its buffer
+				 * ("Data subpacket too long") and drops
+				 * into its error-resync loop; it answers
+				 * with ZRPOS(pos) — wait for it and
+				 * resume from the acknowledged offset */
+				if (cap > SUBPKT_MAX) {
 					size_t resume_pos;
 					int got;
+					struct rparser rp3;
 					tr_mark("# long-packet: sent %lu-byte"
 						" subpacket (> %d)",
 						(unsigned long)chunk,
 						SUBPKT_MAX);
-					rp_init(&rp);
-					got = read_frame(&rp, &fb, 3000);
-					if (!got || fb.type != ZRPOS) {
-						tr_mark("# long-packet: no "
-							"ZRPOS, abandoning");
-						goto finish;
-					}
-					resume_pos = (size_t)fb.hdr[0]
-					    | ((size_t)fb.hdr[1] << 8)
-					    | ((size_t)fb.hdr[2] << 16)
-					    | ((size_t)fb.hdr[3] << 24);
-					if (resume_pos > off)
-						resume_pos = off;
-					tr_mark("# long-packet: resync at "
-						"pos=%lu",
-						(unsigned long)resume_pos);
-					hdr[0] = resume_pos & 0xff;
-					hdr[1] = (resume_pos >> 8) & 0xff;
-					hdr[2] = (resume_pos >> 16) & 0xff;
-					hdr[3] = (resume_pos >> 24) & 0xff;
-					out_reset();
-					if (crc32)
-						build_binhdr32(ZDATA, hdr);
-					else
-						build_binhdr16(ZDATA, hdr,
-							       ctlesc);
-					mut_send(mc, 1);
-					tr_mark("> ZDATA pos=%lu (resync)",
-						(unsigned long)resume_pos);
-					off = resume_pos;
 					cap = 1024;
-					continue;
+					rp_init(&rp3);
+					got = read_frame(&rp3, &fb, 3000);
+					if (!got)
+						got = read_frame(&rp3, &fb,
+								 3000);
+					if (got && fb.type == ZRPOS) {
+						resume_pos =
+						    (size_t)fb.hdr[0]
+						    | ((size_t)fb.hdr[1] << 8)
+						    | ((size_t)fb.hdr[2] << 16)
+						    | ((size_t)fb.hdr[3] << 24);
+						if (resume_pos > off)
+							resume_pos = off;
+						tr_mark("# long-packet: "
+							"resync at pos=%lu",
+							(unsigned long)
+							resume_pos);
+						hdr[0] = resume_pos & 0xff;
+						hdr[1] = (resume_pos >> 8)
+						    & 0xff;
+						hdr[2] = (resume_pos >> 16)
+						    & 0xff;
+						hdr[3] = (resume_pos >> 24)
+						    & 0xff;
+						out_reset();
+						if (crc32)
+							build_binhdr32(ZDATA,
+								       hdr);
+						else
+							build_binhdr16(ZDATA,
+								       hdr,
+								       ctlesc);
+						mut_send(mc, 1);
+						tr_mark("> ZDATA pos=%lu "
+							"(resync)",
+							(unsigned long)
+							resume_pos);
+						off = resume_pos;
+						continue;
+					}
+					tr_mark("# long-packet: no ZRPOS "
+						"(receiver kept it), "
+						"continuing");
 				}
 				/* M_TRUNC: cut the stream after a bounded
 				 * number of subpackets — the receiver is
@@ -1556,6 +1648,162 @@ fuzz_receive_iter(int it, enum mclass mc, int *exitcode)
 						mut.trunc_stop);
 					sent_pos = off;
 					goto after_data;
+				}
+			}
+			/* the stream is out; a receiver that rejected chunks
+			 * (small subpacket limit) is error-retrying and has
+			 * sent ZRPOS requests while we were streaming. Honor
+			 * them now, newest wins, and re-stream the remainder
+			 * from the requested offset — a real sender does
+			 * exactly this, as many times as it takes. Bounded:
+			 * a wedged receiver must not extend the iteration
+			 * forever. IMPORTANT: after a rejection the receiver
+			 * keeps scanning the leftover of the rejected data
+			 * as garbage; re-streaming immediately would feed
+			 * THAT scan too (the receiver then errors again).
+			 * So after each ZRPOS: quiesce first (collect more
+			 * ZRPOS for a grace period), then stream once.
+			 * Gated on M_LONGPACKET only: for the other classes
+			 * a receiver stuck in an error loop over corrupted
+			 * data IS the mutation — answering its retries would
+			 * turn every BYTEFLIP/FLAGS iteration into a
+			 * 14s resync marathon instead of a bounded abort. */
+			if (mc == M_LONGPACKET && mut.sub_chunk) {
+				size_t last_pos = 0;
+				int same_pos = 0;
+				for (;;) {
+					size_t p2;
+					struct rparser rp4;
+					size_t wait_ms = 200;
+					size_t newest;
+					int got_any;
+					/* quiesce: collect ZRPOS until the
+					 * receiver stops asking */
+					newest = payload_len;
+					got_any = 0;
+					for (;;) {
+						rp_init(&rp4);
+						if (!read_frame(&rp4, &fb,
+								(int)wait_ms))
+							break;
+						if (fb.type == ZRPOS) {
+							newest =
+							    (size_t)fb.hdr[0]
+							    | ((size_t)fb.hdr
+							       [1] << 8)
+							    | ((size_t)fb.hdr
+							       [2] << 16)
+							    | ((size_t)fb.hdr
+							       [3] << 24);
+							if (newest >
+							    payload_len)
+								newest =
+								payload_len;
+							got_any = 1;
+						} else if (fb.type == ZSKIP
+							   || fb.type == ZCAN
+							   || fb.type ==
+							   ZABORT
+							   || fb.type ==
+							   ZFERR) {
+							tr_mark("# receiver "
+								"aborted "
+								"during "
+								"resync");
+							goto finish;
+						}
+					}
+					if (!got_any)
+						break;
+					p2 = newest;
+					if (resyncs >= 20) {
+						tr_mark("# resync budget "
+							"exhausted, "
+							"abandoning");
+						goto finish;
+					}
+					resyncs++;
+					tr_mark("# resync at pos=%lu",
+						(unsigned long)p2);
+					if (p2 >= payload_len) {
+						/* the receiver already has
+						 * everything: it wants the
+						 * ZEOF, not another header */
+						break;
+					}
+					hdr[0] = p2 & 0xff;
+					hdr[1] = (p2 >> 8) & 0xff;
+					hdr[2] = (p2 >> 16) & 0xff;
+					hdr[3] = (p2 >> 24) & 0xff;
+					out_reset();
+					if (crc32)
+						build_binhdr32(ZDATA, hdr);
+					else
+						build_binhdr16(ZDATA, hdr,
+							       ctlesc);
+					mut_send(mc, 1);
+					tr_mark("> ZDATA pos=%lu (resync)",
+						(unsigned long)p2);
+					/* re-stream payload[p2..] with
+					 * legal 1024-byte subpackets */
+					{
+						size_t o2 = p2;
+						while (o2 < payload_len) {
+							size_t c2 =
+							    payload_len
+							    - o2;
+							size_t npos;
+							if (c2 > 1024)
+								c2 = 1024;
+							out_reset();
+							npos = outpos;
+							if (crc32)
+								outpos =
+								append_data32(
+								outbuf,
+								sizeof outbuf,
+								npos,
+								payload + o2,
+								c2,
+								(o2 + c2 >=
+								 payload_len)
+								 ? ZCRCE
+								 : ZCRCG,
+								ctlesc);
+							else
+								outpos =
+								append_data16(
+								outbuf,
+								sizeof outbuf,
+								npos,
+								payload + o2,
+								c2,
+								(o2 + c2 >=
+								 payload_len)
+								 ? ZCRCE
+								 : ZCRCG,
+								ctlesc);
+							mut_send(mc, 1);
+							o2 += c2;
+						}
+						tr_mark("# re-streamed "
+							"pos=%lu..%lu",
+							(unsigned long)p2,
+							(unsigned long)
+							payload_len);
+					}
+					/* if the receiver asks for the SAME
+					 * position again, it discarded our
+					 * re-stream as garbage: back off so
+					 * its scanner can drain the pipe */
+					if (p2 == last_pos) {
+						same_pos++;
+						if (same_pos >= 2)
+							wait_ms = 1200;
+					} else {
+						same_pos = 0;
+						last_pos = p2;
+					}
 				}
 			}
 			sent_pos = payload_len;
@@ -1646,6 +1894,11 @@ after_data:
 		}
 	}
 finish:
+	/* every early exit skips wait_target() — a pending alarm would
+	 * otherwise fire mid-later-iteration where nothing checks it
+	 * (observed: harness killed by its own SIGALRM against
+	 * zmtx-zmrx-1.02, which ignores reads) */
+	alarm(0);
 	(void)it;
 	(void)exitcode;
 	return 0;
@@ -1937,13 +2190,19 @@ check_invariants(int exitcode, int hang)
 		snprintf(reason, sizeof reason, "death by signal %d", -exitcode);
 		return reason;
 	}
-	/* exitcode 0/1/127/128+ are fine; anything else is suspicious.
+	/* exitcode 0/1/4/127/128+ are fine; anything else is suspicious.
 	 * 127 is lrz's Security-Violation outcome: checkpath() rejects a
 	 * hostile name (e.g. the M_NAME class sends "..") with
 	 * bibi(-1) → fatal_error(128 + -1, ...) → exit(127). That is a
-	 * correct, intended rejection, not a fuzzer finding. */
-	if (exitcode != 0 && exitcode != 1 && exitcode != 127
-	    && exitcode < 0x80) {
+	 * correct, intended rejection, not a fuzzer finding.
+	 * 4 is zmtx-zmrx-2.02's EXIT_TRANSFER_FAILED: its designed
+	 * abort when a transfer cannot complete (the mutation classes
+	 * corrupt exchanges by design — a receiver giving up then is
+	 * like lrz's exit 1). A clean iteration (it % 17 == 0) must
+	 * NEVER end in 4; that was the harness's missing trailing-NUL
+	 * bug in build_zfile_data, fixed. */
+	if (exitcode != 0 && exitcode != 1 && exitcode != 4
+	    && exitcode != 127 && exitcode < 0x80) {
 		snprintf(reason, sizeof reason, "odd exit code %d", exitcode);
 		return reason;
 	}
@@ -2110,7 +2369,18 @@ main(int argc, char *argv[])
 		rng_state = 88172645463325252ULL;
 	fuzz_start = time(NULL);
 
-	signal(SIGALRM, on_alarm);
+	/* install on_alarm via sigaction WITHOUT SA_RESETHAND: signal()
+	 * here came up one-shot (SA_RESETHAND visible in strace), so the
+	 * SECOND alarm fired with SIG_DFL and killed the harness against
+	 * targets that outlive one deadline (zmtx-zmrx-1.02). The handler
+	 * must stay installed for the whole run. */
+	{
+		struct sigaction sa;
+		memset(&sa, 0, sizeof sa);
+		sa.sa_handler = on_alarm;
+		sigemptyset(&sa.sa_mask);
+		sigaction(SIGALRM, &sa, NULL);
+	}
 	signal(SIGPIPE, SIG_IGN);
 
 	tr_mark("# zmodemfuzz seed=%ld mode=%s iters=%ld target=%s",
@@ -2159,6 +2429,7 @@ main(int argc, char *argv[])
 			 * target starts with a clean output stream */
 			target_dead = 0;
 			to_target_buf.len = 0;
+			iter_crc32 = 0; /* set by fuzz_receive_iter if CRC32 negotiated */
 			if (mode_receive) {
 				if (do_selftest) {
 					send_choice = -1;
@@ -2251,6 +2522,8 @@ main(int argc, char *argv[])
 					st->hangs++;
 				if (bad)
 					st->fails++;
+				if (iter_crc32)
+					st->crc32++;
 			}
 			if (show_progress) {
 				fprintf(stderr,
@@ -2284,21 +2557,23 @@ main(int argc, char *argv[])
 			};
 			long ci;
 			fprintf(stderr, "zmodemfuzz: class summary "
-				"(count, avg ms, max ms, hangs, fails)\n");
+				"(count, avg ms, max ms, hangs, fails"
+				", crc32)\n");
 			if (mode_receive) {
 				for (ci = 0; ci < N_MCLASS; ci++) {
 					if (!rx_stats[ci].count)
 						continue;
 					fprintf(stderr,
 						"  %-9s %6ld %7ld %7ld"
-						" %5ld %5ld\n",
+						" %5ld %5ld %5ld\n",
 						names[ci],
 						rx_stats[ci].count,
 						rx_stats[ci].total_ms
 						    / rx_stats[ci].count,
 						rx_stats[ci].max_ms,
 						rx_stats[ci].hangs,
-						rx_stats[ci].fails);
+						rx_stats[ci].fails,
+						rx_stats[ci].crc32);
 				}
 			} else {
 				for (ci = 0; ci < 12; ci++) {
