@@ -1608,6 +1608,18 @@ fuzz_receive_iter(int it, enum mclass mc, int *exitcode)
 		}
 		if (!got_zrinit) {
 			tr_mark("# no ZRINIT: aborting exchange");
+			/* counted as ok: a receiver may legitimately ignore
+			 * a mutated ZRQINIT. But if it printed anything it
+			 * is usually a misconfigured invocation — say so
+			 * loudly instead of looking like a healthy run. */
+			if (stderr_len)
+				fprintf(stderr,
+					"zmodemfuzz: iter %d: target sent no "
+					"ZRINIT and printed:\n  %.*s\n",
+					it,
+					(int)(stderr_len < 400 ? stderr_len
+							       : 400),
+					stderr_capture);
 			*exitcode = -2;
 			return 1; /* counted as ok (target rejected us) */
 		}
@@ -2126,23 +2138,63 @@ fuzz_send_iter(void)
 
 	/* wait for the first ZRQINIT */
 	rp_init(&rp);
-	if (!read_frame(&rp, &fb, 5000))
-		return; /* lsz never even started talking: nothing to fuzz */
-
-	for (;;) {
-		unsigned char hdr[4] = { 0, 0, 0,
-					 CANFDX | CANOVIO | CANBRK | CANFC32 };
-		if (target_dead)
-			return; /* the target is gone; nothing to fuzz */
-		out_reset();
-		build_hexhdr(ZRINIT, hdr);
-		tr_mark("< ZRINIT (hostile receiver ready)");
-		send_bytes(outbuf, outpos); /* session init: never mutated */
-		rp_init(&rp);
-		if (read_frame(&rp, &fb, 5000)) {
-			if (fb.type == ZFILE || fb.type == ZSINIT)
-				break;
+	if (!read_frame(&rp, &fb, 5000)) {
+		/* the sender never even spoke. A sender that printed
+		 * to stderr is a misconfigured invocation — fail
+		 * loudly instead of masquerading as a healthy
+		 * "silence" iteration. */
+		if (stderr_len) {
+			fprintf(stderr,
+				"zmodemfuzz: target sent nothing and printed:\n"
+				"  %.*s\n",
+				(int)(stderr_len < 400 ? stderr_len : 400),
+				stderr_capture);
+			die("target never spoke (bad file argument?); "
+			    "fuzzing aborted");
 		}
+		return; /* silent death (e.g. exec failure): nothing to fuzz */
+	}
+
+	{
+		int got_file = 0;
+		for (;;) {
+			unsigned char hdr[4] = { 0, 0, 0,
+						 CANFDX | CANOVIO | CANBRK
+						     | CANFC32 };
+			if (target_dead)
+				break; /* the target is gone */
+			out_reset();
+			build_hexhdr(ZRINIT, hdr);
+			tr_mark("< ZRINIT (hostile receiver ready)");
+			send_bytes(outbuf, outpos); /* session init: never mutated */
+			rp_init(&rp);
+			if (read_frame(&rp, &fb, 5000)) {
+				if (fb.type == ZFILE || fb.type == ZSINIT) {
+					got_file = 1;
+					break;
+				}
+			}
+		}
+		if (!got_file && stderr_len) {
+			/* lsz answered ZRQINIT but then died without
+			 * ever offering a file, and said why on stderr:
+			 * that is a misconfigured invocation (e.g. a
+			 * file argument that does not exist relative to
+			 * the harness's cwd) — the classic symptom is
+			 * "cannot open <file>: No such file or
+			 * directory". This used to masquerade as a
+			 * healthy 0-failure run of "silence"
+			 * iterations. Fail loudly instead. */
+			fprintf(stderr,
+				"zmodemfuzz: target never offered a file and "
+				"printed:\n  %.*s\n",
+				(int)(stderr_len < 400 ? stderr_len : 400),
+				stderr_capture);
+			die("target never offered a file (bad file "
+			    "argument?); fuzzing aborted");
+		}
+		if (!got_file)
+			return; /* silent death: nothing to fuzz */
 	}
 	/* now ZFILE arrived: decide hostile answer */
 	{
@@ -2666,7 +2718,9 @@ usage(void)
 	fprintf(stderr,
 "Usage: zmodemfuzz -m receive|send [-s SEED] [-n N] [-S N] [-t SEC] [--] TARGET [args...]\n"
 "  -m receive  target is a receiver (lrz); fuzzer plays a mutating sender\n"
-"  -m send     target is a sender (lsz); fuzzer plays a hostile receiver\n"
+"  -m send     target is a sender (lsz); fuzzer plays a hostile receiver.\n"
+"              Its file arguments are anchored to THIS process's cwd\n"
+"              (relative paths like test/4k.bin work from anywhere)\n"
 "  -s SEED     deterministic PRNG seed (default: time-based)\n"
 "  -n N        iterations (default 200; FUZZITER overrides when -n is absent)\n"
 "  -S N        fast-forward to iteration N: replay the PRNG draws of\n"
@@ -2681,7 +2735,9 @@ usage(void)
 "              Small values (1-5s) are fine for targeted -S replays.\n"
 "  -k          keep the per-iteration working directory (debugging)\n"
 "  -P, --progress  print a progress line (with elapsed ms) per iteration\n"
-"  --selftest  run the clean-baseline exchange only\n");
+"  --selftest  run the clean-baseline exchange only\n\n"
+"  A target that exits (or prints to stderr) before speaking ZMODEM is\n"
+"  reported loudly, not silently skipped.\n");
 	exit(2);
 }
 
@@ -2733,23 +2789,35 @@ main(int argc, char *argv[])
 		target_argv[target_argc++] = argv[i];
 	if (!target_argc)
 		usage();
-	/* the child chdir()s to the receiving directory: make every target
-	 * argument that names an executable a path relative to OUR cwd, so
-	 * relative invocations keep working (this covers nested execs like
-	 * zmodemsnif lrz). This matters because the child chdirs into the
-	 * working directory before exec. Absolute paths (leading '/') must
-	 * NOT be touched: rewriting "/bin/true" produced
-	 * "<cwd>//bin/true" and a confusing exit 127. */
+	/* the child chdir()s to the receiving directory in receive mode:
+	 * make every target argument that names an executable OR a
+	 * readable regular file a path relative to OUR cwd, so relative
+	 * invocations keep working (this covers nested execs like
+	 * zmodemsnif lrz and send-mode data files like test/4k.bin —
+	 * in send mode the target's file arguments are relative to the
+	 * harness's cwd, not the fuzz working directory). Absolute paths
+	 * (leading '/') must NOT be touched: rewriting "/bin/true"
+	 * produced "<cwd>//bin/true" and a confusing exit 127. */
 	{
 		static char abspath[68][4096];
 		char cwd[2048];
 		int ai;
 		if (getcwd(cwd, sizeof cwd) != NULL) {
 			for (ai = 0; ai < target_argc; ai++) {
+				struct stat st;
 				if (target_argv[ai][0] == '-'
 				    || target_argv[ai][0] == '/')
 					continue;
-				if (access(target_argv[ai], X_OK) != 0)
+				/* readable regular files (lsz's data
+				 * arguments like test/4k.bin) and
+				 * executables (nested execs like
+				 * zmodemsnif lrz) are both anchored
+				 * to OUR cwd */
+				if (stat(target_argv[ai], &st) == 0
+				    && S_ISREG(st.st_mode)
+				    && access(target_argv[ai], R_OK) == 0)
+					; /* fall through to rewrite */
+				else if (access(target_argv[ai], X_OK) != 0)
 					continue;
 				snprintf(abspath[ai], sizeof abspath[ai],
 					 "%s/%s", cwd, target_argv[ai]);
