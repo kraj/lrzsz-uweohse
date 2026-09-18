@@ -883,6 +883,8 @@ struct framebuf {
 	unsigned char data[2048];
 	size_t data_len;
 	int frame_ind;
+	int term;	/* data subpacket: the ZCRCx terminator byte */
+	int crc_ok;	/* data subpacket: CRC checked out */
 };
 
 enum rstate { R_IDLE, R_ZPADS, R_FRAME, R_HEX, R_BIN, R_BIN32 };
@@ -901,6 +903,13 @@ struct rparser {
 	int crccnt;
 	int crc_esc;
 	int canc;
+	int term_byte;	/* data subpacket: the ZCRCx terminator */
+	int in_data;	/* binary data frame: subpackets follow, not CRC */
+	int sub_term;	/* current data subpacket's ZCRCx terminator */
+	int sub_crc_cnt; /* collecting subpacket CRC bytes */
+	int data_len;	/* data bytes of the current subpacket */
+	int hdr_crc_left; /* binary header CRC bytes still pending */
+	int eof_frame;	/* ZEOF: frame ends after the header CRC */
 };
 
 static void
@@ -918,6 +927,11 @@ rp_emit(struct rparser *p, struct framebuf *fb)
 	memcpy(fb->hdr, p->hdr, 4);
 	fb->data_len = 0;
 	fb->frame_ind = p->frame_ind;
+	fb->term = p->term_byte;
+	if (p->state == R_BIN)
+		fb->crc_ok = (p->crc16 == 0);
+	else
+		fb->crc_ok = (p->crc32 == 0xDEBB20E3UL);
 	memset(p, 0, sizeof *p);
 	p->type = -1;
 	p->frame_ind = -1;
@@ -1013,7 +1027,10 @@ rp_byte(struct rparser *p, unsigned char c, struct framebuf *fb)
 		break;
 	case R_BIN:
 	case R_BIN32:
-		if (p->crc_esc) {
+		if (p->in_data && p->bytecnt >= 5) {
+			/* data subpackets: the ZDLE handling below is
+			 * per-byte, done in the branches themselves */
+		} else if (p->crc_esc) {
 			p->crc_esc = 0;
 			c = (unsigned char)(c ^ 0x40);
 		} else if (c == ZDLE) {
@@ -1022,6 +1039,10 @@ rp_byte(struct rparser *p, unsigned char c, struct framebuf *fb)
 		}
 		if (p->bytecnt == 0) {
 			p->type = c;
+			p->term_byte = 0;
+			p->in_data = 0;
+			p->sub_term = 0;
+			p->sub_crc_cnt = 0;
 			if (p->state == R_BIN)
 				p->crc16 = updcrc(c, 0);
 			else
@@ -1036,17 +1057,182 @@ rp_byte(struct rparser *p, unsigned char c, struct framebuf *fb)
 			else
 				p->crc32 = updc32(c, p->crc32);
 			p->bytecnt++;
+			if (p->bytecnt == 5) {
+				/* header complete: binary headers end
+				 * with their own CRC (2 bytes 16-bit /
+				 * 4 bytes 32-bit) BEFORE any data
+				 * subpackets; the CRC bytes must be
+				 * consumed first */
+				switch (p->type) {
+				case ZRPOS:
+				case ZACK:
+				case ZRQINIT:
+				case ZRINIT:
+				case ZFIN:
+				case ZNAK:
+				case ZABORT:
+				case ZFERR:
+				case ZSKIP:
+				case ZCRC:
+				case ZCHALLENGE:
+				case ZCOMPL:
+				case ZCAN:
+				case ZFREECNT:
+				case ZCOMMAND:
+				case ZSTDERR:
+					p->in_data = 0; /* CRC follows */
+					break;
+				case ZSINIT:
+					/* ZSINIT carries the attention
+					 * string as a data subpacket,
+					 * but lsz sends it only after
+					 * ESCCTL/TESC8 negotiation — the
+					 * header CRC comes first either
+					 * way */
+					p->in_data = 0;
+					break;
+				default:
+					/* ZFILE/ZDATA/ZEOF: header CRC
+					 * first (consumed in the
+					 * !in_data branch). ZDATA/ZFILE
+					 * then carry data subpackets;
+					 * ZEOF ENDS after its header CRC
+					 * (no subpackets) */
+					p->in_data = 0;
+					p->hdr_crc_left =
+					    (p->state == R_BIN) ? 2 : 4;
+					p->eof_frame = (p->type == ZEOF);
+					break;
+				}
+			}
 			return 0;
 		}
-		p->crcrecv[p->crccnt++] = c;
-		if (p->state == R_BIN)
-			p->crc16 = updcrc(c, p->crc16);
-		else
-			p->crc32 = updc32(c, p->crc32);
-		if ((p->state == R_BIN && p->crccnt == 2)
-		    || (p->state == R_BIN32 && p->crccnt == 4)) {
-			rp_emit(p, fb);
-			return 1;
+		if (!p->in_data) {
+			/* header CRC bytes: 2 (16-bit) / 4 (32-bit) close
+			 * the header; for data frames they precede the
+			 * subpackets instead of ending the frame */
+			p->crcrecv[p->crccnt++] = c;
+			if (p->crccnt == 1)
+				p->term_byte = c;
+			if (p->state == R_BIN)
+				p->crc16 = updcrc(c, p->crc16);
+			else
+				p->crc32 = updc32(c, p->crc32);
+			if ((p->state == R_BIN && p->crccnt == 2)
+			    || (p->state == R_BIN32 && p->crccnt == 4)) {
+				if (p->hdr_crc_left && !p->eof_frame) {
+					/* data frame: header CRC done,
+					 * subpackets follow; re-init the
+					 * CRC chain: the subpacket CRC
+					 * covers only data + terminator +
+					 * CRC, not the header */
+					p->hdr_crc_left = 0;
+					p->crccnt = 0;
+					p->in_data = 1;
+					p->sub_crc_cnt = 0;
+					if (p->state == R_BIN)
+						p->crc16 = 0;
+					else
+						p->crc32 = 0xFFFFFFFFUL;
+					return 0;
+				}
+				rp_emit(p, fb);
+				return 1;
+			}
+			return 0;
+		}
+		/* data frame: parse the subpacket stream. A ZDLE pair
+		 * 'h'/'i'/'j'/'k' is the subpacket terminator (the raw
+		 * terminator is never ZDLE-escaped as data), then 2/4
+		 * CRC bytes, also ZDLE-escaped. One event per subpacket. */
+		if (p->sub_crc_cnt == 0) {
+			/* collecting data bytes */
+			if (p->crc_esc) {
+				/* the byte after ZDLE: terminator or
+				 * escaped data? Only 'h'/'i'/'j'/'k' are
+				 * terminators; everything else is data */
+				if (c == ZCRCE || c == ZCRCG || c == ZCRCQ
+				    || c == ZCRCW) {
+					p->sub_term = c;
+					p->crc_esc = 0;
+					if (p->state == R_BIN)
+						p->crc16 = updcrc(c,
+							p->crc16);
+					else
+						p->crc32 = updc32(c,
+							p->crc32);
+					p->sub_crc_cnt = 1;
+					return 0;
+				}
+				/* escaped data byte */
+				p->crc_esc = 0;
+				if (p->data_len < (int)sizeof fb->data)
+					fb->data[p->data_len++] =
+					    (unsigned char)(c ^ 0x40);
+				if (p->state == R_BIN)
+					p->crc16 = updcrc(
+						(unsigned char)(c ^ 0x40),
+						p->crc16);
+				else
+					p->crc32 = updc32(
+						(unsigned char)(c ^ 0x40),
+						p->crc32);
+				return 0;
+			}
+			if (c == ZDLE) {
+				p->crc_esc = 1;
+				return 0;
+			}
+			if (p->data_len < (int)sizeof fb->data)
+				fb->data[p->data_len++] = c;
+			if (p->state == R_BIN)
+				p->crc16 = updcrc(c, p->crc16);
+			else
+				p->crc32 = updc32(c, p->crc32);
+			return 0;
+		}
+		/* subpacket CRC bytes */
+		{
+			int want = (p->state == R_BIN) ? 2 : 4;
+			p->crcrecv[p->crccnt++] = c;
+			if (p->state == R_BIN)
+				p->crc16 = updcrc(c, p->crc16);
+			else
+				p->crc32 = updc32(c, p->crc32);
+			if (p->crccnt >= want) {
+				fb->data_len = p->data_len;
+				fb->type = p->type;
+				memcpy(fb->hdr, p->hdr, 4);
+				fb->frame_ind = p->frame_ind;
+				fb->term = p->sub_term;
+				if (p->state == R_BIN)
+					fb->crc_ok = (p->crc16 == 0);
+				else
+					fb->crc_ok =
+					    (p->crc32 == 0xDEBB20E3UL);
+				p->data_len = 0;
+				p->crccnt = 0;
+				p->sub_crc_cnt = 0;
+				{
+					int t = p->sub_term;
+
+					p->sub_term = 0;
+					if (t == ZCRCE || t == ZCRCW) {
+						/* frame ends: the next
+						 * bytes are a new header
+						 * (lsz flushes after
+						 * ZCRCE/ZCRCW subpackets) */
+						p->state = R_IDLE;
+						p->bytecnt = 0;
+					} else {
+						/* stay in data mode: the
+						 * next subpacket continues
+						 * this frame */
+						p->bytecnt = 5;
+					}
+				}
+				return 1;
+			}
 		}
 		return 0;
 	}
@@ -1129,8 +1315,9 @@ struct class_stats {
 	long crc32; /* iterations that negotiated 32-bit CRC (receive mode) */
 };
 static struct class_stats rx_stats[N_MCLASS];   /* receive mode: class */
-static struct class_stats tx_stats[12];         /* send mode: choice */
+static struct class_stats tx_stats[13];         /* send mode: choice */
 static int send_choice = -1;
+static int n_tx_choices = 13; /* includes the data-phase ACK-loop */
 static enum mclass mc_current = M_NONE; /* class of the running iteration */
 static int iter_crc32; /* iteration negotiated 32-bit CRC (receive mode) */
 
@@ -1924,9 +2111,17 @@ fuzz_send_iter(void)
 	struct framebuf fb;
 	int crc32 = 0;
 	/* byte-level mutation class for the receiver's own frames: the
-	 * mirror of receive mode. The 12-way choice below still decides
-	 * the session-level behavior; mc corrupts the answer frames. */
+	 * mirror of receive mode. The choice below still decides the
+	 * session-level behavior; mc corrupts the answer frames. Every
+	 * 17th iteration is forced to M_NONE (like receive mode's clean
+	 * baseline) so the data-phase ACK loop can complete cleanly —
+	 * the mutation classes corrupt every ACK by design, which would
+	 * otherwise keep lsz in its bounded retry paths forever. The
+	 * override happens AFTER the draw: the PRNG stream is unaffected
+	 * (send mode has no -S replay anyway). */
 	enum mclass mc = (enum mclass)(rng_below(N_MCLASS - 1) + 1);
+	if (current_iteration % 17 == 0)
+		mc = M_NONE;
 	draw_mut_params(mc);
 
 	/* wait for the first ZRQINIT */
@@ -1951,7 +2146,14 @@ fuzz_send_iter(void)
 	}
 	/* now ZFILE arrived: decide hostile answer */
 	{
-		unsigned int choice = rng_below(12);
+		unsigned int choice = rng_below(n_tx_choices);
+		/* clean-baseline iterations always take the ACK loop:
+		 * the mutated choices would keep lsz in its bounded
+		 * handshake retry paths and never exercise the data
+		 * phase; the PRNG stream keeps its draw (send mode has
+		 * no -S replay) */
+		if (current_iteration % 17 == 0)
+			choice = 11;
 		send_choice = (int)choice;
 		switch (choice) {
 		case 0: /* never respond: lsz must hit its retry bounds */
@@ -2067,6 +2269,205 @@ fuzz_send_iter(void)
 			tr_mark("< ZFIN (receiver quits)");
 			mut_send(mc, 1);
 			read_frame(&rp, &fb, 3000);
+			break;
+		}
+		case 11: {
+			/* the data-phase ACK loop: act as a real receiver —
+			 * answer the ZFILE's ZCRCW with ZRPOS(0), then ack
+			 * every data subpacket: ZCRCQ → ZACK(pos), ZCRCW →
+			 * ZACK(pos), ZCRCE → ZACK(pos) + ZEOF handling and
+			 * the final ZRINIT (next-file) close. All answer
+			 * frames go through mut_send(mc, 1), so the 14
+			 * byte-mutation classes corrupt ACKs, positions and
+			 * CRCs mid-stream — this is the only send-mode
+			 * choice that exercises the ACK path at all. */
+			unsigned char rh[4];
+			unsigned long ack_pos = 0;
+			long n_acked = 0;
+			int rounds;
+			int data_phase_open = 0;
+
+			/* ZRINIT for the data phase: advertise CANFDX with
+			 * a 4096-byte buffer so lsz opens its streaming
+			 * window (Txwindow = (Rxbuflen/2/64)*64, lsz.c) and
+			 * pings ZCRCQ every Txwspac bytes — without a
+			 * buffer size it streams ZCRCG-only and the ACK
+			 * loop stays idle until ZCRCE. CANFC32 stays on:
+			 * when lsz negotiates CRC32 the data subpackets
+			 * arrive with 4-byte CRCs (R_BIN32) and our ZACKs
+			 * must be built with the 32-bit builder. */
+			rh[0] = 0x00;	/* Rxbuflen low */
+			rh[1] = 0x10;	/* Rxbuflen high: 0x1000 = 4096 */
+			rh[2] = 0;
+			rh[3] = CANFDX | CANOVIO | CANBRK | CANFC32;
+			out_reset();
+			build_hexhdr(ZRINIT, rh);
+			tr_mark("< ZRINIT (ACK-loop, buffer 4096)");
+			send_bytes(outbuf, outpos); /* clean: session frame */
+
+			for (rounds = 0; rounds < 100; rounds++) {
+				if (target_dead)
+					break;
+				rp_init(&rp);
+				/* 8s, not 4s: after a ZRINIT bad-ack lsz
+				 * eats input for up to 5s (READLINE_PF(50)
+				 * in its ZPAD hunter) before it resends
+				 * the ZFILE; 4s missed the resend every
+				 * time ("0 subpackets acked"). Once the
+				 * data phase is open, lsz's stdio
+				 * buffering can hold ZCRCG subpackets
+				 * for a while (pipes: auto-flush at
+				 * ~4KB), so keep reading up to 15s
+				 * before declaring the sender dead. */
+				if (!read_frame(&rp, &fb,
+						data_phase_open ? 15000
+								: 8000))
+					break; /* lsz stopped talking */
+				ack_pos = (unsigned long)fb.hdr[0]
+				    | ((unsigned long)fb.hdr[1] << 8)
+				    | ((unsigned long)fb.hdr[2] << 16)
+				    | ((unsigned long)fb.hdr[3] << 24);
+				switch (fb.type) {
+				case ZFILE:
+				case ZSINIT:
+					/* re-offer / attention string:
+					 * answer ZRPOS(0) — the sender
+					 * (re)starts the data phase.
+					 * Handshake frame: pass through
+					 * UNMUTATED (like receive mode's
+					 * mut_send(mc, 0)) — a mutated
+					 * ZRPOS fails lsz's CRC check and
+					 * lsz resends the ZFILE forever
+					 * (bounded by its bad_acks>3), so
+					 * the data phase would never open
+					 * for the mutation classes. The
+					 * ZACK/ZNAK data-phase answers
+					 * below stay mutated. */
+					rh[0] = 0;
+					rh[1] = 0;
+					rh[2] = 0;
+					rh[3] = 0;
+					out_reset();
+					build_hexhdr(ZRPOS, rh);
+					tr_mark("< ZRPOS pos=0");
+					mut_send(mc, 0);
+					ack_pos = 0;
+					break;
+				case ZDATA:
+					/* the parser emits the ZDATA
+					 * frame's FIRST subpacket as a
+					 * ZDATA event (fb.term carries the
+					 * ZCRCx); later subpackets of the
+					 * same frame arrive as more ZDATA
+					 * events. Both are acked below via
+					 * the shared term-based path. */
+					if (fb.term != ZCRCE
+					    && fb.term != ZCRCG
+					    && fb.term != ZCRCQ
+					    && fb.term != ZCRCW)
+						break; /* pure header */
+					goto ack_subpacket;
+				case ZEOF:
+					/* the sender is done: confirm with
+					 * ZRINIT (file accepted) and end
+					 * the loop on a clean note */
+					rh[0] = 0;
+					rh[1] = 0;
+					rh[2] = 0;
+					rh[3] = CANFDX | CANOVIO | CANBRK
+					    | CANFC32;
+					out_reset();
+					build_hexhdr(ZRINIT, rh);
+					tr_mark("< ZRINIT (after ZEOF, "
+						"file accepted)");
+					send_bytes(outbuf, outpos);
+					rounds = 1000; /* leave the loop */
+					break;
+				case ZCAN:
+				case ZABORT:
+				case ZFERR:
+					tr_mark("# sender aborted the "
+						"data phase");
+					rounds = 1000;
+					break;
+				case ZFIN:
+					rh[0] = 0;
+					rh[1] = 0;
+					rh[2] = 0;
+					rh[3] = 0;
+					out_reset();
+					build_hexhdr(ZFIN, rh);
+					tr_mark("< ZFIN (close)");
+					mut_send(mc, 1);
+					rounds = 1000;
+					break;
+				default:
+					if (fb.term != ZCRCE
+					    && fb.term != ZCRCG
+					    && fb.term != ZCRCQ
+					    && fb.term != ZCRCW)
+						break;
+ack_subpacket:
+					/* a data subpacket: the ack
+					 * carries the file offset lsz has
+					 * sent so far (header position +
+					 * acked bytes); lsz's getinsync
+					 * compares it with its bytes_sent
+					 * and eats mismatched acks */
+					if (fb.crc_ok) {
+						ack_pos += fb.data_len;
+						rh[0] = (unsigned char)
+						    ack_pos;
+						rh[1] = (unsigned char)
+						    (ack_pos >> 8);
+						rh[2] = (unsigned char)
+						    (ack_pos >> 16);
+						rh[3] = (unsigned char)
+						    (ack_pos >> 24);
+						out_reset();
+						if (crc32)
+							build_binhdr32(ZACK,
+								       rh);
+						else
+							build_hexhdr(ZACK,
+								     rh);
+						tr_mark("< ZACK pos=%lu "
+							"(term=%c)",
+							ack_pos, fb.term);
+					} else {
+						/* corrupted subpacket:
+						 * protocol answer is
+						 * ZNAK; position unchanged */
+						rh[0] = 0;
+						rh[1] = 0;
+						rh[2] = 0;
+						rh[3] = 0;
+						out_reset();
+						build_hexhdr(ZNAK, rh);
+						tr_mark("< ZNAK (bad "
+							"subpacket CRC, "
+							"term=%c)",
+							fb.term);
+					}
+					mut_send(mc, 1);
+					n_acked++;
+					if (fb.type == ZDATA)
+						data_phase_open = 1;
+					break;
+				}
+			}
+			tr_mark("# ACK-loop: %ld subpackets acked",
+				n_acked);
+			/* six CANs so lsz exits promptly instead of
+			 * waiting out saybibi()'s 60s read timeout (the
+			 * session was torn down mid-stream; the same
+			 * trick keeps receive-mode M_TRUNC bounded) */
+			{
+				unsigned char cans[6] =
+				    { CAN, CAN, CAN, CAN, CAN, CAN };
+				tr_mark("# ACK-loop: cancelling");
+				send_bytes(cans, sizeof cans);
+			}
 			break;
 		}
 		default: { /* ZRPOS offset 0: force restart, then skip */
@@ -2454,13 +2855,21 @@ main(int argc, char *argv[])
 						to_target[1] = -1;
 					}
 				}
-			} else {
-				fuzz_send_iter();
-				exitcode = 0;
-				st = &tx_stats[send_choice >= 0
-					       && send_choice < 12
-					       ? send_choice : 0];
+		} else {
+			fuzz_send_iter();
+			exitcode = 0;
+			st = &tx_stats[send_choice >= 0
+				       && send_choice < 13
+				       ? send_choice : 0];
+			/* same as receive mode: the harness has finished
+			 * its part; close the write end so the target
+			 * (lsz) sees EOF and exits instead of burning
+			 * the alarm (e.g. inside saybibi()'s 60s read) */
+			if (to_target[1] >= 0) {
+				close(to_target[1]);
+				to_target[1] = -1;
 			}
+		}
 			{
 				int w = wait_target(&exitcode);
 				int clean = (mode_receive
@@ -2549,11 +2958,11 @@ main(int argc, char *argv[])
 				"POSITION", "FLAGS", "GARBAGE", "CANCAN",
 				"TRUNC", "EOF", "NAME", "LONGPKT"
 			};
-			const char *choice_names[12] = {
+			const char *choice_names[13] = {
 				"silence", "ZNAK", "ZSKIP", "ZABORT",
 				"ZFERR", "ZCRC+skip", "ZCHALLENGE",
 				"ZRPOS-max", "CAN*9", "ZRINIT-storm",
-				"ZFIN", "ZRPOS-0+skip"
+				"ZFIN", "ACK-loop", "ZRPOS-0+skip"
 			};
 			long ci;
 			fprintf(stderr, "zmodemfuzz: class summary "
@@ -2576,7 +2985,7 @@ main(int argc, char *argv[])
 						rx_stats[ci].crc32);
 				}
 			} else {
-				for (ci = 0; ci < 12; ci++) {
+				for (ci = 0; ci < n_tx_choices; ci++) {
 					if (!tx_stats[ci].count)
 						continue;
 					fprintf(stderr,
