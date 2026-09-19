@@ -116,9 +116,11 @@ All ZMODEM implementations MUST, either by default or by an option, be
 able to escape and un-escape the full list of characters listed in the
 paragraph above.
 
-If the ESCCTL (ZRINIT) or TESCCTL (ZSINIT) flag is set, 0x7f and all
-bytes < 0x20 are escaped via ZDLE encoding, not just the default minimal
-set.
+If the ESCCTL (ZRINIT) or TESCCTL (ZSINIT) flag is set, all bytes < 0x20
+(and their 0x80-0x9f high-bit forms) are escaped via ZDLE encoding, not
+just the default minimal set. 0x7f is not escaped by common
+implementations, but the receiver must be able to decode its escape
+sequence should a peer send it.
 
 If the ESC8 (ZRINIT) or TESC8 (ZSINIT) flag is set, all bytes >= 0x80
 are escaped via ZDLE encoding.
