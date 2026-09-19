@@ -91,7 +91,7 @@ Security related changes:
   command through the shell.
   This was a feature of the original public domain zmodem, and by default
   disabled in lrzsz since sometime in the 90s, by hiding it behind the 
-  -C or --allow-remote-commands options.
+  -C or --allow-commands options.
 
 * the sending of remote commands (lsz -c / -i, "the fifth form") is
   deprecated and will be removed in a future release.
