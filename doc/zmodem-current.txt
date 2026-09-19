@@ -260,6 +260,9 @@ used instead of fixed-size blocks — this avoids padding overhead,
 preserves exact file length (even for files that grow during transfer),
 and eliminates the block-number limitations of XMODEM-style protocols.
 
+A data subpacket always uses the CRC type (16- or 32-bit) of the header
+frame it follows (see section 2.4).
+
 ### Subpacket sizes
 
 The original ZMODEM documentation specifies a maximum data subpacket size
@@ -642,8 +645,8 @@ correct position.
 
 #### ZDATA data subpackets
 
-The data subpackets must be ZDLE encoded and use the same CRC type as
-was used in the ZDATA header.
+The data subpackets must be ZDLE encoded (their CRC type follows the
+header, per section 2.3).
 
 At the end of each transmitted data subpacket, the sender SHOULD check
 for the presence of a header from the receiver. If it detects that input
