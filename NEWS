@@ -1,23 +1,23 @@
-Version 0.13.0 -  September 2026, Uwe Ohse
+Version 0.13.0 - September 2026, Uwe Ohse
 
 This is a security release. Two of the changes warrant an immediate update
 if you use lrz to receive files from not perfectly trustworthy senders.
 
 Security fixes:
 
-* if PUBDIR support was NOT compiled in, the restricted mode path check of 
+* if PUBDIR support was NOT compiled in, the restricted mode path check of
   lrz did allow uploads to any directory the user has write access to.
 
-  This was a security bug found by TristanInSec with an email domain gmail 
+  This was a security bug found by TristanInSec with an email domain gmail
   under the com tld.
 
-  Likewise lsz did not correctly check paths in the restricted mode if 
+  Likewise lsz did not correctly check paths in the restricted mode if
   PUBDIR support was not compiled in.
 
-* a buffer overflow was fixed in lrz, in which the attacker could quite 
+* a buffer overflow was fixed in lrz, in which the attacker could quite
   easily cause an overflow in a malloc()ed buffer.
 
-  This was a security bug found by TristanInSec with an email domain 
+  This was a security bug found by TristanInSec with an email domain
   gmail under the com tld.
 
   Note: this stems from the original public domain rzsz suite (80s).
@@ -26,51 +26,51 @@ Security fixes:
   feature: invoked as 'lrztar' lrz would have called tar through the shell
   with the (attacker controlled) filename as argument, without escaping it,
   allowing arbitrary command execution.
-  This feature/insecurity was only accessible if the installer appended 
+  This feature/insecurity was only accessible if the installer appended
   some string to the lrz (or rz) commands name.
-  
+
   This was a security bug found by TristanInSec with an email
   domain gmail under the com tld.
 
   Note: this stems from the original public domain rzsz suite (80s).
 
-* CVE-2018-10195 fixed, in which lsz could leak information to the 
+* CVE-2018-10195 fixed, in which lsz could leak information to the
   receiving attacker if that turned off crc32.
   Impact: low to medium.
 
-* Overlong pathnames (> 960 + X bytes, with X depending on metadata) might 
-  have caused a buffer overflow in the sending programs (Y- and ZMODEM), 
+* Overlong pathnames (> 960 + X bytes, with X depending on metadata) might
+  have caused a buffer overflow in the sending programs (Y- and ZMODEM),
   which could have leaked information to the receiver.
 
   Note: this stems from the original public domain rzsz suite (80s).
 
-* lsz no longer uses mmap() for input files. input is now read via stdio
-  only. this also means the input file is no longer closed early, and a
+* lsz no longer uses mmap() for input files. Input is now read via stdio
+  only. This also means the input file is no longer closed early, and a
   file truncated during the transfer fails with a read error instead of
   killing the sender with SIGBUS. Wire behavior is unchanged.
   A benchmark (buffered with 8192..262144-byte buffers vs mmap, 15 MiB
   file) showed buffered I/O at parity or better than mmap, so the
   special case was not worth its complexity.
-  Security: After removal of the mmap code, fuzzing showed that an 
-  illegal offset during a resumed transfer might have caused a remote 
-  denial of service (reliable, deterministic) and a potential 
+  Security: After removal of the mmap code, fuzzing showed that an
+  illegal offset during a resumed transfer might have caused a remote
+  denial of service (reliable, deterministic) and a potential
   out-of-bounds read within the 4 GiB following the start of the file.
   This could have caused an information leak.
 
-* an attacker could have created a setuid/setgid/sticky file when 
+* an attacker could have created a setuid/setgid/sticky file when
   restricted mode was not used.
 
   Note: this stems from the original public domain rzsz suite (80s).
 
-* the lrz path name check would have allowed to create a filename `..`, 
-  which may or may not be a security problem with pre-created symlinks 
+* the lrz path name check would have allowed to create a filename `..`,
+  which may or may not be a security problem with pre-created symlinks
   for `..`.
 
   Note: this stems from the original public domain rzsz suite (80s).
 
-* when the lrz -B / --bufsize "auto" option was used, an attacker could 
-  have wasted up to 2 GB of memory while keeping the connection open. 
-  This was a remotely triggered denial of service attack (in a rare 
+* when the lrz -B / --bufsize "auto" option was used, an attacker could
+  have wasted up to 2 GB of memory while keeping the connection open.
+  This was a remotely triggered denial of service attack (in a rare
   configuration).
 
 * the lrz file CRC check could have run into an endless loop.
@@ -80,7 +80,7 @@ Security fixes:
   - double fclose in lrz.
   - a write before a buffer in lrz (80s).
   - a use of uninitialized memory in lsz (80s).
-  - a misbehaving receiver could cause an endless loop 
+  - a misbehaving receiver could cause an endless loop
     when the sender used a transmit window (80s).
 
 
@@ -91,7 +91,7 @@ Security related changes:
   feature: a sender could have lrz execute that command through the shell
   (ZCOMMAND).
   This was a feature of the original public domain zmodem, and by default
-  disabled in lrzsz since sometime in the 90s, by hiding it behind the 
+  disabled in lrzsz since sometime in the 90s, by hiding it behind the
   -C or --allow-commands options.
 
 * the sending of remote commands (lsz -c / -i, "the fifth form") is
@@ -100,20 +100,20 @@ Security related changes:
   implementations (OMEN zmodem and older lrz) that still execute received
   commands. New setups should not use these options.
 
-* lsz no longer sends the "rz\r" auto-download trigger. The original 
-  zmodem software sent this to make the receiving side start its rz; 
+* lsz no longer sends the "rz\r" auto-download trigger. The original
+  zmodem software sent this to make the receiving side start its rz;
   modern practice is to watch the data stream for a ZRQINIT frame
   instead. This also stops lsz from writing protocol-unrelated bytes
   to the transfer line.
 
 * the PUBDIR feature was removed from lsz and lrz.
-  this feature of the restricted mode allowed uploads not only from the 
+  This feature of the restricted mode allowed uploads not only from the
   current directory, but from the compiled in PUBDIR
   (/usr/spool/uucppublic, typically), and it allowed uploads into that, too.
-  If you really need something like this, you can add a symlink to the 
+  If you really need something like this, you can add a symlink to the
   current directory.
 
-* lrz in very restricted mode now disallows invisible leading 
+* lrz in very restricted mode now disallows invisible leading
   directories, too (`dir/.subdir/filename` was allowed before).
 
   Note: this stems from the original public domain rzsz suite (80s).
@@ -121,8 +121,8 @@ Security related changes:
 * the TCP mode was removed (no authentication, no encryption).
 
 * the -U/--unrestrict option has been removed from both lrz and lsz.
-  Rationale: Security-relevant options cannot be turned off: whoever 
-  can add -U to a command line can equally well drop it, so the option 
+  Rationale: Security-relevant options cannot be turned off: whoever
+  can add -U to a command line can equally well drop it, so the option
   provided no protection - only a trap.
   The one legitimate use, keeping partially received files on transfer
   error, lives on as lrz's new --keep-incomplete option (below).
@@ -132,29 +132,29 @@ Other changes:
 
 * autotools updated. GNU automake 1.17, GNU Autoconf 2.72.
 
-* the timesync protocol support was removed. No other zmodem suite still 
-  in use implemented it, and the function to set the receivers time 
-  needed root rights - which, given the facts listed above, lrz should 
+* the timesync protocol support was removed. No other zmodem suite still
+  in use implemented it, and the function to set the receivers time
+  needed root rights - which, given the facts listed above, lrz should
   not have.
 
 * the `-d / --dot-to-slash` option (DOS 8.3 filename transformation)
   was removed (it collided with the now extended pathname checking).
 
-* on 32bit systems the programs are now able to transfer files with sizes 
-  in the range 2GB to just under 4GB (64bit systems did not have that 
+* on 32bit systems the programs are now able to transfer files with sizes
+  in the range 2GB to just under 4GB (64bit systems did not have that
   limit).
 
   Note: lrzsz's 31-bit file-size limit stems from the
   original public domain rzsz suite (80s). The same limit existed
-  in later published omen technology sources, and at least one 
+  in later published omen technology sources, and at least one
   independent implementation.
 
-  Expect interoperability problems when transferring files of that size. 
+  Expect interoperability problems when transferring files of that size.
 
 * both main programs now can write a journal.
 
-* documented the scope of the file management options (-+, -E, -H, -n, 
-  -N, -p, -y): they apply to ZMODEM (partially to YMODEM) and are ignored 
+* documented the scope of the file management options (-+, -E, -H, -n,
+  -N, -p, -y): they apply to ZMODEM (partially to YMODEM) and are ignored
   in XMODEM mode, as they always were. The -D / --null option now also
   works in XMODEM mode.
 
@@ -166,13 +166,13 @@ Other changes:
   questionable (it removes every carriage return and cuts the file short at
   the first CPM EOF character / ^X).
 
-* likewise deprecated is the acting on the historical full st_mode in the 
+* likewise deprecated is the acting on the historical full st_mode in the
   file metadata. A sender transmitting file type bits (e.g. 0100644 instead
   of 0644) still makes lrz force binary transfer for that file (which
   overrides -a) and skip the lower-casing of the file name.
-  The current ZMODEM documentation states this should neither be sent nor 
-  acted upon. lrzsz keeps it for compatibility and will likely remove it 
-  in a future release. The received mode is filtered as before (type bits 
+  The current ZMODEM documentation states this should neither be sent nor
+  acted upon. lrzsz keeps it for compatibility and will likely remove it
+  in a future release. The received mode is filtered as before (type bits
   stripped, umask applied).
 
 * the -f / --full-path option of lsz (transmit the path instead of the
@@ -181,9 +181,9 @@ Other changes:
   The current ZMODEM documentation states that a sender must not transmit
   absolute pathnames or ".." components. The historical behavior (OMEN sz
   and derivatives) allowed both, so lsz still keeps it for compatibility.
-  A future release will keep allowing relative paths but will reject 
+  A future release will keep allowing relative paths but will reject
   absolute paths and ".." components with a fatal error.
-   On the receiving side lrz confines received filenames to the receiving 
+   On the receiving side lrz confines received filenames to the receiving
    directory regardless of what the sender transmits.
    New setups should use plain relative filenames.
 
@@ -212,7 +212,7 @@ Other changes:
 * ^C during a ZMODEM transfer no longer interrupts the sender in a
   read via longjmp. lsz notices the ^C at the next loop checkpoint
   and attempts the same resync as before. This removes one source
-  of undefined behaviour. 
+  of undefined behaviour.
 
 * lrz has a new --keep-incomplete option: on a transfer error the
   partially received file is kept instead of deleted (the default),
@@ -236,23 +236,23 @@ Other changes:
   Formerly it was advertised unconditionally. Attempts to send a break
   on a line that cannot do it (e.g. a pipe) are detected and skipped.
 
-* lrz has a new option -A --segmentsize NNN. This turns on `Segmented 
-  Streaming' if the sender supports it. This ZMODEM feature was originally 
-  intended to allow transfers to machines unable to do overlapping serial 
-  and disk I/O. Today it is useful to limit the damage caused by line 
+* lrz has a new option -A --segmentsize NNN. This turns on `Segmented
+  Streaming' if the sender supports it. This ZMODEM feature was originally
+  intended to allow transfers to machines unable to do overlapping serial
+  and disk I/O. Today it is useful to limit the damage caused by line
   errors when the sender streams without asking for an ACK.
-  lsz, the original public domain zmodem sz and crzsz csz always enforced 
-  segmented streaming - which is why lrzsz and other zmodem 
-  implementations stemming from the same source usually behave much better 
-  on faulty lines than other implementations optimized for the perfect 
+  lsz, the original public domain zmodem sz and crzsz csz always enforced
+  segmented streaming - which is why lrzsz and other zmodem
+  implementations stemming from the same source usually behave much better
+  on faulty lines than other implementations optimized for the perfect
   world.
 
-* syslog support is now always compiled in. Earlier releases had 
+* syslog support is now always compiled in. Earlier releases had
   configure options to deselect it.
 
-* performance on bad lines is quite a bit better now.
+* Performance on bad lines is quite a bit better now.
 
-* support for many old systems has been removed. The new support policy is 
+* support for many old systems has been removed. The new support policy is
   this:
   - I aim for POSIX standards of the last 20 years.
   - I aim for the next older C standard.
@@ -260,7 +260,7 @@ Other changes:
 
 * the german translation was removed, because it was seriously out of date.
   Translations are welcome, just my own ill-maintained one wasn't.
- 
+
   I'm willing to work with translators, not only to include translations,
   but also to make your job easier - but I am not going to burden myself
   with doing translations.
@@ -276,10 +276,10 @@ Other changes:
   documentation defines as equivalent) with the ZFIN sequence that the
   documentation requires, followed by the usual clean end-of-session
   handshake. Formerly lsz answered with the cancel sequence, as the OMEN
-  ZMODEM implementations also did. 
-  The result is the same, but peers expecting the documented reply now 
+  ZMODEM implementations also did.
+  The result is the same, but peers expecting the documented reply now
   get it.
-  Also a receiver that dies instead of answering no longer stalls the 
+  Also a receiver that dies instead of answering no longer stalls the
   closing handshake.
 
 * lsz now answers ZABORT/ZFERR in every phase of the session instead of
@@ -289,10 +289,10 @@ Other changes:
   that aborted would previously have been sent the command up to 20
   times). ZABORT is counted as a user cancel, ZFERR as a file error.
 
-* compatibility tests were done against sexyz-3.5, lrzsz-0.12.21rc, 
-  crzsz-1.13, rzsz-3.73 and zmtx-zmrx-1.02 and -2.02
+* compatibility tests were done against Synchronet sexyz v3.5,
+  lrzsz-0.12.21rc, crzsz-1.13, rzsz-3.73 and zmtx-zmrx-1.02 and -2.02.
 
-* compile tested on debian linux, alpine linux and openbsd.
+* compile tested on Debian GNU/Linux, Alpine Linux and OpenBSD.
 * compile tested with gcc and clang.
 
 * included: ZMODEM specification / documentations. See doc/README
