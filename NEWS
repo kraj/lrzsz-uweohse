@@ -254,15 +254,15 @@ Other changes:
 
 * support for many old systems has been removed. The new support policy is 
   this:
-  - i aim for POSIX standards of the last 20 years.
-  - i aim for the next older C standard.
+  - I aim for POSIX standards of the last 20 years.
+  - I aim for the next older C standard.
   Currently: POSIX.1-2008, C99.
 
 * the german translation was removed, because it was seriously out of date.
   Translations are welcome, just my own ill-maintained one wasn't.
  
   I'm willing to work with translators, not only to include translations,
-  but also to make your job easier - but i am not going to burden me
+  but also to make your job easier - but I am not going to burden myself
   with doing translations.
 
 * the dejagnu testsuite was removed. An update broke it, and i decided to
