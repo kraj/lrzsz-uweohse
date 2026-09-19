@@ -79,8 +79,8 @@ And sometimes things go wrong:
     S-->R [1024 byte data subpacket with ZCRCG]
     S<--R ZRPOS 5120  [receiver: " resend from here"]
     [sender discards the subpackets it already sent after 5120 - but if it 
-     cannot do that, for example because they already in the network, the
-     receiver will have to do it]
+     cannot do that, for example because the data already is in the network, 
+     the receiver will have to do it]
     S-->R ZDATA 5120
     S-->R [1024 byte data subpacket with ZCRCW]  << first block after error: wait
     S<--R ZACK 6144
@@ -268,10 +268,9 @@ implementations (lrzsz, sexyz, and others). lrzsz uses 1024 bytes by
 default; the user can select 2048 (`-2`), 4096 (`-4`), or 8192
 (`-8`) if the receiver supports it.
 
-The sender SHOULD NOT exceed the receiver's advertised segment size
-(ZP0/ZP1 in ZRINIT, little-endian). If the receiver specifies a non-zero
-value, that is the maximum subpacket size the sender should use. If the
-receiver specifies 0 (unlimited), the sender is free to choose any size.
+The receiver may specify a segment length in the ZRINIT frame (ZP0/ZP1,
+little-endian); 0 means unlimited (see section 3). If a segment length
+was specified, the subpacket size MUST NOT exceed it.
 
 A larger subpacket size reduces per-subpacket overhead (CRC, frameend,
 ZDLE escaping) but increases the amount of data that must be
@@ -350,8 +349,8 @@ The sender controls the stream with the frameend bytes (see section 2.3).
 
 Segmented streaming was originally introduced to support receivers unable
 to do overlapping serial and disk I/O (rarely a problem today). In this
-mode the sender sends a ZCRCW subpacket at some interval, and then waits
-for a status update from the receiver.
+ mode the sender sends a ZCRCW subpacket after approximately the segment
+ length, and then waits for a status update from the receiver.
 
 Traditionally, Omen software sz and lsz default to a 16 KB segment
 length.
@@ -706,8 +705,8 @@ These three are historic. There is currently no ZMODEM software
 implementing variable headers, and the other two depended on them.
 See section 9.
 
-ZP0 and ZP1 contain the maximum segment size the receiver can accept
-in bytes (little-endian), or 0 if nonstop I/O is allowed.
+ZP0 and ZP1 contain the receiver's segment length in bytes
+(little-endian), or 0 if nonstop I/O is allowed (see section 3).
 
 Recommendation: send CANFC32|CANFDX|CANOVIO, and maybe |CANBRK.
 
@@ -869,7 +868,7 @@ a cancel sequence or a ZABORT frame.
 
 The sender sends ZRQINIT to request the receiver's ZRINIT. The receiver
 responds with ZRINIT, advertising its capabilities (CANFDX, CANFC32,
-etc.) and buffer size.
+etc.) and segment length.
 
 The sender may optionally send ZSINIT to define an attention sequence
 or request control-character escaping. The receiver responds with ZACK.
@@ -1199,4 +1198,3 @@ if the features are somewhat attractive.
 
 ## 10.15 ZCOMMAND byte ZF0
 - ZCACK1  1       /* Acknowledge, then do command [DEPRECATED: ZCOMMAND is deprecated] */
-
