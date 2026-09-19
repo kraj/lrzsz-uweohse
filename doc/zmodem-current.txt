@@ -84,7 +84,8 @@ And sometimes things go wrong:
      cannot do that, for example because the data already is in the network,
      the receiver will have to do it]
     S-->R ZDATA 5120
-    S-->R [1024 byte data subpacket with ZCRCW]  << first block after error: wait
+    S-->R [1024 byte data subpacket with ZCRCW]
+                     << first block after error: wait
     S<--R ZACK 6144
     S-->R [1024 byte data subpacket with ZCRCG]
     [streaming resumes ...]
@@ -380,9 +381,10 @@ CRC-32 polynomials. There are better ones, but it is good enough.
 
 # 3. Stream control
 
-The sender controls the stream with the frameend bytes (see section 2.3).
+The sender controls the stream with the frameend bytes (see section
+2.3). The three streaming modes below can be combined (see Mixed modes).
 
-### Segmented streaming
+## Segmented streaming
 
 Segmented streaming was originally introduced to support receivers unable
 to do overlapping serial and disk I/O (rarely a problem today). In this
@@ -398,7 +400,7 @@ bytes, where 0 means unlimited.
 
 Segmented streaming is the safe approach for faulty lines.
 
-### Window streaming
+## Window streaming
 
 In this mode the sender uses ZCRCQ data subpackets to trigger ZACK
 responses from the receiver, in which the receiver reports its current
@@ -414,13 +416,13 @@ The entire file can be used as the window. This simplifies buffer
 management and avoids the window-overrun failure modes that affect
 fixed-window protocols.
 
-### Non-streaming mode
+## Non-streaming mode
 
 In this mode the sender waits (ZCRCW) for a response after every
 subpacket. This can be slow, especially over high-latency connections,
 but it is the safest approach when the connection is really bad.
 
-### Mixed modes
+## Mixed modes
 
 Segment length of 32 KB with a window of 4 KB? Why not. The modes can be
 combined as needed.
@@ -696,7 +698,8 @@ SHOULD ignore the ZEOF and wait, because it might have arrived before a
 pending ZRPOS. (The sender may have sent ZEOF before receiving the
 receiver's ZRPOS error response.)
 
-### ZFREECNT (S-->R) [half deprecated: sending it is forbidden, answering it is still required]
+### ZFREECNT (S-->R) [half deprecated: sending it is forbidden,
+answering it is still required]
 
 The sender requests a ZACK frame with ZP0...ZP3 containing the number of
 free bytes on the current file system. A value of 0 represents an
@@ -1020,6 +1023,9 @@ But you MUST NOT implement the ZXSPARS option. The sender cannot know
 enough about the receiver's filesystem to drive that, and in cases where
 retransmissions and smaller subpacket sizes are needed, the sender's
 logic can only fail.
+Without the option, a receiver can only guess; the pragmatic approach is
+to detect sparse-friendly (highly repetitive) content after transfer and
+to punch holes then, or not to bother at all.
 
 ## Serial number transfer
 
@@ -1116,7 +1122,7 @@ be detected by simpler means.
 ## 9.4 Variable header deprecation
 
 The variable length headers have been around for 30 years, and since then
-the only implementations of them have been in OMEN software - but all of
+the only implementations of them have been in Omen software - but all of
 these are dead.
 
 V-Headers are just longer headers (with a maximum of 16 bytes payload
@@ -1154,9 +1160,11 @@ if the features are somewhat attractive.
 - ZHEX 'B'        /* HEX frame indicator */
 - ZBIN32 'C'      /* Binary frame with 32 bit FCS */
 - ZBINR32 'D'     /* RLE packed Binary frame with 32 bit FCS [DEPRECATED] */
-- ZVBIN 'a'       /* Binary frame indicator (CRC-16) [DEPRECATED: variable headers] */
+- ZVBIN 'a'       /* Binary frame indicator (CRC-16)
+                     [DEPRECATED: variable headers] */
 - ZVHEX 'b'       /* HEX frame indicator [DEPRECATED: variable headers] */
-- ZVBIN32 'c'     /* Binary frame with 32 bit FCS [DEPRECATED: variable headers] */
+- ZVBIN32 'c'     /* Binary frame with 32 bit FCS
+                     [DEPRECATED: variable headers] */
 - ZVBINR32 'd'    /* RLE packed Binary frame with 32 bit FCS [DEPRECATED] */
 
 ## 10.3 byte positions within the header payload array
@@ -1187,7 +1195,8 @@ if the features are somewhat attractive.
 - ZCHALLENGE 14   /* Receiver's Challenge [DEPRECATED] */
 - ZCOMPL 15       /* Request is complete [DEPRECATED] */
 - ZCAN 16         /* Other end canned session with CAN*5 */
-- ZFREECNT 17     /* Request for free bytes on filesystem [likely future DEPRECATION] */
+- ZFREECNT 17     /* Request for free bytes on filesystem
+                     [likely future DEPRECATION] */
 - ZCOMMAND 18     /* Command from sending program [DEPRECATED] */
 - ZSTDERR 19      /* Output to standard error, data follows [DEPRECATED] */
 
@@ -1202,7 +1211,8 @@ if the features are somewhat attractive.
 - CANOVIO 0x02    /* Rx can receive data during disk I/O */
 - CANBRK  0x04    /* Rx can send a break signal */
 - CANCRY  0x08    /* Receiver can decrypt [DEPRECATED] (yes, same as RLE) */
-- CANRLE  0x08    /* Receiver can decode run-length encoding [DEPRECATED] (yes, same as CRY) */
+- CANRLE  0x08    /* Receiver can decode run-length encoding
+                     [DEPRECATED] (yes, same as CRY) */
 - CANLZW  0x10    /* Receiver can uncompress [DEPRECATED] */
 - CANFC32 0x20    /* Receiver can use 32 bit Frame Check */
 - ESCCTL  0x40    /* Receiver expects ctl chars to be escaped */
@@ -1210,8 +1220,10 @@ if the features are somewhat attractive.
 
 ## 10.7 ZRINIT byte ZF1
 - CANVHDR 0x01  /* Variable headers OK [DEPRECATED] */
-- ZRRQWN  0x08       /* Receiver specified window size in ZRPXWN [DEPRECATED] */
-- ZRRQQQ  0x10      /* Additional control chars to quote in ZRPXQQ [DEPRECATED] */
+- ZRRQWN  0x08       /* Receiver specified window size in ZRPXWN
+                        [DEPRECATED] */
+- ZRRQQQ  0x10      /* Additional control chars to quote in ZRPXQQ
+                       [DEPRECATED] */
 
 ## 10.8 ZSINIT params
 - ZATTNLEN 32     /* Max length of attention string */
@@ -1252,8 +1264,10 @@ if the features are somewhat attractive.
 - ZXSPARS   0x40    /* Encoding for sparse file operations [DEPRECATED] */
 
 ## 10.14 Receiver window size override
-- ZRWOVR 4        /* byte position for receive window override/256 [DEPRECATED: undocumented] */
+- ZRWOVR 4        /* byte position for receive window override/256
+                     [DEPRECATED: undocumented] */
   (how this was meant or used is totally unknown)
 
 ## 10.15 ZCOMMAND byte ZF0
-- ZCACK1  1       /* Acknowledge, then do command [DEPRECATED: ZCOMMAND is deprecated] */
+- ZCACK1  1       /* Acknowledge, then do command
+                     [DEPRECATED: ZCOMMAND is deprecated] */
