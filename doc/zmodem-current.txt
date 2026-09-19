@@ -302,11 +302,16 @@ There are four different frameend values, which control streaming:
   'W' like 'wait'.
 
 - ZCRCQ: the sender expects a response but continues to stream.
-  'Q' like 'control'.
+  'Q' like 'Query'.
 
 - ZCRCE: the sender does not expect a response, and the stream ends.
   This is sent when the sender detected end of file within the data
   subpacket. 'E' like 'end'.
+
+  The final subpacket may also be a ZCRCW instead (the frame then ends
+  and the sender waits for the ZACK); this is a sender's choice, and
+  some implementations use it to make the receiver's end-of-file
+  processing synchronous.
 
 The general logic is:
 
@@ -809,10 +814,11 @@ with its own ZFIN.
 ### ZCRC (S<->R)
 
 The receiver requests a CRC for the number of bytes given in ZP0..ZP3.
-The sender responds with the CRC in ZP0..ZP3. The CRC is a 32-bit CRC
-(CRC-32), which is why it occupies all four position/flag bytes. The
-sender MUST use CRC-32 for the ZCRC response, regardless of whether
-CRC-32 is in use for the data subpackets.
+The sender responds with the CRC in ZP0..ZP3. The value is a 32-bit CRC
+(CRC-32), which is why it occupies all four position/flag bytes; the
+frame itself is sent in whatever header format the negotiation dictates
+(section 2.2). A ZP0..ZP3 value of 0 in the request means "the CRC of
+the entire file".
 
 ## Pseudo frame
 
