@@ -444,9 +444,9 @@ ZF0..ZF3 contain options.
 The sender MUST use one of the two following options:
 
 - ZCBIN (1) — "Binary" transfer.
-- ZCRESUM (2) — "Resume" transfer.
+- ZCRESUM (3) — "Resume" transfer.
 
-There was a historic third option, ZCNL, to convert newlines. It is
+There was a historic third option, ZCNL (2), to convert newlines. It is
 deprecated; see section 9.
 
 The receiver MUST assume ZCBIN if it encounters any value other than
