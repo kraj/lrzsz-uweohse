@@ -772,8 +772,10 @@ ZCOMPL SHOULD treat it as any other unknown or out-of-sync frame.
 ### ZACK (S<->R)
 
 An acknowledgment, sent as an answer to a ZSINIT or ZCHALLENGE frame, or
-to a ZCRCQ or ZCRCW data subpacket. ZP0..ZP3 contain the current file
-offset.
+to a ZCRCQ or ZCRCW data subpacket — except the ZFILE metadata
+subpacket, which expects ZRPOS/ZSKIP and MUST NOT be answered with a
+ZACK (see the ZFILE frame description). ZP0..ZP3 contain the current
+file offset.
 
 A ZACK sent in response to a ZCHALLENGE frame returns the (random)
 number from the ZCHALLENGE.
