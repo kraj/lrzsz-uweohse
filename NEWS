@@ -23,8 +23,8 @@ Security fixes:
   Note: this stems from the original public domain rzsz suite (80s).
 
 * the lrz pipe execution feature was removed.
-  feature: invoked as 'lrztar' lrz would have called tar through the shell 
-  with the (attacker controlled) filename as argument, with escaping it, 
+  feature: invoked as 'lrztar' lrz would have called tar through the shell
+  with the (attacker controlled) filename as argument, without escaping it,
   allowing arbitrary command execution.
   This feature/insecurity was only accessible if the installer appended 
   some string to the lrz (or rz) commands name.
@@ -89,7 +89,7 @@ Security related changes:
 * the lrz remote command execution feature was removed.
   feature: `lsz -c any command` would have caused lrz to execute that 
   command through the shell.
-  This was feature of the original public domain zmodem, and by default 
+  This was a feature of the original public domain zmodem, and by default
   disabled in lrzsz since sometime in the 90s, by hiding it behind the 
   -C or --allow-remote-commands options.
 
