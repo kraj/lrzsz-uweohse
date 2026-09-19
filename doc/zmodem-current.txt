@@ -436,7 +436,9 @@ The data subpacket contains the null-terminated attention sequence,
 limited to 32 bytes including the final null.
 
 The receiver must answer with ZACK and 0 in the position/flag bytes, or
-ZNAK if the ZSINIT frame was garbled.
+ZNAK if the ZSINIT frame was garbled. A garbled attention-sequence
+subpacket is answered with ZNAK, too: the receiver re-enables the
+previous escape settings and awaits a fresh ZSINIT.
 
 ### ZFILE (S-->R)
 
@@ -785,11 +787,9 @@ ZCOMPL SHOULD treat it as any other unknown or out-of-sync frame.
 An acknowledgment, sent as an answer to a ZSINIT or ZCHALLENGE frame, or
 to a ZCRCQ or ZCRCW data subpacket — except the ZFILE metadata
 subpacket, which expects ZRPOS/ZSKIP and MUST NOT be answered with a
-ZACK (see the ZFILE frame description). ZP0..ZP3 contain the current
-file offset.
-
-A ZACK sent in response to a ZCHALLENGE frame returns the (random)
-number from the ZCHALLENGE.
+ZACK (see the ZFILE frame description). The payload depends on what is
+being acknowledged: the current file offset for a ZCRCQ/ZCRCW subpacket,
+0 for a ZSINIT, and the echoed number for a ZCHALLENGE.
 
 ### ZNAK (S<->R)
 
