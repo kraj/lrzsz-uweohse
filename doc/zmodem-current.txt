@@ -262,11 +262,11 @@ of 1024 bytes, with recommended sizes of 256 bytes below 2400 bps, 512 at
 it, and some only support 1024. Attempts to use larger subpackets with
 these implementations will fail.
 
-Larger subpacket sizes (2048, 4096, 8192 bytes) are common extensions
+Larger subpacket sizes (4096, 8192 bytes) are common extensions
 that reduce per-subpacket overhead. They are widely used on modern
-implementations (lrzsz, sexyz, and others). lrzsz uses 1024 bytes by 
-default; the user can select 2048 (`-2`), 4096 (`-4`), or 8192
-(`-8`) if the receiver supports it.
+implementations (lrzsz, sexyz, and others). lrzsz uses 1024 bytes by
+default; the user can select 4096 (`-4, --try-4k`) or 8192
+(`-8, --try-8k`) if the receiver supports it.
 
 The receiver may specify a segment length in the ZRINIT frame (ZP0/ZP1,
 little-endian); 0 means unlimited (see section 3). If a segment length
