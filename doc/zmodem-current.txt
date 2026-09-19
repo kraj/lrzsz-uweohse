@@ -873,8 +873,6 @@ etc.) and segment length.
 The sender may optionally send ZSINIT to define an attention sequence
 or request control-character escaping. The receiver responds with ZACK.
 
-The receiver may optionally send ZCHALLENGE to verify the sender (deprecated).
-
 Once synchronization is complete, the sender proceeds to file transfer.
 
 ## 6.2 File transfer
