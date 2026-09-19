@@ -739,7 +739,8 @@ The sender responds with a ZFIN sequence.
 
 Sent by the receiver to force file transfer to resume at the file offset
 given in ZP0...ZP3. This is part of the error recovery flow; see
-section 5.
+section 5. The offset is attacker-controlled from the sender's point
+of view; it MUST be validated before use (see section 5).
 
 ### ZFERR (S<--R)
 
@@ -849,7 +850,13 @@ When the sender receives a ZRPOS:
 1. It SHOULD purge its output buffers and/or network of unprocessed
    output data, to minimize the amount of stale data the receiver must
    discard.
-2. It seeks to the position given in the ZRPOS.
+2. It seeks to the position given in the ZRPOS. The position MUST be
+   validated first: it MUST NOT exceed the size of the input file (or
+   be negative, or otherwise nonsensical). The response to an invalid
+   position (rejecting the frame, or clamping it to the file size) is
+   implementation-defined. A sender that cannot seek (pipe,
+   non-seekable input) MUST NOT resume to a foreign offset; it either
+   ignores the ZRPOS position or restarts the transfer.
 3. It sends a ZDATA frame at that position.
 4. The first data subpacket MUST be ZCRCW (wait for ACK) to ensure both
    sides are synchronized before resuming streaming.
