@@ -643,8 +643,9 @@ Zero-length data subpackets may be used as an idle subpacket to prevent
 the receiver from timing out in case data is not immediately available
 to the sender.
 
-The sender is free to choose frameend types, except when ZDATA is sent
-as part of error recovery (see section 5).
+The sender is free to choose frameend types, except that the first
+subpacket after a ZRPOS — the initial one as well as one during error
+recovery — MUST be ZCRCW (see section 5).
 
 The receiver compares the file position in the ZDATA header with the
 position it expects. If they differ, it sends a ZRPOS response with the
