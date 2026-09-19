@@ -52,7 +52,7 @@ Shown from the sender's perspective:
     S<--R ZRINIT
     S-->R ZFIN
     S<--R ZFIN
-    S-->R OO ("Over and Out" — purely cosmetical)
+    S-->R OO ("Over and Out" — cosmetic for the sender)
 
 Often things are simpler:
 
@@ -69,7 +69,7 @@ Often things are simpler:
     S<--R ZRINIT
     S-->R ZFIN
     S<--R ZFIN
-    S-->R OO ("Over and Out" — purely cosmetical)
+    S-->R OO ("Over and Out" — cosmetic for the sender)
 
 And sometimes things go wrong:
 
@@ -718,6 +718,10 @@ Deprecated ZF0 flags:
 - CANRLE (0x08): the receiver can decode ZMODEM run-length encoding.
   Only implemented in Omen software.
 - CANLZW (0x10): the receiver can uncompress. Never implemented anywhere.
+
+Note: CANCRY and CANRLE share the same bit. The bit is meaningless
+today: a receiver receiving it set SHOULD ignore it, and MUST NOT
+interpret it as RLE or encryption capability.
 
 ZF1 is another bitwise OR mask of the receiver's capabilities. All
 deprecated:
