@@ -86,9 +86,10 @@ Security fixes:
 
 Security related changes:
 
-* the lrz remote command execution feature was removed.
-  feature: `lsz -c any command` would have caused lrz to execute that 
-  command through the shell.
+* the lrz remote command execution feature (receiving remote commands)
+  was removed.
+  feature: a sender could have lrz execute that command through the shell
+  (ZCOMMAND).
   This was a feature of the original public domain zmodem, and by default
   disabled in lrzsz since sometime in the 90s, by hiding it behind the 
   -C or --allow-commands options.
