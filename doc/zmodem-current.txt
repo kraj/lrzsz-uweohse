@@ -209,7 +209,8 @@ and begins with the sequence ZPAD, ZDLE, ZBIN. They are followed by:
   The CRC is calculated over the type byte and the four position/flag
   bytes (in their unencoded state).
 
-Zero or more binary data subpackets with 16-bit CRC may follow.
+Zero or more binary data subpackets with 16-bit CRC may follow (but see
+section 2.4 for when sending data with CRC-16 is allowed).
 
 A ZBIN header therefore looks like this:
 
@@ -325,9 +326,13 @@ The following recommendations apply:
 - You MUST implement CRC-16 for hex headers. There is no way around it,
   and the CCITT-1021 polynomial is adequate for that purpose.
 - You MUST be able to handle incoming CRC-16 binary headers.
+- You MUST implement CRC-32.
+- A receiver MUST advertise CANFC32 in its ZRINIT frames (section 4).
 - You MAY reject file transfer with CRC-16.
 - You MAY send CRC-16 binary headers when NOT sending data subpackets.
-- You MUST send CRC-32 binary headers when sending data subpackets.
+- You MUST send CRC-32 binary headers when sending data subpackets
+  over a connection where the receiver advertised CANFC32; without
+  CANFC32 you MUST use CRC-16 (see section 2.2).
 
 The reason for this is that the CCITT CRC-16 polynomial is weak even for
 a 16-bit CRC. It is adequate for headers (which are short and sent
@@ -686,7 +691,7 @@ Useful flags:
 - CANBRK  (0x04): the receiver can send a break signal.
   (If you have tcsendbreak and send via a terminal, set this.)
 - CANFC32 (0x20): the receiver can use 32-bit CRC.
-  (You really want this.)
+  (A receiver MUST set this; see section 2.4.)
 - ESCCTL  (0x40): the receiver expects control chars to be escaped.
 - ESC8    (0x80): the receiver expects the 8th bit to be escaped.
 
@@ -708,7 +713,8 @@ See section 9.
 ZP0 and ZP1 contain the receiver's segment length in bytes
 (little-endian), or 0 if nonstop I/O is allowed (see section 3).
 
-Recommendation: send CANFC32|CANFDX|CANOVIO, and maybe |CANBRK.
+Recommendation: a typical ZRINIT sets CANFC32|CANFDX|CANOVIO,
+and maybe |CANBRK.
 
 ### ZSKIP (S<--R)
 
