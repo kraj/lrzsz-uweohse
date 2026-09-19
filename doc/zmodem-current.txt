@@ -1052,7 +1052,7 @@ Horse message.
 As a security measure it is extremely weak, and 'spurious data' could
 be easily caught otherwise.
 
-## 9.3 Variable header deprecation
+## 9.4 Variable header deprecation
 
 The variable length headers have been here for 30 years, and since then
 the only implementations of them have been in OMEN software - but all of
