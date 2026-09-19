@@ -1311,6 +1311,7 @@ struct class_stats {
 	long total_ms;
 	long max_ms;
 	long hangs; /* target waited until the alarm */
+	long timeouts; /* hangs + excused child-alarm (-14) deaths */
 	long fails;
 	long crc32; /* iterations that negotiated 32-bit CRC (receive mode) */
 };
@@ -1320,6 +1321,36 @@ static int send_choice = -1;
 static int n_tx_choices = 13; /* includes the data-phase ACK-loop */
 static enum mclass mc_current = M_NONE; /* class of the running iteration */
 static int iter_crc32; /* iteration negotiated 32-bit CRC (receive mode) */
+
+/* per-class fail-reason histogram: the raw `bad` string from
+ * check_invariants()/fail() grouped by class/choice, so a summary row
+ * says WHAT failed, not just how often */
+#define N_FAIL_REASONS 64
+struct fail_reason {
+	const char *what;
+	long count;
+};
+static struct fail_reason fail_reasons[N_MCLASS][N_FAIL_REASONS];
+static struct fail_reason fail_reasons_tx[13][N_FAIL_REASONS];
+
+static void
+note_fail_reason(const char *what, int rx, long idx)
+{
+	struct fail_reason (*tab)[N_FAIL_REASONS] =
+	    rx ? fail_reasons : fail_reasons_tx;
+	struct fail_reason *t = tab[idx];
+	int i;
+	for (i = 0; i < N_FAIL_REASONS && t[i].what; i++) {
+		if (t[i].what == what) { /* same string literal */
+			t[i].count++;
+			return;
+		}
+	}
+	if (i < N_FAIL_REASONS) {
+		t[i].what = what;
+		t[i].count = 1;
+	}
+}
 
 /* build one ZFILE metadata subpacket around `name` */
 static size_t
@@ -1526,7 +1557,9 @@ mut_send(enum mclass mc, int data_frame)
  * it did in the original run. Mirrors the main loop's per-iteration
  * draw order: build_payload(), mutation class, optional hostile-name
  * pick, then fuzz_receive_iter()'s payload length and payload bytes
- * plus draw_mut_params(). */
+ * plus draw_mut_params(). In send mode the mirror is fuzz_send_iter()'s
+ * unconditional sequence: build_payload(), mc draw, draw_mut_params(),
+ * choice draw (the clean-baseline overrides never touch the stream). */
 static void
 fast_forward_rng(long it)
 {
@@ -1538,6 +1571,11 @@ fast_forward_rng(long it)
 		mc = rng_below(N_MCLASS - 1) + 1;
 		if (i % 17 == 0)
 			mc = M_NONE;
+		if (!mode_receive) {
+			draw_mut_params((enum mclass)mc);
+			(void)rng_below(n_tx_choices); /* fuzz_send_iter's choice */
+			continue;
+		}
 		if ((enum mclass)mc == M_NAME)
 			(void)rng_below(N_HOSTILE);
 		build_payload(); /* fuzz_receive_iter()'s own call */
@@ -2130,7 +2168,7 @@ fuzz_send_iter(void)
 	 * the mutation classes corrupt every ACK by design, which would
 	 * otherwise keep lsz in its bounded retry paths forever. The
 	 * override happens AFTER the draw: the PRNG stream is unaffected
-	 * (send mode has no -S replay anyway). */
+	 * (which is what makes send-mode -S replay possible). */
 	enum mclass mc = (enum mclass)(rng_below(N_MCLASS - 1) + 1);
 	if (current_iteration % 17 == 0)
 		mc = M_NONE;
@@ -2202,8 +2240,8 @@ fuzz_send_iter(void)
 		/* clean-baseline iterations always take the ACK loop:
 		 * the mutated choices would keep lsz in its bounded
 		 * handshake retry paths and never exercise the data
-		 * phase; the PRNG stream keeps its draw (send mode has
-		 * no -S replay) */
+		 * phase; the PRNG stream keeps its draw (which is what
+		 * makes send-mode -S replay possible) */
 		if (current_iteration % 17 == 0)
 			choice = 11;
 		send_choice = (int)choice;
@@ -2635,15 +2673,26 @@ teardown_iteration(void)
 static const char *
 check_invariants(int exitcode, int hang)
 {
+	/* distinct string literals per exit code so the fail-reason
+	 * histogram can group by pointer identity */
 	static char reason[256];
 
 	if (hang)
 		return "target hang (alarm)";
 	if (exitcode < 0) {
+		switch (-exitcode) {
+		case 2: return "death by signal 2";
+		case 4: return "death by signal 4";
+		case 6: return "death by signal 6";
+		case 7: return "death by signal 7";
+		case 8: return "death by signal 8";
+		case 11: return "death by signal 11";
+		default: break;
+		}
 		snprintf(reason, sizeof reason, "death by signal %d", -exitcode);
 		return reason;
 	}
-	/* exitcode 0/1/4/127/128+ are fine; anything else is suspicious.
+	/* exitcode 0/1/4/24/127/128+ are fine; anything else is suspicious.
 	 * 127 is lrz's Security-Violation outcome: checkpath() rejects a
 	 * hostile name (e.g. the M_NAME class sends "..") with
 	 * bibi(-1) → fatal_error(128 + -1, ...) → exit(127). That is a
@@ -2653,9 +2702,23 @@ check_invariants(int exitcode, int hang)
 	 * corrupt exchanges by design — a receiver giving up then is
 	 * like lrz's exit 1). A clean iteration (it % 17 == 0) must
 	 * NEVER end in 4; that was the harness's missing trailing-NUL
-	 * bug in build_zfile_data, fixed. */
+	 * bug in build_zfile_data, fixed.
+	 * 24 is zmtx-zmrx-1.02's "remote aborted": it counts >=5 CAN
+	 * bytes as a receiver cancel and tears down (verified directly:
+	 * 5 raw CANs on stdin → exit 24, no message; the harness's
+	 * post-transfer 6-CAN close burst lands as a cancel even on a
+	 * clean exchange). Same class as 4 — designed cancel, not a bug. */
 	if (exitcode != 0 && exitcode != 1 && exitcode != 4
-	    && exitcode != 127 && exitcode < 0x80) {
+	    && exitcode != 24 && exitcode != 127 && exitcode < 0x80) {
+		switch (exitcode) {
+		case 2: return "odd exit code 2";
+		case 3: return "odd exit code 3";
+		case 5: return "odd exit code 5";
+		case 101: return "odd exit code 101";
+		case 126: return "odd exit code 126";
+		case 128: return "odd exit code 128";
+		default: break;
+		}
 		snprintf(reason, sizeof reason, "odd exit code %d", exitcode);
 		return reason;
 	}
@@ -2725,9 +2788,9 @@ usage(void)
 "  -n N        iterations (default 200; FUZZITER overrides when -n is absent)\n"
 "  -S N        fast-forward to iteration N: replay the PRNG draws of\n"
 "              iterations 0..N-1 without running the target, then run\n"
-"              iterations N..N-1+(-n N) (receive mode only). NOTE: the\n"
-"              draw sequence is only stable within one binary — changes\n"
-"              to the mutation code invalidate older seeds' offsets\n"
+"              iterations N..N-1+(-n N). NOTE: the draw sequence is\n"
+"              only stable within one binary — changes to the mutation\n"
+"              code invalidate older seeds' offsets\n"
 "  -t SEC      per-iteration timeout in seconds (default 20). Keep this\n"
 "              at 8s or more for exploratory runs: the receiver has a\n"
 "              fixed 10s internal retry wait, and smaller values cut\n"
@@ -2860,20 +2923,13 @@ main(int argc, char *argv[])
 	{
 		long it;
 		int failures = 0;
-		if (start_iteration > 0) {
-			if (!mode_receive) {
-				/* send mode's rng stream depends on what the
-				 * target does (fuzz_send_iter draws only
-				 * after exchanges happened), so it cannot be
-				 * replayed blind */
-				die("-S needs -m receive");
-			}
-			if (start_iteration >= iterations)
-				iterations = start_iteration + 1;
-			fast_forward_rng(start_iteration);
-			tr_mark("# fast-forwarded rng to iteration %ld",
-				start_iteration);
-		}
+	if (start_iteration > 0) {
+		if (start_iteration >= iterations)
+			iterations = start_iteration + 1;
+		fast_forward_rng(start_iteration);
+		tr_mark("# fast-forwarded rng to iteration %ld",
+			start_iteration);
+	}
 		for (it = start_iteration; it < iterations; it++) {
 			int exitcode = 0;
 			const char *bad = NULL;
@@ -2957,13 +3013,17 @@ main(int argc, char *argv[])
 							"expected after a "
 							"mid-stream mutation");
 						failures += 0;
+						if (st)
+							st->timeouts++;
 					} else {
 						fail("hang", it, exitcode);
 						failures++;
+						if (st)
+							st->timeouts++;
 					}
 				} else {
 					bad = check_invariants(exitcode, 0);
-	if (bad && exitcode == -14)
+	if (bad && exitcode == -14) {
 		/* the child's alarm fired: a
 		 * mutation (or, in send mode,
 		 * every iteration is one)
@@ -2971,6 +3031,10 @@ main(int argc, char *argv[])
 		 * by design and the target
 		 * waited — expected */
 		bad = NULL;
+		/* still bookkeep the budget burn */
+		if (st)
+			st->timeouts++;
+	}
 	if (!bad && clean)
 		bad = check_received();
 	if (!bad && !clean && longpkt_completed())
@@ -2978,6 +3042,12 @@ main(int argc, char *argv[])
 	if (bad) {
 		fail(bad, it, exitcode);
 		failures++;
+		if (st)
+			note_fail_reason(bad, mode_receive,
+					 mode_receive
+					     ? (long)(st - rx_stats)
+					     : send_choice < 13
+						   ? send_choice : 0);
 	}
 				}
 			}
@@ -3033,24 +3103,42 @@ main(int argc, char *argv[])
 				"ZFIN", "ACK-loop", "ZRPOS-0+skip"
 			};
 			long ci;
-			fprintf(stderr, "zmodemfuzz: class summary "
-				"(count, avg ms, max ms, hangs, fails"
-				", crc32)\n");
+			fprintf(stderr,
+				"zmodemfuzz: class summary "
+				"(seed=%ld mode=%s t=%ds target=%s)\n",
+				seed, mode_receive ? "receive" : "send",
+				alarm_seconds, target_argv[0]);
+			fprintf(stderr, "zmodemfuzz: "
+				"(count, avg ms, max ms, hangs, timeouts"
+				", fails, crc32)\n");
 			if (mode_receive) {
 				for (ci = 0; ci < N_MCLASS; ci++) {
 					if (!rx_stats[ci].count)
 						continue;
 					fprintf(stderr,
 						"  %-9s %6ld %7ld %7ld"
-						" %5ld %5ld %5ld\n",
+						" %5ld %5ld %5ld %5ld\n",
 						names[ci],
 						rx_stats[ci].count,
 						rx_stats[ci].total_ms
 						    / rx_stats[ci].count,
 						rx_stats[ci].max_ms,
 						rx_stats[ci].hangs,
+						rx_stats[ci].timeouts,
 						rx_stats[ci].fails,
 						rx_stats[ci].crc32);
+					{
+						int r;
+						for (r = 0; r < N_FAIL_REASONS
+							     && fail_reasons[ci][r].what;
+						     r++)
+							fprintf(stderr,
+								"    ^ %ldx %s\n",
+								fail_reasons[ci][r]
+								    .count,
+								fail_reasons[ci][r]
+								    .what);
+					}
 				}
 			} else {
 				for (ci = 0; ci < n_tx_choices; ci++) {
@@ -3059,14 +3147,27 @@ main(int argc, char *argv[])
 					fprintf(stderr,
 						"  choice %2ld %-15s"
 						" %6ld %7ld %7ld"
-						" %5ld %5ld\n",
+						" %5ld %5ld %5ld\n",
 						ci, choice_names[ci],
 						tx_stats[ci].count,
 						tx_stats[ci].total_ms
 						/ tx_stats[ci].count,
 						tx_stats[ci].max_ms,
 						tx_stats[ci].hangs,
+						tx_stats[ci].timeouts,
 						tx_stats[ci].fails);
+					{
+						int r;
+						for (r = 0; r < N_FAIL_REASONS
+							     && fail_reasons_tx[ci][r].what;
+						     r++)
+							fprintf(stderr,
+								"    ^ %ldx %s\n",
+								fail_reasons_tx[ci][r]
+								    .count,
+								fail_reasons_tx[ci][r]
+								    .what);
+					}
 				}
 			}
 		}

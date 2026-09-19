@@ -3,6 +3,8 @@ Version 0.13.0 -  September 2026, Uwe Ohse
 This is a security release. Two of the changes warrant an immediate update
 if you use lrz to receive files from not perfectly trustworthy senders.
 
+Security fixes:
+
 * if PUBDIR support was NOT compiled in, the restricted mode path check of 
   lrz did allow uploads to any directory the user has write access to.
 
@@ -42,6 +44,48 @@ if you use lrz to receive files from not perfectly trustworthy senders.
 
   Note: this stems from the original public domain rzsz suite (80s).
 
+* lsz no longer uses mmap() for input files. input is now read via stdio
+  only. this also means the input file is no longer closed early, and a
+  file truncated during the transfer fails with a read error instead of
+  killing the sender with SIGBUS. Wire behavior is unchanged.
+  A benchmark (buffered with 8192..262144-byte buffers vs mmap, 15 MiB
+  file) showed buffered I/O at parity or better than mmap, so the
+  special case was not worth its complexity.
+  Security: After removal of the mmap code, fuzzing showed that an 
+  illegal offset during a resumed transfer might have caused a remote 
+  denial of service (reliable, deterministic) and a potential 
+  out-of-bounds read within the 4 GiB following the start of the file.
+  This could have caused an information leak.
+
+* an attacker could have created a setuid/setgid/sticky file when 
+  restricted mode was not used.
+
+  Note: this stems from the original public domain rzsz suite (80s).
+
+* the lrz path name check would have allowed to create a filename `..`, 
+  which may or may not be a security problem with pre-created symlinks 
+  for `..`.
+
+  Note: this stems from the original public domain rzsz suite (80s).
+
+* when the lrz -B / --bufsize "auto" option was used, an attacker could 
+  have wasted up to 2 GB of memory while keeping the connection open. 
+  This was a remotely triggered denial of service attack (in a rare 
+  configuration).
+
+* the lrz file CRC check could have run into an endless loop.
+  This was a possible remotely triggered denial of service attack.
+
+* a number of possible security problems have been fixed:
+  - double fclose in lrz.
+  - a write before a buffer in lrz (80s).
+  - a use of uninitialized memory in lsz (80s).
+  - a misbehaving receiver could cause an endless loop 
+    when the sender used a transmit window (80s).
+
+
+Security related changes:
+
 * the lrz remote command execution feature was removed.
   feature: `lsz -c any command` would have caused lrz to execute that 
   command through the shell.
@@ -68,34 +112,25 @@ if you use lrz to receive files from not perfectly trustworthy senders.
   If you really need something like this, you can add a symlink to the 
   current directory.
 
-* an attacker could have created a setuid/setgid/sticky file when 
-  restricted mode was not used.
-
-  Note: this stems from the original public domain rzsz suite (80s).
-
-* the lrz path name check would have allowed to create a filename `..`, 
-  which may or may not be a security problem with pre-created symlinks 
-  for `..`.
-
-  Note: this stems from the original public domain rzsz suite (80s).
-
 * lrz in very restricted mode now disallows invisible leading 
   directories, too (`dir/.subdir/filename` was allowed before).
 
   Note: that this was possible stems from the original public 
   domain rzsz suite (80s).
 
-* when the lrz -B / --bufsize "auto" option was used, an attacker could 
-  have wasted up to 2 GB of memory while keeping the connection open. 
-  This was a remotely triggered denial of service attack (in a rare 
-  configuration).
+* the TCP mode was removed (no authentication, no encryption).
 
-* the lrz file CRC check could have run into an endless loop.
-  This was a possible remotely triggered denial of service attack.
+* the -U/--unrestrict option has been removed from both lrz and lsz.
+  Rationale: Security-relevant options cannot be turned off: whoever 
+  can add -U to a command line can equally well drop it, so the option 
+  provided no protection - only a trap.
+  The one legitimate use, keeping partially received files on transfer
+  error, lives on as lrz's new --keep-incomplete option (below).
+
+
+Other changes:
 
 * autotools updated. GNU automake 1.17, GNU Autoconf 2.72.
-
-* the TCP mode was removed (no authentication, no encryption).
 
 * the timesync protocol support was removed. No other zmodem suite still 
   in use implemented it, and the function to set the receivers time 
@@ -165,14 +200,6 @@ if you use lrz to receive files from not perfectly trustworthy senders.
   The option is only needed on lines that corrupt the 8th bit, or to
   force the capability advertisement.
 
-* lsz no longer uses mmap() for input files. input is now read via stdio
-  only. this also means the input file is no longer closed early, and a
-  file truncated during the transfer fails with a read error instead of
-  killing the sender with SIGBUS. Wire behavior is unchanged.
-  A benchmark (buffered with 8192..262144-byte buffers vs mmap, 15 MiB
-  file) showed buffered I/O at parity or better than mmap, so the
-  special case was not worth its complexity.
-
 * lrzsz now measures transfer durations (bps, ETA, the -m/--min-bps
   watchdog) with a monotonic clock instead of the wall clock. NTP steps
   or manual date changes during a transfer no longer produce absurd
@@ -186,13 +213,6 @@ if you use lrz to receive files from not perfectly trustworthy senders.
   read via longjmp. lsz notices the ^C at the next loop checkpoint
   and attempts the same resync as before. This removes one source
   of undefined behaviour. 
-
-* the -U/--unrestrict option has been removed from both lrz and lsz.
-  Rationale: Security-relevant options cannot be turned off: whoever 
-  can add -U to a command line can equally well drop it, so the option 
-  provided no protection - only a trap.
-  The one legitimate use, keeping partially received files on transfer
-  error, lives on as lrz's new --keep-incomplete option (below).
 
 * lrz has a new --keep-incomplete option: on a transfer error the
   partially received file is kept instead of deleted (the default),
@@ -231,13 +251,6 @@ if you use lrz to receive files from not perfectly trustworthy senders.
   configure options to deselect it.
 
 * performance on bad lines is quite a bit better now.
-
-* a number of possible security problems have been fixed:
-  - double fclose in lrz.
-  - a write before a buffer in lrz (80s).
-  - a use of uninitialized memory in lsz (80s).
-  - a misbehaving receiver could cause an endless loop 
-    when the sender used a transmit window (80s).
 
 * support for many old systems has been removed. The new support policy is 
   this:
