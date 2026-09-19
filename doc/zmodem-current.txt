@@ -811,6 +811,11 @@ ZFILE.
 The sender sends this to terminate the session. The receiver answers
 with its own ZFIN.
 
+A receiver that cannot continue MAY send ZFIN on its own. A sender
+receiving ZFIN mid-session SHOULD treat it as a session end request and
+exit; completing the ZFIN/"OO" handshake is a courtesy, not a
+requirement.
+
 ### ZCRC (S<->R)
 
 The receiver requests a CRC for the number of bytes given in ZP0..ZP3.
