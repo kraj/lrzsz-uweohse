@@ -1,7 +1,8 @@
 Version 0.13.0 - September 2026, Uwe Ohse
 
-This is a security release. Two of the changes warrant an immediate update
-if you use lrz to receive files from not perfectly trustworthy senders.
+This release fixes a large number of security issues. Two of the changes
+warrant an immediate update if you use lrz to receive files from not
+perfectly trustworthy senders.
 
 Security fixes:
 
