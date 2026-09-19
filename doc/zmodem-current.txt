@@ -920,6 +920,8 @@ For each file:
    - ZRPOS (begin transfer at the given offset, normally 0)
    - ZSKIP (skip this file)
    - ZCRC (request a CRC check before deciding)
+   - ZNAK (the ZFILE frame was garbled; the sender retries)
+   - ZABORT or ZFERR (terminate the batch; see section 4)
 3. The sender sends ZDATA at the requested offset, followed by data
    subpackets.
 4. The sender sends ZEOF when the file is complete.
