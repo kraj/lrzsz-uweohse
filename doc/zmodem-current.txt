@@ -13,15 +13,16 @@ A ZMODEM session typically has three phases:
 
 The first two are the essential ones; the third is trivial.
 
-All bytes transferred are ZDLE encoded, which makes it possible to use
-ZMODEM over many types of networks unable to deal with certain characters
-or that (ab)use them for other purposes.
+The byte stream is subject to ZDLE encoding (section 2.1), which makes
+it possible to use ZMODEM over many types of networks unable to deal
+with certain characters or that (ab)use them for other purposes.
 
 All frames (think of them as messages) transferred over a ZMODEM session
 are CRC protected.
 
-ZMODEM allows the sender to define an attention sequence, with which the
-receiver prefixes all error responses. This is an optional mechanism for
+ZMODEM allows the sender to define an attention sequence, which the
+receiver sends before its error responses (in practice: before the
+ZRPOS of error recovery, see section 5). This is an optional mechanism for
 interrupt-based error recovery on systems that cannot sample the reverse
 channel. It is rarely needed on modern systems. See the error recovery
 section for details.
@@ -77,9 +78,9 @@ And sometimes things go wrong:
     S-->R [1024 byte data subpacket with ZCRCG]
     S-->R [1024 byte data subpacket with ZCRCG]  << this one has a CRC error
     S-->R [1024 byte data subpacket with ZCRCG]
-    S<--R ZRPOS 5120  [receiver: " resend from here"]
-    [sender discards the subpackets it already sent after 5120 - but if it 
-     cannot do that, for example because the data already is in the network, 
+    S<--R ZRPOS 5120  [receiver: "resend from here"]
+    [sender discards the subpackets it already sent after 5120 - but if it
+     cannot do that, for example because the data already is in the network,
      the receiver will have to do it]
     S-->R ZDATA 5120
     S-->R [1024 byte data subpacket with ZCRCW]  << first block after error: wait
@@ -126,7 +127,7 @@ If the ESC8 (ZRINIT) or TESC8 (ZSINIT) flag is set, all bytes >= 0x80
 are escaped via ZDLE encoding.
 Note: this option is not widely implemented.
 
-A common extension or optimization is to not escape 0x10, 0x90, 0x0d 
+A common extension or optimization is to not escape 0x10, 0x90, 0x0d
 and 0x8d (this is often called turbo escaping).
 Another common extension is to escape additional characters, for example
 the ssh escape char.
@@ -175,11 +176,12 @@ condition) and then get the rest of the header with a non-error-specific
 routine.
 
 The type byte, four position/flag bytes, and the 16-bit CRC follow, and
-are sent in hex using the character set 0123456789abcdef (upper case
-digits are not allowed). Each byte is transferred as two hex characters.
+are sent in hex using the character set 0123456789abcdef (upper-case
+hex digits are not allowed). Each byte is transferred as two hex
+characters.
 
-A CR and LF pair follow. Some programs only send LF. The LF is or was
-sometimes sent as 0x8a (LF with the highest bit set).
+A CR and LF pair follows. Some programs only send LF. The LF has
+sometimes been sent as 0x8a (LF with the highest bit set).
 
 The CRC is a 16-bit CRC, calculated over the type byte and the four
 position/flag bytes.
@@ -256,9 +258,8 @@ A ZBIN32 header therefore looks like this:
 
 A data subpacket is a stream of bytes, followed by a frameend byte and a
 CRC. The data subpacket is ZDLE encoded. Variable-length subpackets are
-used instead of fixed-size blocks — this avoids padding overhead,
-preserves exact file length (even for files that grow during transfer),
-and eliminates the block-number limitations of XMODEM-style protocols.
+used instead of fixed-size blocks — this avoids padding overhead and
+eliminates the block-number limitations of XMODEM-style protocols.
 
 A data subpacket always uses the CRC type (16- or 32-bit) of the header
 frame it follows (see section 2.4).
@@ -266,8 +267,9 @@ frame it follows (see section 2.4).
 ### Subpacket sizes
 
 The original ZMODEM documentation specifies a maximum data subpacket size
-of 1024 bytes, with recommended sizes of 256 bytes below 2400 bps, 512 at
-2400 bps, and 1024 above 4800 bps or on relatively error-free links.
+of 1024 bytes, with recommended sizes of 256 bytes below 2400 bps, 512
+bytes at 2400 bps, and 1024 above 4800 bps or on relatively error-free
+links.
 
 1024 bytes remains the safest choice: all ZMODEM implementations support
 it, and some only support 1024. Attempts to use larger subpackets with
@@ -358,7 +360,7 @@ CRC-32 reduces this to negligible levels even for terabyte-scale
 transfers.
 
 The ZMODEM CRC-32 polynomial is relatively strong compared to other
-CRC-32 polynomials. There are better one, but it is good enough.
+CRC-32 polynomials. There are better ones, but it is good enough.
 
 
 # 3. Stream control
@@ -608,13 +610,13 @@ The fields:
 
 - Number of files remaining in the batch.
 
-  Sent as a decimal number, includes the current file. It is an
-  estimate, intended for use in the user interface.
+  Sent as a decimal number. The count includes the current file. It is
+  an estimate, intended for use in the user interface.
 
 - Number of bytes remaining in the batch.
 
-  Sent as a decimal number, includes the current file. It is an
-  estimate, intended for use in the user interface.
+  Sent as a decimal number. The count includes the current file. It is
+  an estimate, intended for use in the user interface.
 
 - File type.
 
@@ -1056,19 +1058,19 @@ This is, and was, the whole documentation. You MUST NOT implement this.
 
 The original ZMODEM documentation stated:
 
-- `No spaces are included in the pathname'
-  This requirement has been removed. Nowadays spaces are common in 
+- `No spaces are included in the pathname`
+  This requirement has been removed. Nowadays spaces are common in
   filenames.
 
-- `File names should be translated to lower case unless the sending 
+- `File names should be translated to lower case unless the sending
    system supports upper/lower case file names.`
-  This has been explictly forbidden. Today practically all systems
-  support file names in difference cases, even though they might also
+  This has been explicitly forbidden. Today practically all systems
+  support file names in different cases, even though they might also
   support filesystems enforcing a single case.
 
 ## 9.2 Rationale for the half deprecation of ZFREECNT
 
-ZFREECNT allowed the sender to inquire about the receivers free space.
+ZFREECNT allowed the sender to inquire about the receiver's free space.
 
 This documentation deprecates the inquiry, and enforces the answer 0,
 aka 'indefinite'. Why?
@@ -1082,7 +1084,7 @@ Good question, the answer is 0.
 You may ask why the sender even wants to know this? Good question, the
 answer is 0.
 
-We have a safe answer here. Forbidding to answer a ZFREECNT would be 
+We have a safe answer here. Forbidding answers to a ZFREECNT would be
 more risky.
 
 ## 9.3 ZCHALLENGE half deprecation
@@ -1093,25 +1095,25 @@ operating program, and was not activated by spurious data or a Trojan
 Horse message.
 
 As a security measure it is extremely weak, and 'spurious data' could
-be easily caught otherwise.
+be detected by simpler means.
 
 ## 9.4 Variable header deprecation
 
-The variable length headers have been here for 30 years, and since then
+The variable length headers have been around for 30 years, and since then
 the only implementations of them have been in OMEN software - but all of
 these are dead.
 
-V-Headers are just longer headers (with max. 16 bytes payload instead
-of fixed 4), with more information.
+V-Headers are just longer headers (with a maximum of 16 bytes payload
+instead of 4), with more information.
 
-Lets see what is known:
+Let's see what is known:
 #define ZRPXWN  8       /* 9th byte in header contains window size/256 */
 #define ZRPXQQ  9       /* 10th to 14th bytes contain quote mask */
 #define ZRRQWN  8       /* Receiver specified window size in ZRPXWN */
 #define ZRRQQQ  16      /* Additional control chars to quote in ZRPXQQ  */
 Summary:
-- the receiver can influence the senders window size (still useful)
-- and it can set the control escaping per character (may be still useful).
+- the receiver can influence the sender's window size (still useful)
+- and it can set the control escaping per character (may still be useful).
 
 But it also leaves some open questions:
 a) Why 5 bytes (40 bits) for 32 control chars? (csz really uses 4 bytes)
@@ -1179,7 +1181,7 @@ if the features are somewhat attractive.
 - ZCRCQ 'j'       /* CRC next, frame continues, ZACK expected */
 - ZCRCW 'k'       /* CRC next, ZACK expected, end of frame */
 
-## 10.6 ZRINIT byte ZF0 
+## 10.6 ZRINIT byte ZF0
 - CANFDX  0x01    /* Rx can send and receive true FDX */
 - CANOVIO 0x02    /* Rx can receive data during disk I/O */
 - CANBRK  0x04    /* Rx can send a break signal */
@@ -1190,7 +1192,7 @@ if the features are somewhat attractive.
 - ESCCTL  0x40    /* Receiver expects ctl chars to be escaped */
 - ESC8    0x80    /* Receiver expects 8th bit to be escaped */
 
-## 10.7 ZRINIT byte ZF1 
+## 10.7 ZRINIT byte ZF1
 - CANVHDR 0x01  /* Variable headers OK [DEPRECATED] */
 - ZRRQWN  0x08       /* Receiver specified window size in ZRPXWN [DEPRECATED] */
 - ZRRQQQ  0x10      /* Additional control chars to quote in ZRPXQQ [DEPRECATED] */
