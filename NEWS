@@ -116,8 +116,7 @@ Security related changes:
 * lrz in very restricted mode now disallows invisible leading 
   directories, too (`dir/.subdir/filename` was allowed before).
 
-  Note: that this was possible stems from the original public 
-  domain rzsz suite (80s).
+  Note: this stems from the original public domain rzsz suite (80s).
 
 * the TCP mode was removed (no authentication, no encryption).
 
@@ -145,7 +144,7 @@ Other changes:
   in the range 2GB to just under 4GB (64bit systems did not have that 
   limit).
 
-  Note: that lrzsz was limited to 31 bit file sizes stems from the 
+  Note: lrzsz's 31-bit file-size limit stems from the
   original public domain rzsz suite (80s). The same limit existed
   in later published omen technology sources, and at least one 
   independent implementation.
