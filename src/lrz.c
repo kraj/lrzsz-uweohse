@@ -2063,8 +2063,21 @@ static void
 ackbibi(void)
 {
 	int n;
+	struct sigaction sa;
 
 	DPRINTF(DEBUG_TRANSFER, "ackbibi:");
+	/* Now the session is complete, every file has been received and 
+         * this ZFIN exchange is only the sender's farewell.
+	 * If the line destroys our ZFIN or the sender's "OO", we retransmit
+	 * - and if the sender already left (its OO was lost, it exited
+	 * after writing it), out retransmit would fail with EPIPE. Dying of
+	 * SIGPIPE there would turn the clean end into exit 141 even
+	 * though nothing was lost. The retransmit loop below handles
+	 * the silence (RCDO/TIMEOUT) and just gives up. So ignore
+	 * SIGPIPE for the remainder of the session. */
+	memset(&sa, 0, sizeof sa);
+	sa.sa_handler = SIG_IGN;
+	sigaction(SIGPIPE, &sa, NULL);
 	stohdr(0L);
 	for (n=3; --n>=0; ) {
 		purgeline(0);
