@@ -1667,7 +1667,11 @@ ack_resync (struct zm_fileinfo *zi, int c, bool sync_first,
 		case ZRPOS:
 			break;
 		case ZRINIT:
-			return OK;
+			/* the receiver finished the file and closed our input
+			 * (getinsync): the data phase must terminate, never
+			 * re-enter it — zfilbuf() would fread() from NULL.
+			 * (OK would mean "resend ZDATA" to the callers.) */
+			return ZRINIT;
 		}
 
 		/* drain pending receiver input; CAN/ZPAD and read errors
