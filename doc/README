@@ -14,8 +14,14 @@ Included in this directory are:
   It was written in 2026.
   I marked many features as deprecated, because they are either
   obsolete or should not be used in todays environment. I also 
-  documented common extension.
+  documented common extensions.
+
+- my work-in-progress ZMODEM64 proposal, to add large file 
+  support, larger and more precise time stamps, receiver originated
+  window, rxbuf and subpacket sizes and receivers originated 
+  escapes to the protocol.
 
 - zmodemsnif.txt, the only documentation of the ZMODEM sniffer i
   use.
-
+  This is a rework of my old recordxyz, but the options are 
+  incompatible, and the 'feature' of crashing randomly is gone.

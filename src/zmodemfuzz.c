@@ -409,6 +409,7 @@ build_payload(void)
 		payload[i] = (unsigned char)rng_next();
 }
 
+__attribute__((noreturn))
 __attribute__((format(printf, 1, 2))) static void
 die(const char *fmt, ...)
 {
@@ -462,7 +463,9 @@ static int to_target[2];   /* parent -> target stdin */
 static int from_target[2]; /* target stdout -> parent */
 static int target_stderr[2];
 static volatile sig_atomic_t alarm_fired;
+#ifdef RLIMIT_AS
 static unsigned long mem_limit = 256UL * 1024 * 1024;
+#endif
 
 /* run a shell command, discarding its status (mkdir/ln/rm plumbing).
  * system() is deliberately NOT used: its /bin/sh child resets signal
@@ -545,10 +548,12 @@ spawn_target(void)
 		 * relative file arguments like ./test/4k.bin break. */
 		if (mode_receive && chdir(recvdir) != 0)
 			_exit(126);
+#ifdef RLIMIT_AS
 		if (mem_limit
 		    && setrlimit(RLIMIT_AS,
 				 &(struct rlimit){ mem_limit, mem_limit }) != 0)
 			_exit(126);
+#endif
 		if (dup2(to_target[0], 0) < 0
 		    || dup2(from_target[1], 1) < 0
 		    || dup2(target_stderr[1], 2) < 0)
