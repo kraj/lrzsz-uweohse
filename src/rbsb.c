@@ -145,6 +145,8 @@ bool Twostop;		/* Use two stop bits */
 
 static struct termios oldtty, tty;
 
+static int not_a_tty = false;	/* tcgetattr can never succeed on this fd */
+
 /*
  * mode(n)
  *  3: save old tty stat, set raw mode with flow control
@@ -164,19 +166,23 @@ io_mode(int fd, int n)
 		did0 = 1;
 		if (tcgetattr(fd,&oldtty) == 0)
 			have_oldtty = true;
-		else if (errno == ENOTTY) {
-			/* not a terminal (pipe, pty master...): tcgetattr can
-			 * never succeed on this fd. Don't retry it forever. */
-			did0 = 2;
-			DPRINTF(DEBUG_TTY, "tcgetattr failed: not a tty\n");
-		} else {
-			/* transient failure (e.g. EINTR): don't latch did0 and
-			 * don't change the line now, so the next call can still
+		else if (errno == EINTR) {
+			/* transient failure: don't latch did0 and don't
+			 * change the line now, so the next call can still
 			 * capture the UNMODIFIED state. (Setting a mode here
 			 * would make the later tcgetattr save the changed
 			 * settings, and the exit would "restore" those.) */
 			did0 = 0;
 			return ERROR;
+		} else {
+			/* not a terminal (pipe, pty master...): tcgetattr can
+			 * never succeed on this fd. Whatever the errno is
+			 * (ENOTTY on Linux, EOPNOTSUPP on OpenBSD fifos),
+			 * don't retry it forever. */
+			did0 = 2;
+			not_a_tty = true;
+			DPRINTF(DEBUG_TTY, "tcgetattr failed: not a tty (errno %d)\n",
+				errno);
 		}
 	}
 
@@ -265,6 +271,10 @@ sendbrk(int fd)
 
 	if (nobreak)
 		return;
+	if (not_a_tty) {
+		nobreak = 1;
+		return;
+	}
 	if (tcsendbreak(fd,0) < 0) {
 		if (errno == ENOTTY)
 			nobreak = 1;
