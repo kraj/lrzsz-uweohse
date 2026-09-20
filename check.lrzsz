@@ -154,21 +154,25 @@ doit() {
     rz="$4"
     cmp="$5"
     files="$6"
-    # Optional 7th argument: expected nonzero exit codes, as
-    # "sender-codes|receiver-codes" (comma separated, empty meaning "only 0").
-    # Used for tests where a side is EXPECTED to fail (aborts, refusals, 
-    # path violations). Death by a core-dumping signal can and will never bej
+    # Optional arguments 7 and 8: exit codes accepted for the sender and
+    # the receiver, comma separated (empty or absent = only 0). Used for
+    # tests where a side is EXPECTED to fail (aborts, refusals, path
+    # violations). Death by a core-dumping signal can and will never be
     # accepted, so a buggy binary that dumps core can no longer yield
     # "PASSED". The caught-signal exits that lrzsz produces by design
     # (SIGPIPE=141 etc.) still need an opt-out.
-    # I wish that complicated wasn't needed.
+    # I wish that complication wasn't needed.
+    # Two separate arguments, NOT one "A|B" argument: the "|" would have
+    # to be split out of the string, and in a ${var%%...} pattern ksh
+    # treats it as alternation, not as a literal character (dash and
+    # bash treat it as literal) — so the split is unportable.
     doit_ok_sender="0"
     doit_ok_receiver="0"
     if test -n "$7" ; then
-        doit_ok_sender="${7%%|*}"
-        if test "$7" != "${7#*|}" ; then
-            doit_ok_receiver="${7#*|}"
-        fi
+        doit_ok_sender="$7"
+    fi
+    if test -n "$8" ; then
+        doit_ok_receiver="$8"
     fi
 
     if test "$ONLY" != "$doit_key" -a -n "$ONLY"; then
@@ -1705,7 +1709,7 @@ SEOF
     # check below uses its basename inside $key, as always.
     doit "$key" "lsz sending ../escape-target.bin to lrz must fail" \
         "$testdir/run-traversal-sender.sh" \
-        "$RZ -q" missing escape-target.bin "0,128|127"
+        "$RZ -q" missing escape-target.bin 0,128 127
     if cmp -s $testdir/escape-target.bin $testdir/escape-target.pristine ; then
         :
     else
@@ -1759,7 +1763,7 @@ SEOF
     # on its sector-header retries) — the verdict is the missing file.
     key="xmodem-lrz-null"
     doit "$key" "xmodem lrz -D does not create the file" \
-        "$SZ -q -X" "$RZ -q -b -X -D" "missing" $all_256_file "128|128"
+        "$SZ -q -X" "$RZ -q -b -X -D" "missing" $all_256_file 128 128
 
     #
     # long ZFILE subpacket (V10): a filename near the 960-byte name limit
@@ -1806,9 +1810,9 @@ SEOF
     dd if=$srcdir/src/lsz.c of=$testdir/newfile.bin bs=256 count=3 2>&5
     cp $testdir/newfile.bin $testdir/$key/newfile.bin    # the victim
     doit "$key" "ZMODEM_RESTRICTED + -R + -y refuses to overwrite existing file" \
-        "$SZ -q -y" "env ZMODEM_RESTRICTED=1 $RZ -q -R -y" cmp $testdir/newfile.bin "128|127"
+        "$SZ -q -y" "env ZMODEM_RESTRICTED=1 $RZ -q -R -y" cmp $testdir/newfile.bin 128 127
     doit "$key" "ZMODEM_RESTRICTED + -y refuses to overwrite existing file" \
-        "$SZ -q -y" "env ZMODEM_RESTRICTED=1 $RZ -q -y" cmp $testdir/newfile.bin "128|127"
+        "$SZ -q -y" "env ZMODEM_RESTRICTED=1 $RZ -q -y" cmp $testdir/newfile.bin 128 127
 
     #
     # -U/--unrestrict was removed: both programs must print the removal
@@ -1844,9 +1848,9 @@ SEOF
     mkdir "$testdir/$key"
     FAULT="$SIMU -s 1 -f 9999999999 -r 1m"
     doit "$key-delete-default" "aborted transfer deletes the incomplete file" \
-        "$SZ -q -Z" "$RZ -q -Z -s +1" missing $binary_1m "141|128"
+        "$SZ -q -Z" "$RZ -q -Z -s +1" missing $binary_1m 141 128
     doit "$key-keep" "aborted transfer keeps the incomplete file with --keep-incomplete" \
-        "$SZ -q -Z" "$RZ -q -Z --keep-incomplete -s +1" incomplete_keep_cmp $binary_1m "141|128"
+        "$SZ -q -Z" "$RZ -q -Z --keep-incomplete -s +1" incomplete_keep_cmp $binary_1m 141 128
     FAULT=
 
     #
