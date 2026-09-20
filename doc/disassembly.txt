@@ -1,0 +1,126 @@
+RealDeuce, the current maintainer of zmtx-zmrx, has done a disassembly of the
+Omen Technology DSZ.EXE, and documented MobyTurbo, Pack-7, and some RLE mode
+(beyond that found in, for example, crzsz).
+
+You can find it there:
+https://github.com/RealDeuce/zmtx-zmrx/blob/main/docs/omen-esc8-disassembly.md
+
+
+# Why I ignored the disassembly when I rewrote the ZMODEM documentation
+
+I've chosen to ignore this because I'm quite sure Chuck Forsberg, if he was
+alive, would have opposed any usage of these features by independent
+implementations:
+
+1) I had contact with Chuck Forsberg once, and was threatened with legal
+   actions after telling him about a bug in the public domain zmodem
+   sources, which I had fixed in lrzsz.
+
+2) Chuck Forsberg accused the original author of zmtx-zmrx, a ZMODEM
+   implementation totally independent of the Omen public domain rzsz
+   suite, of copyright infringement (which was totally laughable).
+
+3) In some of the proprietary features of the Omen DSZ.EXE (MobyTurbo
+   and the 0x31, 0x32, and 0x33 headers) the following string is
+   included in the CRC calculation:
+   `Copyright 1989 Omen Technology INC All Rights Reserved'.
+   Any interoperable implementation is thus forced to embed this
+   copyrighted string in its own CRC computation.
+
+4) Forsberg documented that these features exist, but never documented
+   how they work on the wire.
+
+5) Even after the mentioned features had been implemented in DSZ
+   (and likely in GSZ) they have not been implemented in new
+   UNIX rzsz releases by Omen.
+
+6) The RLE implementation in the crzsz sources states that
+   * Use of this code by inclusion,
+   * decompilation, reverse engineering or any other means
+   * constitutes agreement to these conditions and acceptance of
+   * liability to license the material
+   I assume that someone who would forbid decompilation or
+   reverse engineering of a package distributed in source code
+   would never forget to add the same constraint to a package
+   distributed as binary.
+
+I can only conclude Forsberg was not interested in spreading these features.
+
+From a legal perspective it would possibly be okay to implement these
+features, but morally? Forsberg was opposed to it, and that's it.
+
+Technically I'm less than impressed by the features, anyway.
+
+## MobyTurbo aka mode 3
+
+`A sender emits the five raw bytes 23 c1 d4 93 11 immediately before
+ZFILE and uses ZFILE.ZF3 bit 0x04 to offer the mode.`
+
+Wait, what? This sends five probe bytes before a ZFILE header.
+Sorry, this is just dirty. They are no garbage, though: the sequence is a
+deliberate line-quality probe. It contains XON/XOFF lookalikes and their
+ZDLE-escaped forms, which a link with software flow control will eat - and
+such a link is exactly what MobyTurbo, which sends raw XON/XOFF values as
+data, could not survive. Unsupporting implementations treat the bytes as
+garbage, and simply keep scanning for the next header.
+
+Besides, what is MobyTurbo? A mode in which only the ZDLE char itself
+is escaped, which reduces overhead by quite a bit, to about 0.4%.
+
+In the worst average case ZMODEM ZDLE escaping has an overhead of 3.6%
+(assuming an equal distribution of all 256 characters, and assuming
+that a `\r' always follows a `@', thus triggering the telenet escape).
+
+In reality the telenet escape sequence almost never happens. In a binary
+transfer it happens once every 32k, and in text files it's almost as rare
+that a @ is followed by a \r or \r|0x80.
+In reality most ZMODEM implementations offer a way to not escape ^P or
+^P|0x80, or generally to escape less.
+Thus the real ZDLE overhead is at about 2%.
+
+These calculations get more finicky if you consider that Omen products only
+supported 1024 byte subpackets, while most other implementations support
+8192 byte subpackets, thus needing 35 bytes (7 times 4-byte CRC plus
+frameend) less.
+
+This lower overhead is good, but it never transferred into much better
+transfer rates. Segment and window sizes influence transfer rates much
+more than the escaping does.
+
+Aside from that: many people want more escaping, for example for the
+ssh escape character.
+
+## 0x31 headers aka mode 4
+
+This, basically, is RLE encoding with CRC32 and eighth-bit quoting.
+
+I don't think this is needed. RLE? Why?
+
+## 0x32 headers aka mode 5
+
+Here four bytes of input are encoded into five bytes on the line,
+staying clear of the control characters and the eight bit, but having
+an overhead of 25%.
+
+This is a nice solution to a rare problem: a line eating the eight bit.
+And it mostly solves the ssh escape problem, too: the data alphabet
+(0x22 through 0x79) excludes the tilde and every control character.
+Escaping still matters for the header bytes, though, and the other two
+modes don't address it at all.
+
+## State of the documentation
+
+The disassembly is impressive, but it is not a documentation, and it
+doesn't completely document the variable length headers used.
+I'm almost sure I completely understand what's going on there, but
+the operative word is 'almost'.
+
+# Conclusion
+
+This is not to say that ZMODEM wouldn't benefit from a better escaping.
+It would.
+
+But these three solutions do not solve all escaping problems, and, in
+total, introduce too many new and almost nowhere implemented features,
+which is bound to create interoperability problems instead of solving
+them.
