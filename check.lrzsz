@@ -1843,14 +1843,20 @@ SEOF
     # the receiver hits its -s +1 stop deadline while the linesimulator's
     # 1m-baud limit keeps the ~1MiB transfer busy for ~8s, so lrz aborts
     # mid-file (rzfile: reached stop time -> ERROR -> session fubar).
-    #
+    # Which side tears the session down first is a race. On Linux the
+    # receiver always hits its deadline first (receiver 128, sender then dies
+    # of SIGPIPE=141 on the closed pipe). On OpenBSD in rare cases the sender
+    # won the race, and the receiver's final write hit the closed pipe first
+    # first (receiver SIGPIPE=141 via its bibi handler, sender 141). Both 
+    # orders are by-design outcomes of the deliberate abort, and not failures.
+    # The real verdicts are the cmp functions (delete vs keep).
     key="zmodem-lsz-lrz-MGMT-keep-incomplete"
     mkdir "$testdir/$key"
     FAULT="$SIMU -s 1 -f 9999999999 -r 1m"
     doit "$key-delete-default" "aborted transfer deletes the incomplete file" \
-        "$SZ -q -Z" "$RZ -q -Z -s +1" missing $binary_1m 141 128
+        "$SZ -q -Z" "$RZ -q -Z -s +1" missing $binary_1m 141 128,141
     doit "$key-keep" "aborted transfer keeps the incomplete file with --keep-incomplete" \
-        "$SZ -q -Z" "$RZ -q -Z --keep-incomplete -s +1" incomplete_keep_cmp $binary_1m 141 128
+        "$SZ -q -Z" "$RZ -q -Z --keep-incomplete -s +1" incomplete_keep_cmp $binary_1m 141 128,141
     FAULT=
 
     #
