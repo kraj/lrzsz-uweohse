@@ -2237,6 +2237,12 @@ getinsync(struct zm_fileinfo *zi, int flag)
 		case ZRINIT:
 			/* The receiver got the file and is ready for the next.
                          * return ZRINIT, not ZSKIP, for correct accounting.
+                         * It must be ZRINIT, not OK: ack_resync()'s verdict
+                         * switches on this value, and OK would mean "resend
+                         * ZDATA" there — with input_f closed, zfilbuf()
+                         * would fread() from NULL.
+                         * One day i'll possibly clean up the function exit 
+                         * codes.
                          */
 			if (input_f) {
 				fclose (input_f);

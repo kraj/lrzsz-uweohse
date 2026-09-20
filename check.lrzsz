@@ -154,6 +154,22 @@ doit() {
     rz="$4"
     cmp="$5"
     files="$6"
+    # Optional 7th argument: expected nonzero exit codes, as
+    # "sender-codes|receiver-codes" (comma separated, empty meaning "only 0").
+    # Used for tests where a side is EXPECTED to fail (aborts, refusals, 
+    # path violations). Death by a core-dumping signal can and will never bej
+    # accepted, so a buggy binary that dumps core can no longer yield
+    # "PASSED". The caught-signal exits that lrzsz produces by design
+    # (SIGPIPE=141 etc.) still need an opt-out.
+    # I wish that complicated wasn't needed.
+    doit_ok_sender="0"
+    doit_ok_receiver="0"
+    if test -n "$7" ; then
+        doit_ok_sender="${7%%|*}"
+        if test "$7" != "${7#*|}" ; then
+            doit_ok_receiver="${7#*|}"
+        fi
+    fi
 
     if test "$ONLY" != "$doit_key" -a -n "$ONLY"; then
         # caller might have prepared something here.
@@ -207,9 +223,64 @@ doit() {
     echo "$doit_key - $title" >>$runlog
     echo "pid: $$" >>$runlog
     echo "cmd: ($sz $files ) <$testdir/pipe | (cd $testdir/$doit_key ; exec $FAULT $MYSNIF $rz >>../pipe )" >>$runlog
-        (echo "pid-sender: " $(getpid) >>$runlog ; exec $TIMEOUT $TRACE_SZ $sz $files ) <$testdir/pipe | 
-        (echo "pid-receiver: $(getpid)" >>$runlog ; cd $testdir/$doit_key ; exec $FAULT $MYSNIF $TIMEOUT $TRACE_RZ $rz >>../pipe )
+    # both sides record their exit status (128+N = death by signal N or
+    # lrzsz's caught-signal exits); a missing status file (hard kill of
+    # the subshell) fails too. The `exec` was dropped from both
+    # subshells: the wrapper must survive to write the status file. The
+    # receiver subshell keeps its redirections on the command, as
+    # before.
+    doit_st_s=$testdir/$doit_key/.status-sender
+    doit_st_r=$testdir/$doit_key/.status-receiver
+    rm -f $doit_st_s $doit_st_r
+    (echo "pid-sender: " $(getpid) >>$runlog ; $TIMEOUT $TRACE_SZ $sz $files ; echo $? >$doit_st_s ) <$testdir/pipe |
+        (echo "pid-receiver: $(getpid)" >>$runlog ; cd $testdir/$doit_key ; $FAULT $MYSNIF $TIMEOUT $TRACE_RZ $rz >>../pipe ; echo $? >$doit_st_r )
     end=$($TIMESTAMP)
+    doit_rc_s=$(cat $doit_st_s 2>/dev/null)
+    doit_rc_r=$(cat $doit_st_r 2>/dev/null)
+    if test -z "$doit_rc_s" ; then
+        echo "status: sender did not report an exit status (hard kill?)" >>$runlog
+        doit_rc_s="none"
+    fi
+    if test -z "$doit_rc_r" ; then
+        echo "status: receiver did not report an exit status (hard kill?)" >>$runlog
+        doit_rc_r="none"
+    fi
+    echo "status: sender=$doit_rc_s receiver=$doit_rc_r" >>$runlog
+    # status verdict: 0 always ok; otherwise the code must be listed in
+    # the opt-out. Death by a CORE-DUMPING signal is never acceptable —
+    # those are the codes a buggy binary produces (SIGSEGV=139,
+    # SIGABRT=134, SIGFPE=136, SIGILL=132, SIGBUS=138, SIGTRAP=133,
+    # SIGQUIT=131, SIGSYS=140, SIGXCPU=152, SIGXFSZ=153). The codes for
+    # SIGPIPE/SIGTERM/SIGINT (141/143/130) are NOT listed: lrzsz
+    # catches those by design (bibi_sighandler) and may legitimately
+    # exit 141 on an aborted transfer; they still need an opt-out.
+    doit_bad=""
+    if test "$doit_rc_s" != "0" ; then
+        case ,"$doit_ok_sender", in
+            *,"$doit_rc_s",*) ;;
+            *) doit_bad="$doit_bad sender-exit-$doit_rc_s" ;;
+        esac
+    fi
+    if test "$doit_rc_r" != "0" ; then
+        case ,"$doit_ok_receiver", in
+            *,"$doit_rc_r",*) ;;
+            *) doit_bad="$doit_bad receiver-exit-$doit_rc_r" ;;
+        esac
+    fi
+    case "$doit_rc_s" in
+        131|132|133|134|136|138|139|140|152|153)
+            doit_bad="$doit_bad sender-signal-death" ;;
+    esac
+    case "$doit_rc_r" in
+        131|132|133|134|136|138|139|140|152|153)
+            doit_bad="$doit_bad receiver-signal-death" ;;
+    esac
+    if test -n "$doit_bad" ; then
+        echo "$doit_key:$doit_bad" >>$testdir/failures.log
+        echo "summary: $doit_key FAILED ($doit_bad)" >>$runlog
+        failed=1
+    fi
+    rm -f $doit_st_s $doit_st_r
     echo "cmp: $cmp" >>$runlog
     for doit_i in $files ; do 
             doit_bn=`basename $doit_i`
@@ -1634,7 +1705,7 @@ SEOF
     # check below uses its basename inside $key, as always.
     doit "$key" "lsz sending ../escape-target.bin to lrz must fail" \
         "$testdir/run-traversal-sender.sh" \
-        "$RZ -q" missing escape-target.bin
+        "$RZ -q" missing escape-target.bin "0,128|127"
     if cmp -s $testdir/escape-target.bin $testdir/escape-target.pristine ; then
         :
     else
@@ -1652,6 +1723,8 @@ SEOF
     cp $all_256_file $testdir/sub/escape-target.bin
     cp $all_256_file $testdir/escape-target.pristine
     ln -s .. $testdir/$key/sub
+    # the receiver refuses via safe_open() ELOOP -> clean ZSKIP path:
+    # both sides are expected to exit 0 (no opt-out needed).
     doit "$key" "lsz sending sub/escape-target.bin through a symlinked dir must fail" \
         "$SZ -q -f sub/escape-target.bin" "$RZ -q" missing sub/escape-target.bin
     if cmp -s $testdir/sub/escape-target.bin $testdir/escape-target.pristine ; then
@@ -1680,10 +1753,13 @@ SEOF
     #
     # -D / --null in XMODEM mode: the received data goes to /dev/null,
     # no file with the given pathname may be created.
-    #
+    # Pre-existing quirk, not checked before the exit-status rule: both
+    # sides end via their cancel path (lsz "Line dropped" once the
+    # receiver's /dev/null receiver has nothing left to say, lrz gives up
+    # on its sector-header retries) — the verdict is the missing file.
     key="xmodem-lrz-null"
     doit "$key" "xmodem lrz -D does not create the file" \
-        "$SZ -q -X" "$RZ -q -b -X -D" "missing" $all_256_file
+        "$SZ -q -X" "$RZ -q -b -X -D" "missing" $all_256_file "128|128"
 
     #
     # long ZFILE subpacket (V10): a filename near the 960-byte name limit
@@ -1730,9 +1806,9 @@ SEOF
     dd if=$srcdir/src/lsz.c of=$testdir/newfile.bin bs=256 count=3 2>&5
     cp $testdir/newfile.bin $testdir/$key/newfile.bin    # the victim
     doit "$key" "ZMODEM_RESTRICTED + -R + -y refuses to overwrite existing file" \
-        "$SZ -q -y" "env ZMODEM_RESTRICTED=1 $RZ -q -R -y" cmp $testdir/newfile.bin
+        "$SZ -q -y" "env ZMODEM_RESTRICTED=1 $RZ -q -R -y" cmp $testdir/newfile.bin "128|127"
     doit "$key" "ZMODEM_RESTRICTED + -y refuses to overwrite existing file" \
-        "$SZ -q -y" "env ZMODEM_RESTRICTED=1 $RZ -q -y" cmp $testdir/newfile.bin
+        "$SZ -q -y" "env ZMODEM_RESTRICTED=1 $RZ -q -y" cmp $testdir/newfile.bin "128|127"
 
     #
     # -U/--unrestrict was removed: both programs must print the removal
@@ -1768,9 +1844,9 @@ SEOF
     mkdir "$testdir/$key"
     FAULT="$SIMU -s 1 -f 9999999999 -r 1m"
     doit "$key-delete-default" "aborted transfer deletes the incomplete file" \
-        "$SZ -q -Z" "$RZ -q -Z -s +1" missing $binary_1m
+        "$SZ -q -Z" "$RZ -q -Z -s +1" missing $binary_1m "141|128"
     doit "$key-keep" "aborted transfer keeps the incomplete file with --keep-incomplete" \
-        "$SZ -q -Z" "$RZ -q -Z --keep-incomplete -s +1" incomplete_keep_cmp $binary_1m
+        "$SZ -q -Z" "$RZ -q -Z --keep-incomplete -s +1" incomplete_keep_cmp $binary_1m "141|128"
     FAULT=
 
     #
