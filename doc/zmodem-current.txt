@@ -1,6 +1,15 @@
 ZMODEM — the current state of things. September 2026.
 ===========================================================================
 
+This document is a rewrite of the original ZMODEM specification. The
+goal was to tighten security and improve interoperability. Where the
+original documentation left behaviour open, it is now pinned down, and
+features that never interoperated are explicitly deprecated.
+
+No new features have been introduced.
+
+# 1. Protocol overview
+
 ZMODEM is a unidirectional file transfer protocol: the sender sends files,
 the receiver receives files, and the back channel is only used to transfer
 protocol information, never file data.
@@ -28,7 +37,12 @@ channel. It is rarely needed on modern systems. See the error recovery
 section for details.
 
 
-# 1. Protocol overview
+## 1.1 Example sessions
+
+The following three example sessions — a complete transfer, a minimal
+one, and one with error recovery — illustrate the message flow. They
+are illustrative, not normative; the details are described in the
+Wire format, Stream control, Frame types, and Error recovery sections.
 
 Shown from the sender's perspective:
 
@@ -538,6 +552,8 @@ compression, encryption. See section 9.
 #### ZF3 — extended options
 
 - ZCANVHDR (0x01): "Variable headers OK"
+  Deprecated. See section 9.
+- MOBYTURBO (0x04): "Mobyturbo escaping offered"
   Deprecated. See section 9.
 - ZXSPARS  (0x40): Encoding for sparse file operations.
   Deprecated. See section 9.
@@ -1144,6 +1160,11 @@ b) What is in bytes 5 to 8?
 I wouldn't want to implement anything on a documentation so spotty, even
 if the features are somewhat attractive.
 
+## 9.5 MobyTurbo, Pack-7, and RLE/ESC8 escaping
+
+None of this was ever documented publicly. We know about the details because
+DSZ was disassembled.
+
 # 10 Constants
 
 ## 10.1 characters
@@ -1261,6 +1282,10 @@ if the features are somewhat attractive.
   To the best of my knowledge this was used to signal the receiver
   to ignore non-vhdr headers, and to turn off the 'unregistered copy'
   message.
+- MOBYTURBO 0x04    /* Real constant name unknown [DEPRECATED] */
+  This was used, in the proprietary DSZ.EXE, to signal the senders
+  ability to use MobyTurbo escaping (only ZDLE is escaped in that
+  mode).
 - ZXSPARS   0x40    /* Encoding for sparse file operations [DEPRECATED] */
 
 ## 10.14 Receiver window size override
