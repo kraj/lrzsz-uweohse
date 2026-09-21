@@ -1234,7 +1234,6 @@ translate_profile() {
         ;;
     esac
 
-echo "$1 -- limit $__limit" >&2
     case "$part2" in
     0)
         __d="" 
