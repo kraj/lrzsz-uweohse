@@ -1918,7 +1918,7 @@ rzfile(struct zm_fileinfo *zi)
 				DPRINTF(DEBUG_TRANSFER, "GOTCRCW: bytes_received=%ld, block=%zu, readline_left=%d\n",
 				      (long)zi->bytes_received, bytes_in_block, readline_left);
 				stohdr(zi->bytes_received);
-				zshhdr(ZACK | 0x80, Txhdr);
+				zshhdr(ZACK, Txhdr);
 				state = ST_HDR;
 				continue;
 			case GOTCRCQ:
