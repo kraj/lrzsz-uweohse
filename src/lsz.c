@@ -1618,14 +1618,17 @@ again:
 	}
 }
 
-/* The ACK/resync machinery of zsendfdata(): the verdict switch (former
- * gotack) plus the pending-input drain (the former waitack/gotack block).
- * SYNC_FIRST: run getinsync(zi,0) first (the former waitack entry, used
- * after a ZCRCW subpacket and for the SIGINT resync); otherwise C is the
- * caller's preset verdict byte (the former goto gotack sites). Returns
- * ERROR / ZSKIP / OK for the caller to propagate, or 0 for "synced, keep
- * going" — the caller then re-sends the ZDATA header (the old waitack
- * fall-through to Normal flow did exactly that). */
+/* The ACK/resync machinery of zsendfdata():
+ * - the decision (former gotack) to return ERROR, ZSKIP or 0/OK.
+ * - the pending-input drain (the former waitack/gotack block).
+ * sync_first: run getinsync(zi,0) first (the former waitack entry, used
+ * after a ZCRCW subpacket and for the SIGINT resync);
+ * c: caller's preset verdict byte (the former goto gotack sites).
+ * Returns ERROR or ZSKIP for the caller to propagate, or 0/OK for
+ * "synced, keep going". in the later case the caller re-sends the ZDATA
+ * header (the old waitack fall-through to normal flow did exactly that).
+ * Not a piece of beauty, but so much better than before.
+ */
 static int
 ack_resync (struct zm_fileinfo *zi, int c, bool sync_first,
              int *junkcountp, int *need_waitp)
@@ -2218,8 +2221,34 @@ getinsync(struct zm_fileinfo *zi, int flag)
 			if (input_f)
 				clearerr(input_f);	/* In case file EOF seen */
 
-                        /* the input_f check is for the static analyzer clang-tidy,
-                         * which doesn't catch the logic around input_f. */
+			/* zmrx 1.02 answers a ZCRCW with 1) a ZACK of the
+			 * wrong (pre-block) position, which is ignored below
+			 * because the position doesn't match, and 2) a ZRPOS
+			 * with the right position — which triggers the error
+			 * recovery machinery and thus another ZCRCW, i.e. a
+			 * slow loop even when the transfer succeeds. It kills
+			 * the benchmark. Partially the fault of the original
+			 * ZMODEM specification, which never concretely
+			 * specified WHICH response a receiver must send when
+			 * answering a ZCRCW.
+			 * Workaround: translate a ZRPOS at the last sent
+			 * offset into a ZACK. That is safe: bytes_sent advances
+			 * when a subpacket is queued, while the receiver can
+			 * only ack what it received — so rxpos == bytes_sent
+			 * proves the receiver is missing nothing, and a real
+			 * error recovery ZRPOS (resend from here) always carries
+			 * rxpos < bytes_sent. A receiver using a same-position
+			 * ZRPOS to force a fresh ZCRCW sync point (the spec's
+			 * ZCRCW-after-ZRPOS rule) gets none — but there is
+			 * nothing to restart at that position, so no restart
+			 * is due. */
+			if (zi->bytes_sent == rxpos) {
+				Lrxpos = rxpos;
+				return ZACK;
+			}
+
+			/* the input_f check is for the static analyzer clang-tidy,
+			 * which doesn't catch the logic around input_f. */
 			if (input_f && fseeko(input_f, (off_t) rxpos, 0))
 				return ERROR;
 			zi->eof_seen = 0;
