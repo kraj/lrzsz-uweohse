@@ -206,11 +206,12 @@ doit() {
     if test -n "$NOSNIF" ; then
         MYSNIF=""
     fi
+    doit_timeout=${TIMEOUT_VALUE:-35}
     TIMEOUT=""
     if test -n "$TIMEOUT_FLAGS" && type "timeout" >/dev/null ; then
-        TIMEOUT="timeout $TIMEOUT_FLAGS 35 ";
+        TIMEOUT="timeout $TIMEOUT_FLAGS $doit_timeout ";
     elif type "timeout" >/dev/null ; then
-        TIMEOUT="timeout 35 ";
+        TIMEOUT="timeout $doit_timeout ";
     fi
     
     TRACE_SZ=""
@@ -1309,6 +1310,7 @@ zbenchmark() {
     profiles="unlimited 100m-0ms-errorfree 100m-5ms-errorfree 10m-9ms-errorfree 10m-50ms-errorfree 1m-250ms-errorfree 115200-0ms-errorfree 115200-0ms-faulty 115200-20ms-errorfree 115200-20ms-faulty"
     # for speed in unlimited 100m 10m 2m 1m 115200 38400 25ms 20ms 15ms 10ms 5ms 2ms; do
     # profiles=unlimited
+    TIMEOUT_VALUE=180
     for profile in $profiles; do
         # FAULT=$(translate_profile $profile)
         translate_profile $profile > profile_tmp
