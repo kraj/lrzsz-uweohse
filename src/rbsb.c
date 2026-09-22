@@ -31,10 +31,6 @@
 #include <stdio.h>
 #include <errno.h>
 
-#ifdef HAVE_SYS_IOCTL_H
-#include <sys/ioctl.h>
-#endif
-
 static const struct {
 	unsigned baudr;
 	speed_t speedcode;
@@ -114,7 +110,7 @@ getspeed(speed_t code)
 	for (n=0; speeds[n].baudr; ++n)
 		if (speeds[n].speedcode == code)
 			return speeds[n].baudr;
-	return 38400;	/* Assume fifo if ioctl failed */
+	return 38400;	/* fallback when the speed code is unknown */
 }
 
 /*

@@ -115,10 +115,11 @@ dnl Checks for libraries.
 
 AC_CHECK_INCLUDES_DEFAULT
 
-AC_CHECK_HEADERS(fcntl.h limits.h sys/ioctl.h sys/time.h unistd.h sys/times.h)
-AC_CHECK_HEADERS(termios.h sys/termios.h)
-AC_CHECK_HEADERS(utime.h syslog.h sys/syslog.h sys/param.h)
-AC_CHECK_HEADERS(sys/select.h strings.h arpa/inet.h locale.h)
+dnl No AC_CHECK_HEADERS: with _POSIX_C_SOURCE >= 200809L (MIN_POSIX_C_STD
+dnl above) all headers formerly checked here (fcntl.h limits.h sys/select.h sys/time.h
+dnl sys/times.h termios.h unistd.h utime.h syslog.h locale.h) are mandatory.
+dnl The former checks for sys/ioctl.h sys/termios.h sys/syslog.h sys/param.h
+dnl strings.h arpa/inet.h are gone: nothing includes them any more.
 
 dnl Checks for typedefs, structures, and compiler characteristics.
 

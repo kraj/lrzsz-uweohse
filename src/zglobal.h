@@ -32,36 +32,17 @@
 
 #  include <sys/time.h>
 #  include <time.h>
-
-#ifdef HAVE_SYS_SELECT_H
 #  include <sys/select.h>
-#endif
 
 #include <string.h>
 
 #include <sys/stat.h>
 
-#ifdef HAVE_FCNTL_H
-#  include <fcntl.h>
-#endif
-#ifdef HAVE_SYS_IOCTL_H
-#  include <sys/ioctl.h>
-#endif
-
-#ifdef HAVE_TERMIOS_H
-# include <termios.h>
-#else
-# if defined(HAVE_SYS_TERMIOS_H)
-#  include <sys/termios.h>
-# else
-#  error neither termios.h nor sys/termios.h found. Cannot continue.
-# endif
-#endif
+#include <fcntl.h>
+#include <termios.h>
 
 /* Take care of NLS matters.  */
-#if HAVE_LOCALE_H
-# include <locale.h>
-#endif
+#include <locale.h>
 
 #ifdef ENABLE_NLS
 # include <libintl.h>
@@ -72,16 +53,10 @@
 # define _(Text) Text
 #endif
 
-#ifdef HAVE_SYSLOG_H
-# include <syslog.h>
-#elif defined HAVE_SYS_SYSLOG_H
-# include <sys/syslog.h>
-#endif
+#include <syslog.h>
 extern int enable_syslog;
 
-#if defined HAVE_UNISTD_H
-# include <unistd.h>
-#endif
+#include <unistd.h>
 #include <limits.h>
 
 #include "stats.h"
