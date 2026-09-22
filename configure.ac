@@ -58,8 +58,6 @@ AC_ARG_ENABLE([coverage],
               [want_coverage="no"])
 
 
-if test "x$CFLAGS" = x ; then old_cflags_empty=1; fi
-
 dnl Checks for programs.
 AC_PROG_CC
 AX_COMPILER_FLAGS_CFLAGS()
