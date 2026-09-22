@@ -62,6 +62,17 @@ dnl Checks for programs.
 AC_PROG_CC
 AX_COMPILER_FLAGS_CFLAGS()
 
+dnl explicit std: must be on the list AND probe clean; anything else is a
+dnl user error (the compiler may accept flags like -std=c89 for code that
+dnl does not build under it).
+dnl default (no/empty): probe down the list, first match wins.
+AS_CASE([$enable_std],
+	[yes|no|""], [],
+	[AS_CASE([" $supported_c_stds "],
+		[*" $enable_std "*], [],
+		[AC_MSG_ERROR([--enable-std=$enable_std: not supported (try: $supported_c_stds)])])
+	AX_CHECK_COMPILE_FLAG(-std=$enable_std, [have_std=$enable_std],
+		[AC_MSG_ERROR([--enable-std=$enable_std: not supported by $CC])])])
 for i in $supported_c_stds ; do
     if test "$have_std" = "no" ; then AX_CHECK_COMPILE_FLAG(-std=$i, [have_std=$i]) fi
 done
@@ -123,7 +134,10 @@ dnl strings.h arpa/inet.h are gone: nothing includes them any more.
 
 dnl Checks for typedefs, structures, and compiler characteristics.
 
-AC_CHECK_FUNCS(sigaction getopt_long fseeko)
+dnl sigaction and fseeko are mandatory under POSIX.1-2008 (MIN_POSIX_C_STD
+dnl above) and used unconditionally. getopt_long is a GNU extension: the
+dnl sources fall back to plain getopt without it.
+AC_CHECK_FUNCS(getopt_long)
 
 dnl O_NOFOLLOW is POSIX.1-2008; this is to provide fallback for ancient systems.
 AH_TEMPLATE([HAVE_O_NOFOLLOW],
@@ -137,11 +151,8 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
    [AC_MSG_RESULT([no])])
 
 
-AC_SUBST(CFLAGS)
 AC_SUBST(LRZSZ_CFLAGS)
 AC_SUBST(LRZSZ_LDFLAGS)
-AC_SUBST(LDFLAGS)
-AC_SUBST(LIBS)
 
 dnl gettext infrastructure is vendored (m4/, po/, config.rpath); do not add
 dnl AM_GNU_GETTEXT_VERSION / AM_GNU_GETTEXT_REQUIRE_VERSION here — autoreconf -fi

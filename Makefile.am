@@ -3,7 +3,7 @@ EXTRA_DIST = m4/ChangeLog check.lrzsz COMPATABILITY README.cvs README.isdn4linux
 	README.tests remote-build-check.sh \
 	doc/README doc/zmodem-forsberg.txt doc/zmodem-zmtx-zmrx.txt doc/zmodem-current.txt doc/zmodemsnif.txt
 
-PR=@PACKAGE@-@VERSION@
+PR=@DIST_TARBALL@
 DISTCLEANFILES=fastcheck.done
 CLEANFILES=fastcheck.done
 ACLOCAL_AMFLAGS = -I m4

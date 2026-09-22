@@ -275,7 +275,6 @@ sanitize_bytes(char *dst, size_t dstcap, const char *src)
 int
 lrzsz_install_signal (int sig, void (*handler)(int))
 {
-#ifdef HAVE_SIGACTION
 	struct sigaction sa, old;
 	sa.sa_handler = handler;
 	sigemptyset(&sa.sa_mask);
@@ -288,13 +287,6 @@ lrzsz_install_signal (int sig, void (*handler)(int))
 		return 1;
 	}
 	return 0;
-#else
-	if (signal(sig, handler) == SIG_IGN) {
-		signal(sig, SIG_IGN);
-		return 0;
-	}
-	return 1;
-#endif
 }
 
 /* Derive protocol and initial Verbose from the invoked name; see util.h.
