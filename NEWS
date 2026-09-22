@@ -215,6 +215,16 @@ Other changes:
   and attempts the same resync as before. This removes one source
   of undefined behaviour.
 
+* lsz could crash (SIGSEGV) when the receiver's ZRINIT frame (the
+  "file complete, next file please" answer) arrived during lsz's
+  ACK wait on an error-prone line. Found by the test suite on
+  Alpine Linux.
+
+* lrz no longer dies with SIGPIPE (exit 141) when the final "OO"
+  of the session close handshake is lost on an error-prone line:
+  after the last file is complete the receiver ignores SIGPIPE,
+  where a lost farewell cannot lose data.
+
 * lrz has a new --keep-incomplete option: on a transfer error the
   partially received file is kept instead of deleted (the default),
   e.g. to resume the transfer later with -r. Interrupted transfers
@@ -290,8 +300,21 @@ Other changes:
   that aborted would previously have been sent the command up to 20
   times). ZABORT is counted as a user cancel, ZFERR as a file error.
 
+* interoperability with senders that do not pace their retransmissions
+  (zmtx 1.02 and friends): lrz now answers a duplicate ZEOF between
+  files with ZRINIT immediately, and lsz answers a receiver's ZRPOS for
+  the position it has already sent with ZACK (the original specification
+  never specified which answer a ZCRCW subpacket gets; zmrx 1.02 answers
+  with a ZRPOS, which forced lsz into a slow recovery loop).
+
 * compatibility tests were done against Synchronet sexyz v3.5,
   lrzsz-0.12.21rc, crzsz-1.13, rzsz-3.73 and zmtx-zmrx-1.02 and -2.02.
+  Known third-party problems found by these tests, none of them lrzsz
+  bugs: zmtx 1.02 retransmits frames without pacing while its input
+  buffer holds queued frames and loses transfers on high-latency lines;
+  crzsz and rzsz-3.73 flush their input queue on error recovery,
+  discarding the receiver's answers, which slows their give-up on faulty
+  lines; zmrx 1.02 answers ZCRCW with ZRPOS (see above).
 
 * compile tested on Debian GNU/Linux, Alpine Linux and OpenBSD.
 * compile tested with gcc and clang.

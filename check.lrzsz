@@ -217,8 +217,8 @@ doit() {
     TRACE_SZ=""
     TRACE_RZ=""
     if test -n "$STRACE" ; then
-        TRACE_SZ="strace -vs 1280 -Ttt -fo $TRACEFILE_SZ"
-        TRACE_RZ="strace -vs 1280 -Ttt -fo $TRACEFILE_RZ"
+        TRACE_SZ="strace -f -vs 1280 -Ttt -o $TRACEFILE_SZ"
+        TRACE_RZ="strace -f -vs 1280 -Ttt -o $TRACEFILE_RZ"
     fi
     if test -n "$KTRACE" ; then
         TRACE_SZ="ktrace -f $TRACEFILE_SZ"
@@ -238,7 +238,7 @@ doit() {
     doit_st_r=$testdir/$doit_key/.status-receiver
     rm -f $doit_st_s $doit_st_r
     (echo "pid-sender: " $(getpid) >>$runlog ; $TIMEOUT $TRACE_SZ $sz $files ; echo $? >$doit_st_s ) <$testdir/pipe |
-        (echo "pid-receiver: $(getpid)" >>$runlog ; cd $testdir/$doit_key ; $FAULT $MYSNIF $TIMEOUT $TRACE_RZ $rz >>../pipe ; echo $? >$doit_st_r )
+        (echo "pid-receiver: $(getpid)" >>$runlog ; cd $testdir/$doit_key ; $TRACE_RZ $FAULT $MYSNIF $TIMEOUT $rz >>../pipe ; echo $? >$doit_st_r )
     end=$($TIMESTAMP)
     doit_rc_s=$(cat $doit_st_s 2>/dev/null)
     doit_rc_r=$(cat $doit_st_r 2>/dev/null)
@@ -1310,6 +1310,14 @@ zbenchmark() {
     # for speed in unlimited 100m 10m 2m 1m 115200 38400 25ms 20ms 15ms 10ms 5ms 2ms; do
     # profiles=unlimited
     TIMEOUT_VALUE=180
+    # The sniffer must stay out of benchmark runs: its per-frame stderr
+    # logging both distorts the numbers being measured and perturbs the
+    # byte-flow timing enough to trigger retransmit storms in fragile
+    # senders (zmtx 1.02 aborts the transfer after the second file).
+    # An ONLY= filtered benchmark would otherwise silently change what
+    # is being measured.
+    NOSNIF=1
+    export NOSNIF
     for profile in $profiles; do
         # FAULT=$(translate_profile $profile)
         translate_profile $profile > profile_tmp
@@ -1360,6 +1368,7 @@ zbenchmark() {
 
         done
     done
+    unset NOSNIF
 }
 zbenchmark2() {
     available=$(available)
