@@ -1596,6 +1596,14 @@ again:
 			continue;
 		
 		case ZEOF:
+			/* A ZEOF between files can only be a duplicate of the
+			 * just-completed file: the sender never saw our ZRINIT.
+			 * Answer at once instead of silently waiting for the
+			 * next header, so a sender stuck in a retransmit loop
+			 * (e.g. zmtx 1.02, which retransmits without pacing
+			 * while its input buffer holds queued frames) gets out
+			 * of its ZEOF wait one round earlier. */
+			zshhdr(ZRINIT, Txhdr);
 			continue;
 		case TIMEOUT:
 			continue;
