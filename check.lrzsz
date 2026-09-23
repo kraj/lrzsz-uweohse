@@ -1719,7 +1719,11 @@ SEOF
     # check below uses its basename inside $key, as always.
     doit "$key" "lsz sending ../escape-target.bin to lrz must fail" \
         "$testdir/run-traversal-sender.sh" \
-        "$RZ -q" missing escape-target.bin 0,128 127
+        "$RZ -q" missing escape-target.bin 0,128,141 127
+    # the receiver opt-out (127) covers bibi(-1); 141 is theoretical:
+    # if the sender left first (it saw the first cancel burst), the
+    # receiver's second burst hit EPIPE before the SIGPIPE-ignore fix
+    # and exited 141 instead of the designed 127.
     if cmp -s $testdir/escape-target.bin $testdir/escape-target.pristine ; then
         :
     else
@@ -1823,10 +1827,14 @@ SEOF
     mkdir "$testdir/$key"
     dd if=$srcdir/src/lsz.c of=$testdir/newfile.bin bs=256 count=3 2>&5
     cp $testdir/newfile.bin $testdir/$key/newfile.bin    # the victim
+    # receiver 127 is bibi(-1) by design (see the traversal test for the
+    # theoretical receiver-141 variant); sender 141 is the same teardown
+    # race mirrored: if lrz's refusal arrived while lsz was writing, lsz
+    # died of SIGPIPE in its cancel path.
     doit "$key" "ZMODEM_RESTRICTED + -R + -y refuses to overwrite existing file" \
-        "$SZ -q -y" "env ZMODEM_RESTRICTED=1 $RZ -q -R -y" cmp $testdir/newfile.bin 128 127
+        "$SZ -q -y" "env ZMODEM_RESTRICTED=1 $RZ -q -R -y" cmp $testdir/newfile.bin 128,141 127
     doit "$key" "ZMODEM_RESTRICTED + -y refuses to overwrite existing file" \
-        "$SZ -q -y" "env ZMODEM_RESTRICTED=1 $RZ -q -y" cmp $testdir/newfile.bin 128 127
+        "$SZ -q -y" "env ZMODEM_RESTRICTED=1 $RZ -q -y" cmp $testdir/newfile.bin 128,141 127
 
     #
     # -U/--unrestrict was removed: both programs must print the removal
