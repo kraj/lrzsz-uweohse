@@ -147,6 +147,16 @@ bibi_sighandler(int n)
 LRZSZ_NORETURN void
 bibi(int n)
 {
+	/* The refusal (or session error) that leads here is fully
+	 * communicated: the cancel sequence was sent, the message printed.
+	 * The cancel burst inside this function is sent just in case; if the
+	 * sender already left because it saw the first burst and cancelled,
+         * that write hits EPIPE and dying of SIGPIPE there would turn the
+	 * designed exit (127 for the refusals) into 141. Ignore SIGPIPE from
+	 * now on. write_all already ignores write errors, so the exit code 
+         * is deterministic.
+	 * Same behaviour and reason as ackbibi() below. */
+	signal(SIGPIPE, SIG_IGN);
 	if (zmodem_requested)
 		zmputs(Attn);
 	canit(STDOUT_FILENO);
