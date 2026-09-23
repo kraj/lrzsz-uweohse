@@ -45,13 +45,10 @@ Security fixes:
 
   Note: this stems from the original public domain rzsz suite (80s).
 
-* lsz no longer uses mmap() for input files. Input is now read via stdio
-  only. This also means the input file is no longer closed early, and a
-  file truncated during the transfer fails with a read error instead of
-  killing the sender with SIGBUS. Wire behavior is unchanged.
-  A benchmark (buffered with 8192..262144-byte buffers vs mmap, 15 MiB
-  file) showed buffered I/O at parity or better than mmap, so the
-  special case was not worth its complexity.
+* lsz now reads input files via stdio instead of mmap(): a file
+  truncated during the transfer fails with a read error instead of
+  killing the sender with SIGBUS. Buffered I/O benchmarks at parity
+  or better; wire behavior is unchanged.
   Security: After removal of the mmap code, fuzzing showed that an
   illegal offset during a resumed transfer might have caused a remote
   denial of service (reliable, deterministic) and a potential
@@ -220,10 +217,8 @@ Other changes:
   ACK wait on an error-prone line. Found by the test suite on
   Alpine Linux.
 
-* lrz no longer dies with SIGPIPE (exit 141) when the final "OO"
-  of the session close handshake is lost on an error-prone line:
-  after the last file is complete the receiver ignores SIGPIPE,
-  where a lost farewell cannot lose data.
+* lrz no longer dies with SIGPIPE (exit 141) when the session is
+  already over (lost final "OO", or a refusal whose sender left).
 
 * lrz has a new --keep-incomplete option: on a transfer error the
   partially received file is kept instead of deleted (the default),
