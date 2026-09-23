@@ -6,9 +6,9 @@
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: lrzsz 0.13.0-beta\n"
+"Project-Id-Version: lrzsz 0.13.0-beta2\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-20 18:00+0200\n"
+"POT-Creation-Date: 2026-09-22 19:34+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,7 +17,7 @@ msgstr ""
 "Content-Type: text/plain; charset=CHARSET\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: src/rbsb.c:254
+#: src/rbsb.c:250
 #, c-format
 msgid "tcsetattr failed: %s"
 msgstr ""
@@ -295,7 +295,7 @@ msgstr ""
 msgid "got ZRQINIT"
 msgstr ""
 
-#: src/lsz.c:1531 src/lrz.c:925 src/lrz.c:1681
+#: src/lsz.c:1531 src/lrz.c:925 src/lrz.c:1689
 msgid "got ZCAN"
 msgstr ""
 
@@ -304,17 +304,17 @@ msgstr ""
 msgid "fstat failed: %s"
 msgstr ""
 
-#: src/lsz.c:1848
+#: src/lsz.c:1851
 #, c-format
 msgid "Bytes Sent:%7ld/%7ld   BPS:%-8ld ETA %02d:%02d  "
 msgstr ""
 
-#: src/lsz.c:1936
+#: src/lsz.c:1939
 #, c-format
 msgid "receiver not advancing after %d ACKs"
 msgstr ""
 
-#: src/lsz.c:2350
+#: src/lsz.c:2379
 msgid "got a ZRQINIT packet: the other side is trying to send, too\n"
 msgstr ""
 
@@ -526,23 +526,23 @@ msgstr ""
 msgid "%s:\tSecurity Violation"
 msgstr ""
 
-#: src/lrz.c:1658
+#: src/lrz.c:1666
 msgid "remote command execution denied"
 msgstr ""
 
-#: src/lrz.c:1677
+#: src/lrz.c:1685
 msgid "got ZRINIT"
 msgstr ""
 
-#: src/lrz.c:1712
+#: src/lrz.c:1720
 msgid "Skipped"
 msgstr ""
 
-#: src/lrz.c:1880
+#: src/lrz.c:1888
 #, c-format
 msgid "\rBytes received: %7ld/%7ld   BPS:%-6lu ETA %02d:%02d  "
 msgstr ""
 
-#: src/lrz.c:2027
+#: src/lrz.c:2035
 msgid "file close error"
 msgstr ""

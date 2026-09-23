@@ -1771,9 +1771,13 @@ SEOF
     # sides end via their cancel path (lsz "Line dropped" once the
     # receiver's /dev/null receiver has nothing left to say, lrz gives up
     # on its sector-header retries) — the verdict is the missing file.
+    # Both sides give up via their own retry counters, so which one quits
+    # first is a race; if the receiver closes while the sender is in its
+    # brief retransmit-write instant, lsz gets SIGPIPE=141 (theoretical,
+    # never observed). The sender opt-out covers both variants.
     key="xmodem-lrz-null"
     doit "$key" "xmodem lrz -D does not create the file" \
-        "$SZ -q -X" "$RZ -q -b -X -D" "missing" $all_256_file 128 128
+        "$SZ -q -X" "$RZ -q -b -X -D" "missing" $all_256_file 128,141 128
 
     #
     # long ZFILE subpacket (V10): a filename near the 960-byte name limit
@@ -1857,16 +1861,20 @@ SEOF
     # receiver always hits its deadline first (receiver 128, sender then dies
     # of SIGPIPE=141 on the closed pipe). On OpenBSD in rare cases the sender
     # won the race, and the receiver's final write hit the closed pipe first
-    # first (receiver SIGPIPE=141 via its bibi handler, sender 141). Both 
-    # orders are by-design outcomes of the deliberate abort, and not failures.
+    # first (receiver SIGPIPE=141 via its bibi handler, sender 141). On Alpine
+    # (musl, gcc/c17) the sender once lost the session through its READ path
+    # instead: draining the receiver's cancel sequence / dead line gives
+    # "Receiver Cancelled" or "Line dropped" -> wcsend() == ERROR ->
+    # END_WITH_CANCEL -> clean exit 0x80=128. Both orders are by-design
+    # outcomes of the deliberate abort, and not failures.
     # The real verdicts are the cmp functions (delete vs keep).
     key="zmodem-lsz-lrz-MGMT-keep-incomplete"
     mkdir "$testdir/$key"
     FAULT="$SIMU -s 1 -f 9999999999 -r 1m"
     doit "$key-delete-default" "aborted transfer deletes the incomplete file" \
-        "$SZ -q -Z" "$RZ -q -Z -s +1" missing $binary_1m 141 128,141
+        "$SZ -q -Z" "$RZ -q -Z -s +1" missing $binary_1m 128,141 128,141
     doit "$key-keep" "aborted transfer keeps the incomplete file with --keep-incomplete" \
-        "$SZ -q -Z" "$RZ -q -Z --keep-incomplete -s +1" incomplete_keep_cmp $binary_1m 141 128,141
+        "$SZ -q -Z" "$RZ -q -Z --keep-incomplete -s +1" incomplete_keep_cmp $binary_1m 128,141 128,141
     FAULT=
 
     #
