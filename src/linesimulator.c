@@ -20,6 +20,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
+#include <signal.h>
 #include <time.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -717,6 +718,18 @@ main(int argc, char **argv)
     /* Parent: relay */
     close(sub_stdin[0]);
     close(sub_stdout[1]);
+
+    /* A peer going away (SUB exited, or the process feeding us) is a
+     * normal end-of-session condition on a half-duplex teardown: the
+     * last buffered frame may still be forwarded after the other side
+     * already left. Dying of SIGPIPE there would abort this process
+     * before waitpid() below can reap SUB, so the caller would see our
+     * death (exit 141) instead of SUB's real exit status. Ignore
+     * SIGPIPE and let the write errors unwind the loop. Do this AFTER
+     * the fork: setting it before would leak SIG_IGN through execvp
+     * into SUB, and lrzsz_install_signal() refuses to install a handler
+     * when the signal is ignored, silently changing SUB's semantics. */
+    signal(SIGPIPE, SIG_IGN);
 
     set_nonblock(STDIN_FILENO);
     set_nonblock(STDOUT_FILENO);
