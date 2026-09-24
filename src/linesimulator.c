@@ -318,6 +318,7 @@ struct error_state {
     int flip_bits;      /* max bits to flip per event (0=disabled) */
     int drop_bytes;     /* max bytes to drop per event (0=disabled) */
     int garble_bytes;   /* max bytes to garble per event (0=disabled) */
+    int drop_packet;    /* drop exactly this many bytes per event (0=disabled) */
     int strip_bit8;     /* clear bit 7 of every byte */
     int strip_ctrl;     /* remove control chars */
     size_t error_freq;  /* nominal bytes between error events */
@@ -360,7 +361,7 @@ es_setup(struct error_state *es)
 {
     if (es->flip_bits > 0)
         es_schedule(es, ERR_FLIP);
-    if (es->drop_bytes > 0)
+    if (es->drop_bytes > 0 || es->drop_packet > 0)
         es_schedule(es, ERR_DROP);
     if (es->garble_bytes > 0)
         es_schedule(es, ERR_GARBLE);
@@ -429,7 +430,8 @@ apply_transform(struct error_state *es, unsigned char *buf, size_t len)
         return 0;
 
     /* Phase 2: error events */
-    if (es->flip_bits <= 0 && es->drop_bytes <= 0 && es->garble_bytes <= 0)
+    if (es->flip_bits <= 0 && es->drop_bytes <= 0 && es->drop_packet <= 0
+        && es->garble_bytes <= 0)
         return len;
 
     {
@@ -450,6 +452,19 @@ apply_transform(struct error_state *es, unsigned char *buf, size_t len)
             && es->byte_count >= es->next_error[ERR_GARBLE]) {
             do_garble(es, buf, len, pos);
             es_schedule(es, ERR_GARBLE);
+        }
+        if (es->drop_packet > 0
+            && es->byte_count >= es->next_error[ERR_DROP]) {
+            /* silent packet drop: exactly drop_packet bytes at the event
+             * position (packet boundaries are ours, not the protocol's) */
+            int n = es->drop_packet;
+            if ((size_t)n > len - pos)
+                n = (int)(len - pos);
+            memmove(buf + pos, buf + pos + n, len - pos - n);
+            len -= n;
+            es_schedule(es, ERR_DROP);
+            /* don't advance pos: next byte is now at pos */
+            continue;
         }
         if (es->drop_bytes > 0
             && es->byte_count >= es->next_error[ERR_DROP]) {
@@ -525,6 +540,8 @@ usage(FILE *out)
 "  -c           strip all ASCII control chars (< 0x20 and 0x7f)\n"
 "  -e N         flip up to N random bits per error event\n"
 "  -x N         drop up to N random bytes per error event\n"
+"  -P N         silently drop exactly N bytes (a packet) per event;\n"
+"               overrides -x\n"
 "  -g N         garble up to N bytes (flip all bits) per error event\n"
 "  -f N         error frequency: ~1 event per N bytes (jittered 0..2N)\n"
 "               (default: 1024)\n"
@@ -559,6 +576,7 @@ main(int argc, char **argv)
     int strip_ctrl = 0;
     int flip_bits = 0;
     int drop_bytes = 0;
+    int drop_packet = 0;
     int garble_bytes = 0;
     int deterministic = 0;
     size_t error_freq = 1024;
@@ -582,7 +600,7 @@ main(int argc, char **argv)
 
     memset(&err_ranges, 0, sizeof(err_ranges));
 
-    while ((c = getopt(argc, argv, "r:R:T:b:p:d:L:7ce:x:g:f:F:w:s:12h")) != -1) {
+    while ((c = getopt(argc, argv, "r:R:T:b:p:d:L:7ce:x:P:g:f:F:w:s:12h")) != -1) {
         switch (c) {
         case 'r': bps_both = (long)parse_size(optarg, NULL); break;
         case 'R': bps_tx = (long)parse_size(optarg, NULL); break;
@@ -595,6 +613,7 @@ main(int argc, char **argv)
         case 'c': strip_ctrl = 1; break;
         case 'e': flip_bits = atoi(optarg); break;
         case 'x': drop_bytes = atoi(optarg); break;
+        case 'P': drop_packet = atoi(optarg); break;
         case 'g': garble_bytes = atoi(optarg); break;
         case 'f': error_freq = (size_t)atol(optarg); break;
         case 'F': error_freq = (size_t)atol(optarg); deterministic = 1; break;
@@ -672,7 +691,8 @@ main(int argc, char **argv)
 
     /* Configure error injection */
     has_errors = (strip_bit8 || strip_ctrl || flip_bits > 0
-                      || drop_bytes > 0 || garble_bytes > 0);
+                      || drop_bytes > 0 || drop_packet > 0
+                      || garble_bytes > 0);
     if (has_errors) {
         for (d = 0; d < 2; d++) {
             if (err_dir == 3 || err_dir == d + 1) {
@@ -681,6 +701,7 @@ main(int argc, char **argv)
                 dir[d].es.strip_ctrl = strip_ctrl;
                 dir[d].es.flip_bits = flip_bits;
                 dir[d].es.drop_bytes = drop_bytes;
+                dir[d].es.drop_packet = drop_packet;
                 dir[d].es.garble_bytes = garble_bytes;
                 dir[d].es.error_freq = error_freq;
                 dir[d].es.deterministic = deterministic;
