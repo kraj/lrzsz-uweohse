@@ -1787,6 +1787,8 @@ rzfile(struct zm_fileinfo *zi)
 	double low_bps=0;
 	size_t bytes_in_block=0;
 	int state = ST_ZRPOS;
+	unsigned int saved_rxtimeout = Rxtimeout;
+	int pos_waits = 0;
 
 	zi->eof_seen=false;
 
@@ -1804,12 +1806,27 @@ rzfile(struct zm_fileinfo *zi)
 		case ST_ZRPOS:
 			stohdr(zi->bytes_received);
 			zshhdr(ZRPOS, Txhdr);
+			/* The ZDATA answering the ZRPOS is either already in
+			 * flight or was lost on the line. Waiting the full
+			 * Rxtimeout (by default 100 tenths of a second) for
+                         * a lost frame costs 10s per resync, during which the
+                         * the sender may wait. Therefore we shorten the first
+                         * few waits after a ZRPOS, with a fallback to the
+			 * full timeout for slow peers. pos_waits counts
+			 * consecutive short waits. */
+			pos_waits = 0;
+			Rxtimeout = 10;
 			state = ST_HDR;
 			/* fall through */
 		case ST_HDR:
 			c = zgethdr(Rxhdr, 0, NULL);
+			if (pos_waits < 4)
+				pos_waits++;
+			else
+				Rxtimeout = saved_rxtimeout;
 			switch (c) {
 			default:
+				Rxtimeout = saved_rxtimeout;
 				DO_SYSLOG(LOG_INFO, "%s/%s: error: zgethdr returned %d", lrzsz_basename(zi->fname),
 					   protname(), c);
 				DPRINTF(DEBUG_TRANSFER, "rzfile: zgethdr returned %d\n", c);
@@ -1817,6 +1834,7 @@ rzfile(struct zm_fileinfo *zi)
 			case ZNAK:
 			case TIMEOUT:
 				if ( --n < 0) {
+					Rxtimeout = saved_rxtimeout;
 					DO_SYSLOG(LOG_INFO, "%s/%s: error: zgethdr returned %s", lrzsz_basename(zi->fname),
 						   protname(), c == ZNAK ? "ZNAK" : "TIMEOUT");
 					DPRINTF(DEBUG_TRANSFER, "rzfile: zgethdr returned %d\n", c);
@@ -1828,10 +1846,12 @@ rzfile(struct zm_fileinfo *zi)
 				state = ST_ZRPOS;
 				continue;
 			case ZFILE:
+				Rxtimeout = saved_rxtimeout;
 				zrdata(secbuf, LRZSZ_MAX_SUBPACKET_LEN, &bytes_in_block);
 				state = ST_ZRPOS;
 				continue;
 			case ZEOF:
+				Rxtimeout = saved_rxtimeout;
 				if (rclhdr(Rxhdr) != (unsigned long) zi->bytes_received) {
 					/*
 					 * Ignore eof if it's at wrong place - force
@@ -1852,6 +1872,7 @@ rzfile(struct zm_fileinfo *zi)
 				DPRINTF(DEBUG_TRANSFER, "rzfile: normal EOF\n");
 				return c;
 			case ERROR:	/* Too much garbage in header search error */
+				Rxtimeout = saved_rxtimeout;
 				if ( --n < 0) {
 					DO_SYSLOG(LOG_INFO, "%s/%s: error: zgethdr returned %d",
 						   lrzsz_basename(zi->fname), protname(), c);
@@ -1862,12 +1883,14 @@ rzfile(struct zm_fileinfo *zi)
 				state = ST_ZRPOS;
 				continue;
 			case ZSKIP:
+				Rxtimeout = saved_rxtimeout;
 				closeit(zi);
 				DO_SYSLOG(LOG_INFO, "%s/%s: error: sender skipped",
 						   lrzsz_basename(zi->fname), protname());
 				DPRINTF(DEBUG_TRANSFER, "rzfile: Sender SKIPPED file\n");
 				return c;
 			case ZDATA:
+				Rxtimeout = saved_rxtimeout;
 				if (rclhdr(Rxhdr) != (unsigned long) zi->bytes_received) {
 					if ( --n < 0) {
 						DPRINTF(DEBUG_TRANSFER, "rzfile: out of sync\n");
@@ -1876,11 +1899,21 @@ rzfile(struct zm_fileinfo *zi)
 						return ERROR;
 					}
                                 /* this is a data block with subframes. if the sender streams
-                                 * fast, this is a mass of data, which can easily overflow 
+                                 * fast, this is a mass of data, which can easily overflow
                                  * the garbage max or the cancel max.
                                  * so we read and forget it.
-                                 */
+                                 * But this *may* be a stale ZDATA (with a position behind
+                                 * what we already have, an answer to a duplicate ZRPOS).
+                                 * Reading it with the full Rxtimeout stalls the resync for
+                                 * 10 seconds while the sender is waiting for us.
+                                 * It may even be a series of subpackets missing a final
+                                 * ZCRCx (garbled or dropped on the line).
+                                 * We shorten our wait drastically here.
+                                 * 0.1s per read still drains what is already in
+                                 * flight, and the ZRPOS below goes out right away. */
+					Rxtimeout = 1;
 					zrdata(secbuf, LRZSZ_MAX_SUBPACKET_LEN, &bytes_in_block);
+					Rxtimeout = saved_rxtimeout;
 					zmputs(Attn);
 					state = ST_ZRPOS;
 					continue;
