@@ -101,7 +101,6 @@ AS_IF([test "x$enable_Werror" = xyes],
 if test "$want_coverage" != "no" ; then
     AX_APPEND_COMPILE_FLAGS([ --coverage ], [LRZSZ_CFLAGS])
     AX_APPEND_COMPILE_FLAGS([ --coverage], [LRZSZ_LDFLAGS])
-    AX_APPEND_COMPILE_FLAGS([ -Wno-error=inline ], [LRZSZ_CFLAGS])
 fi
 
 if test "$want_asan" != "no" ; then
@@ -120,6 +119,18 @@ fi
 if test "$want_ubsan" != "no" ; then
     AX_APPEND_COMPILE_FLAGS([ -fsanitize=undefined ], [LRZSZ_CFLAGS])
     AX_APPEND_COMPILE_FLAGS([ -fsanitize=undefined ], [LRZSZ_LDFLAGS])
+fi
+
+# coverage and the sanitizers instrument every operation, which inflates
+# inline function bodies past gcc's inline budget (--param
+# max-inline-insns-single); gcc then refuses to inline functions declared
+# inline, and -Winline turns that into an error under -Werror. Keep
+# -Werror strict for everything else in plain builds. LRZSZ_CFLAGS is
+# appended after WARN_CFLAGS in AM_CFLAGS, so this overrides -Werror.
+if test "$want_coverage" != "no" -o "$want_asan" != "no" \
+     -o "$want_lsan" != "no" -o "$want_msan" != "no" \
+     -o "$want_ubsan" != "no" ; then
+    AX_APPEND_COMPILE_FLAGS([ -Wno-error=inline ], [LRZSZ_CFLAGS])
 fi
 
 dnl Checks for libraries.
