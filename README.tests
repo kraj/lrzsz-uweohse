@@ -1,5 +1,5 @@
 "make vcheck"
-	will do many more tests.
+	will do many tests.
         this test suite is moderately complete. There are still some options
         without tests, but all crucial ones are covered.
 
@@ -56,6 +56,16 @@ sexyz is easy to compile.
 The other are mostly historic, anyway.
 
 oh, yes… "make vcheck-zbenchmark" runs a benchmark.
+
+"make buildcheck-remote"
+        unpacks the distribution tarball on one or more remote machines
+        (after an scp) and runs "make buildcheck+" there — a clean
+        configure/compile plus the test suite, on systems this tree does
+        not build on locally.
+        The host list is kept in a local, non-distributed cfg.mk, e.g.:
+             REMOTE_HOSTS = uwe@openbsd uwe@dev
+        and can be overridden per run:
+             make buildcheck-remote REMOTE_HOSTS=uwe@openbsd
 
 "make fuzz"
         runs the ZMODEM protocol fuzzing (src/zmodemfuzz.c).

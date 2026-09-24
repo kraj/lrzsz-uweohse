@@ -38,12 +38,18 @@ buildcheck+:
 	fi ; done ; \
         make -s V=0 clean >/dev/null ;
 
-buildcheck-openbsd: dist $(PR).tar.gz
-	scp ./remote-build-check.sh $(PR).tar.gz uwe@openbsd:
-	ssh uwe@openbsd sh ./remote-build-check.sh $(PR)
-buildcheck-alpine: dist $(PR).tar.gz
-	scp ./remote-build-check.sh $(PR).tar.gz uwe@dev:
-	ssh uwe@dev sh ./remote-build-check.sh $(PR)
+# Remote build checks (gnulib cfg.mk convention): the host list lives in a
+# local, non-distributed cfg.mk, e.g.:
+#	REMOTE_HOSTS = uwe@openbsd uwe@dev
+-include cfg.mk
+
+buildcheck-remote: dist
+	@for h in $(REMOTE_HOSTS) ; do \
+		echo "remote buildcheck on $$h"; \
+		scp ./remote-build-check.sh $(PR).tar.gz "$$h": || exit 1; \
+		ssh "$$h" sh ./remote-build-check.sh $(PR) || exit 1; \
+	done
+.PHONY: buildcheck-remote
 
 oldcheck-local:
 	QUIET=-q $(srcdir)/check.lrzsz $(srcdir) `pwd`
