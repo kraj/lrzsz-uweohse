@@ -57,6 +57,23 @@ The other are mostly historic, anyway.
 
 oh, yes… "make vcheck-zbenchmark" runs a benchmark.
 
+"make vcheck-packetloss" (also part of the full vcheck/all run)
+        checks the packetized-line failure class behind the historical
+        README.isdn4linux: linesimulator packetizes (-b 1024) and
+        silently drops whole packets (-P 1024), in the data and/or ack
+        direction. The transfers must complete or abort in bounded
+        time — never hang. -P drops exactly N bytes per event
+        (overrides -x), so "silently dropping packets of some hundred
+        bytes" is directly available.
+
+"make vcheck-rcdo" (also part of the full vcheck/all run)
+        RCDO regression tests on the receiver side: the sender is
+        SIGKILLed right at startup (ZMODEM and YMODEM) and mid-transfer.
+        lrz must abort in bounded time — never burn its retry budgets
+        against a dead line, and never fall back to another protocol or
+        re-handshake (a reconnected line may carry an unauthenticated
+        peer).
+
 "make buildcheck-remote"
         unpacks the distribution tarball on one or more remote machines
         (after an scp) and runs "make buildcheck+" there — a clean

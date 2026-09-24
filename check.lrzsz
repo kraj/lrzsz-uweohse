@@ -1990,6 +1990,114 @@ zpacketloss() {
     FAULT=
 }
 
+zrcdo() {
+    #
+    # RCDO (line gone: peer closed its end of the line, carrier lost) on
+    # the RECEIVER side. The sender-side variants are covered by the
+    # packetloss suite (linesimulator exits when its peer dies) and the
+    # fuzzers' M_EOF class; these tests exercise lrz's verdict paths:
+    # the receiver must abort promptly instead of burning its retry
+    # budgets against a dead line — and must NOT fall back to a slower
+    # protocol or re-handshake, because a reconnected line may carry an
+    # unauthenticated peer (the calling program authenticated the
+    # original one).
+    #
+    # Verdicts. The acceptable exits are 128 (lrz's ERROR exit, 0x80)
+    # and 141 (SIGPIPE via lrz's bibi_sighandler): with the sender dead
+    # and the pipe/FIFO write end gone, one of lrz's own writes (the
+    # ZRINIT invitation or a cancel sequence) can hit EPIPE first —
+    # which side of the abort sees it is a race. Death by SIGPIPE is
+    # lrzsz's designed caught-signal exit here (see doit()'s comments);
+    # what must NOT happen is a hang (exit 124 via doit()'s timeout) —
+    # that would be the regression.
+    #
+
+    # The sender dies as soon as it is up: the wrapper writes its own
+    # pid (which becomes lsz's pid via exec), then the killer (after a
+    # short grace period so lsz is really the process holding the pid)
+    # SIGKILLs it. lrz then sees the dead line either as RCDO or,
+    # racing its own first write, as EPIPE/SIGPIPE — both bounded
+    # aborts. PROTO carries the sender protocol flag (ZMODEM -Z /
+    # YMODEM -g). The script is generated per test (key/PROTO must be
+    # set), not once for the suite.
+    FAULT="$SIMU -s 1 -f 9999999999 -r 1m"
+
+    key="zmodem-lrz-sender-dies-start"
+    mkdir "$testdir/$key"
+    RCDO_PROTO=-Z
+    cat > $testdir/run-rcdo-die-start.sh <<SEOF
+#! /bin/sh
+cd '$testdir/$key' || exit 1
+rm -f .sz-pid
+# \$\$ is this script's pid, which becomes the lsz pid via exec below.
+echo \$\$ >.sz-pid
+( sleep 0.3
+  if test -f .sz-pid ; then
+      read -r pid <.sz-pid
+      kill -KILL \$pid 2>/dev/null
+  fi ) &
+exec $SZ -q $RCDO_PROTO ../binary_1m
+SEOF
+    chmod +x $testdir/run-rcdo-die-start.sh
+    doit "$key" "lrz must abort when the sender dies before/during the handshake" \
+        "$testdir/run-rcdo-die-start.sh" "$RZ -q -Z" missing $binary_1m 137 128,141
+
+    # same idea, YMODEM: the pathname fetch (wcrxpn/wcgetsec) must hit
+    # the dead line and abort.
+    key="ymodem-lrz-sender-dies-start"
+    mkdir "$testdir/$key"
+    RCDO_PROTO=-g
+    cat > $testdir/run-rcdo-die-start.sh <<SEOF
+#! /bin/sh
+cd '$testdir/$key' || exit 1
+rm -f .sz-pid
+# \$\$ is this script's pid, which becomes the lsz pid via exec below.
+echo \$\$ >.sz-pid
+( sleep 0.3
+  if test -f .sz-pid ; then
+      read -r pid <.sz-pid
+      kill -KILL \$pid 2>/dev/null
+  fi ) &
+exec $SZ -q $RCDO_PROTO ../binary_1m
+SEOF
+    chmod +x $testdir/run-rcdo-die-start.sh
+    doit "$key" "ymodem lrz must abort when the sender dies before the handshake" \
+        "$testdir/run-rcdo-die-start.sh" "$RZ -q -g" missing $binary_1m 137 128,141
+
+    RCDO_PROTO=
+    FAULT=
+
+    # sender dies mid-data-phase (SIGKILL once the receiver has written
+    # at least one byte): the data-phase reads must surface RCDO and
+    # abort instead of resyncing into the void. cmp=missing: the partial
+    # file must have been removed (default delete-on-error).
+    key="zmodem-lrz-sender-dies-mid"
+    mkdir "$testdir/$key"
+    cat > $testdir/run-rcdo-mid-sender.sh <<SEOF
+#! /bin/sh
+cd '$testdir/$key' || exit 1
+rm -f binary_1m
+echo \$\$ >.sz-pid
+( n=0
+  while test \$n -lt 40 && test ! -s binary_1m ; do
+      sleep 0.2
+      n=\`expr \$n + 1\`
+  done
+  read -r pid <.sz-pid
+  kill -KILL \$pid ) &
+exec $SZ -q -Z ../binary_1m
+SEOF
+    chmod +x $testdir/run-rcdo-mid-sender.sh
+    FAULT="$SIMU -s 1 -f 9999999999 -r 1m"
+    doit "$key" "lrz must abort when the sender dies mid-transfer" \
+        "$testdir/run-rcdo-mid-sender.sh" "$RZ -q -Z" missing $binary_1m 137 128,141
+    FAULT=
+
+    # cleanup: doit() with cmp=missing leaves the (partial) file only
+    # on failure; remove the leftover from the success paths
+    rm -f $testdir/zmodem-lrz-sender-dies-mid/binary_1m 2>/dev/null
+}
+
 
 echo "mode=$mode"
 if test "$mode" = all -o "$mode" = xerrors -o "$mode" = "errors" -o "$mode" = "x" ; then
@@ -2015,6 +2123,9 @@ if test "$mode" = all -o "$mode" = zmanage -o "$mode" = "z" ; then
 fi
 if test "$mode" = all -o "$mode" = packetloss -o "$mode" = "p" ; then
     zpacketloss
+fi
+if test "$mode" = all -o "$mode" = rcdo -o "$mode" = "r" ; then
+    zrcdo
 fi
 # not part of the normal self test, this is just too slow
 if test "$mode" = zbenchmark  -o "$mode" = "benchmark" ; then

@@ -842,6 +842,11 @@ wcgetsec(size_t *Blklen, char *rxbuf, unsigned int maxtime)
         else if (firstch==TIMEOUT) {
             if (!Firstsec)
                 timed_out = true;   /* a timeout in the first sector is not counted */
+        } else if (firstch==RCDO) {
+            /* the line died (peer closed, carrier lost): do not burn the
+             * retry budget NAKing into the void */
+            zperr( _("Line dropped"));
+            return ERROR;
         } else {
             zperr( _("Got 0x%x sector header"), (unsigned int) firstch);
         }
@@ -1617,6 +1622,18 @@ again:
 			continue;
 		case TIMEOUT:
 			continue;
+		case RCDO:
+			/* the line is gone (peer closed, carrier lost).
+			 * Retrying into the void would burn the whole
+			 * n-budget and then return 0, which sends the caller
+			 * down the YMODEM path against a dead line. Also:
+			 * re-handshaking after a reconnect would be wrong —
+			 * the calling program (bbs, cu, ...) may have
+			 * authenticated the original peer, and whoever is on
+			 * the reconnected line may be someone different. */
+			DO_SYSLOG(LOG_INFO, "%s: RCDO during ZMODEM handshake",
+					   protname());
+			return ERROR;
 		case ZFILE:
 			zconv = Rxhdr[ZF0];
 			if (!zconv)
@@ -1929,6 +1946,13 @@ rzfile(struct zm_fileinfo *zi)
 				}
 				state = ST_ZRPOS;
 				continue;
+			case RCDO:
+				/* the line died mid-file: no ZRPOS retry into
+				 * the void (see tryz() for why no reconnect
+				 * handshake either) */
+				DO_SYSLOG(LOG_INFO, "%s/%s: zrdata returned RCDO",
+						   lrzsz_basename(zi->fname), protname());
+				return ERROR;
 			case GOTCRCW:
 				n = 20;
 				putsec(zi, secbuf, bytes_in_block);
@@ -1963,12 +1987,12 @@ rzfile(struct zm_fileinfo *zi)
 				      (long)zi->bytes_received, bytes_in_block, readline_left);
 				state = ST_HDR;
 				continue;
-                        default:
-                                ;   /* practically unreachable: zrdata always
-                                       returns a frame-end, error, or timeout;
-                                       the original fell out of the loop body
-                                       (re-sending ZRPOS), which ST_ZRPOS
-                                       mirrors */
+			default:
+				;   /* zrdata's remaining returns are handled
+				       above (GOT*, ERROR, TIMEOUT, RCDO,
+				       ZCAN) — anything else mirrors the
+				       original's fall out of the loop body:
+				       re-send ZRPOS */
 				state = ST_ZRPOS;
 				continue;
 			}

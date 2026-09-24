@@ -607,6 +607,12 @@ crcfoo:
 				zperr(_("TIMEOUT"));
                                 stats_timeout();
 				return c;
+			case RCDO:
+				/* the line died (peer closed, carrier lost):
+				 * a net-death verdict, not protocol garbage */
+				zperr(_("Line dropped"));
+				stats_net_error();
+				return c;
 			default:
 				zperr(_("Bad data subpacket"));
                                 stats_msg_format_error();
