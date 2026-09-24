@@ -484,6 +484,7 @@ main(int argc, char **argv)
 	}
 
 	txbuf=xmalloc(LRZSZ_MAX_SUBPACKET_LEN);
+        memset(txbuf,0, LRZSZ_MAX_SUBPACKET_LEN);
 
 	zsendline_init();
 
@@ -968,7 +969,7 @@ getnak(void)
 			return false;
 		case RCDO:
 			/* line dead (peer closed): the receiver will never
-			 * answer — getnak's loop has no retry budget of its
+			 * answer - getnak's loop has no retry budget of its
 			 * own, so RCDO must terminate it (like CAN CAN). */
 			zperr(_("Line dropped"));
 			return ERROR;
