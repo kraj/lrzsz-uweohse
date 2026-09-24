@@ -275,6 +275,8 @@ Other changes:
   work on the older internal check script, because i found it easier to
   extend for the tracing i need.
 
+* the internal test suite, check.lrzsz, was extended.
+
 * speaking about tracing: included in the sources is zmodemsnif.c, a ZMODEM
   protocol sniffer / tracer. Documentation is in doc/zmodemsnif.txt.
 

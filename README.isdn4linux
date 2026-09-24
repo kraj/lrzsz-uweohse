@@ -1,3 +1,9 @@
+[Historical. isdn4linux's tty emulation was removed from Linux in
+kernel 5.15 (2021), so this problem can no longer occur there; the
+general failure class - packetized lines silently losing whole packets -
+is regression-tested by "make vcheck" suite "packetloss"
+(zmodem-lsz-lrz-packetdrop*, using src/linesimulator -P).]
+
 There is a problem with isdn4linux: lsz seems to stop the transmission
 after sending some kilobytes.
 I've been told that the packet size used in the X.75i protocol defaults
