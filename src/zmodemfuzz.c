@@ -464,7 +464,23 @@ static int from_target[2]; /* target stdout -> parent */
 static int target_stderr[2];
 static volatile sig_atomic_t alarm_fired;
 #ifdef RLIMIT_AS
+/* 256MB guards the parent against mutation-driven memory bombs in
+ * plain targets, but it is fatal for sanitizer-built targets: MSan
+ * must mmap ~16TB of virtual shadow memory at startup and dies with
+ * "failed to allocate shadow memory (errno 12)" under any RLIMIT_AS.
+ * The harness itself is msan-built when the tree is (--enable-msan),
+ * so its targets are msan-built too — skip the limit there and rely
+ * on the per-iteration -t deadline to bound runaway targets. */
+#if defined(__has_feature)
+#if __has_feature(memory_sanitizer)
+#define FUZZ_UNDER_MSAN 1
+#endif
+#elif defined(__SANITIZE_MEMORY__)
+#define FUZZ_UNDER_MSAN 1
+#endif
+# ifndef FUZZ_UNDER_MSAN
 static unsigned long mem_limit = 256UL * 1024 * 1024;
+# endif
 #endif
 
 /* run a shell command, discarding its status (mkdir/ln/rm plumbing).
@@ -549,10 +565,12 @@ spawn_target(void)
 		if (mode_receive && chdir(recvdir) != 0)
 			_exit(126);
 #ifdef RLIMIT_AS
+# ifndef FUZZ_UNDER_MSAN
 		if (mem_limit
 		    && setrlimit(RLIMIT_AS,
 				 &(struct rlimit){ mem_limit, mem_limit }) != 0)
 			_exit(126);
+# endif
 #endif
 		if (dup2(to_target[0], 0) < 0
 		    || dup2(from_target[1], 1) < 0
