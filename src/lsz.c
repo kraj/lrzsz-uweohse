@@ -966,6 +966,12 @@ getnak(void)
 			return false;
 		case NAK:
 			return false;
+		case RCDO:
+			/* line dead (peer closed): the receiver will never
+			 * answer — getnak's loop has no retry budget of its
+			 * own, so RCDO must terminate it (like CAN CAN). */
+			zperr(_("Line dropped"));
+			return ERROR;
 		case CAN:
 			if ((firstch = READLINE_PF(20)) == CAN && Lastrx == CAN)
 				return ERROR;
@@ -1534,6 +1540,13 @@ again:
 			return ERROR;
 		case TIMEOUT:
 			DO_SYSLOG(LOG_INFO, "%s/%s: got TIMEOUT",
+					   lrzsz_basename(zi->fname), protname());
+			return ERROR;
+		case RCDO:
+			/* line dead (peer closed): retrying against it is
+			 * pointless — getinsync() treats RCDO like TIMEOUT,
+			 * and so must this phase. */
+			DO_SYSLOG(LOG_INFO, "%s/%s: got RCDO",
 					   lrzsz_basename(zi->fname), protname());
 			return ERROR;
 		case ZABORT:
@@ -2189,6 +2202,10 @@ getinsync(struct zm_fileinfo *zi, int flag)
 		case ZCAN:
 		case ZFIN:
 		case TIMEOUT:
+		case RCDO:
+			/* RCDO: the line is gone (peer closed, carrier lost).
+			 * Retrying (ZNAK etc.) is futile and unbounded against
+			 * a dead line — treat like TIMEOUT. */
 			return ERROR;
 		case ZABORT:
 		case ZFERR:
