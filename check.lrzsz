@@ -1937,6 +1937,59 @@ SEOF
     TIMEOUT_FLAGS=""
 }
 
+zpacketloss() {
+    #
+    # Packetized lines with silent packet loss. The historical trigger was
+    # isdn4linux/X.75i in 1998 (see README.isdn4linux): frames larger than
+    # the configured packet size silently vanish. isdn4linux is gone
+    # (Linux 5.15 removed the tty emulation), but the failure class — a
+    # packetized line silently losing whole N-byte packets, in the data
+    # and/or the ack direction — is a general one, and the only acceptable
+    # outcome is: the transfer completes (data intact), or a side aborts
+    # in bounded time. What may NEVER happen is the lsz "seems to stop"
+    # silent stall. doit()'s timeout + exit-status machinery turns a hang
+    # into a failure, so these tests are that regression check.
+    #
+    # -P N: silently drop exactly N bytes per event; -F N: exactly one
+    # event per N bytes (deterministic with -s 1); -r 8m keeps the
+    # overhead-dominated run fast. Payload is binary_256k: ZMODEM pays
+    # one full resync per dropped packet, so ~12% loss (the literal 1998
+    # scenario) makes even 256k crawl well past doit()'s 35s budget —
+    # the calibration below (~6% loss on 256k) matches the zerrors
+    # suite's loss-per-file-size ratio and exercises the same machinery
+    # within the budget. Heavier loss belongs in a manual benchmark run.
+    #
+
+    # packetized but errorfree line: pacing alone (X.75-style framing
+    # flavor) must never stall the sender.
+    key="zmodem-lsz-lrz-packetline"
+    FAULT="$SIMU -s 1 -r 8m -b 1024 -d 5"
+    doit "$key" "lsz sending to lrz, packetized line (1024 byte blocks, 5ms)" \
+        "$SZ -q -Z" "$RZ -q -Z" cmp $binary_256k
+
+    # ~6% silent packet loss, default subpacket size: completion or
+    # bounded abort, data intact on completion.
+    key="zmodem-lsz-lrz-packetdrop"
+    FAULT="$SIMU -s 1 -r 8m -P 1024 -F 16384"
+    doit "$key" "lsz sending to lrz, ~6% silent packet drops (1k packets)" \
+        "$SZ -q -Z" "$RZ -q -Z" cmp $binary_256k
+
+    # the 1998 scenario shape: the sender insists on oversized (8k)
+    # subpackets while packets keep dropping silently.
+    key="zmodem-lsz-lrz-packetdrop-8k"
+    doit "$key" "lsz -8 sending to lrz, ~6% silent packet drops (1k packets)" \
+        "$SZ -q -8 -Z" "$RZ -q -Z" cmp $binary_256k
+
+    # loss only in the ack direction: the sender's resync path must stay
+    # bounded while its data gets through untouched.
+    key="zmodem-lsz-lrz-packetdrop-acks"
+    FAULT="$SIMU -s 1 -r 8m -P 1024 -F 16384 -2"
+    doit "$key" "lsz sending to lrz, packet drops in ack direction only" \
+        "$SZ -q -Z" "$RZ -q -Z" cmp $binary_256k
+
+    FAULT=
+}
+
 
 echo "mode=$mode"
 if test "$mode" = all -o "$mode" = xerrors -o "$mode" = "errors" -o "$mode" = "x" ; then
@@ -1959,6 +2012,9 @@ if test "$mode" = all -o "$mode" = zcompat -o "$mode" = "compat" -o "$mode" = "z
 fi
 if test "$mode" = all -o "$mode" = zmanage -o "$mode" = "z" ; then
     zmanage
+fi
+if test "$mode" = all -o "$mode" = packetloss -o "$mode" = "p" ; then
+    zpacketloss
 fi
 # not part of the normal self test, this is just too slow
 if test "$mode" = zbenchmark  -o "$mode" = "benchmark" ; then
