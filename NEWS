@@ -45,10 +45,10 @@ Security fixes:
 
   Note: this stems from the original public domain rzsz suite (80s).
 
-* lsz now reads input files via stdio instead of mmap(): a file
+* lsz now reads input files always via stdio instead of mmap(): a file
   truncated during the transfer fails with a read error instead of
   killing the sender with SIGBUS. Buffered I/O benchmarks at parity
-  or better; wire behavior is unchanged.
+  or better.
   Security: After removal of the mmap code, fuzzing showed that an
   illegal offset during a resumed transfer might have caused a remote
   denial of service (reliable, deterministic) and a potential
@@ -98,11 +98,9 @@ Security related changes:
   implementations (OMEN zmodem and older lrz) that still execute received
   commands. New setups should not use these options.
 
-* lsz no longer sends the "rz\r" auto-download trigger. The original
-  zmodem software sent this to make the receiving side start its rz;
-  modern practice is to watch the data stream for a ZRQINIT frame
-  instead. This also stops lsz from writing protocol-unrelated bytes
-  to the transfer line.
+* lsz no longer sends the "rz\r" auto-download trigger. Modern practice 
+  is to watch the data stream for a ZRQINIT frame instead. This also 
+  stops lsz from writing protocol-unrelated bytes to the transfer line.
 
 * the PUBDIR feature was removed from lsz and lrz.
   This feature of the restricted mode allowed uploads not only from the
@@ -226,8 +224,8 @@ Other changes:
   (Ctrl-C, hangup) always keep the partial file, as before.
 
 * lrz and lsz documentation now describes the restricted security
-  model as named levels: "restricted" (the lrz default; lsz's level
-  reached via -R, ZMODEM_RESTRICTED or a restricted shell) and
+  model as named levels: "restricted" (lrz default. to bring lsz
+  to this level use -R, ZMODEM_RESTRICTED or a restricted shell) and
   "very restricted" (lrz only, via -R or ZMODEM_RESTRICTED). Remote
   command execution is denied unconditionally in lrz, in every mode.
   With -U gone, restricted mode cannot be lowered by any option.
@@ -301,17 +299,19 @@ Other changes:
   (zmtx 1.02 and friends): lrz now answers a duplicate ZEOF between
   files with ZRINIT immediately, and lsz answers a receiver's ZRPOS for
   the position it has already sent with ZACK (the original specification
-  never specified which answer a ZCRCW subpacket gets; zmrx 1.02 answers
+  never specified which answer a ZCRCW subpacket gets. zmrx 1.02 answers
   with a ZRPOS, which forced lsz into a slow recovery loop).
 
 * compatibility tests were done against Synchronet sexyz v3.5,
-  lrzsz-0.12.21rc, crzsz-1.13, rzsz-3.73 and zmtx-zmrx-1.02 and -2.02.
+  lrzsz-0.12.21rc, crzsz-1.13, rzsz-3.73 and zmtx-zmrx-2.02.
   Known third-party problems found by these tests, none of them lrzsz
   bugs: zmtx 1.02 retransmits frames without pacing while its input
-  buffer holds queued frames and loses transfers on high-latency lines;
+  buffer holds queued frames and loses transfers on high-latency lines,
+  it sent stale data causing bad CRCs, and answered ZCRCW with ZRPOS
+  (see above).
   crzsz and rzsz-3.73 flush their input queue on error recovery,
   discarding the receiver's answers, which slows their give-up on faulty
-  lines; zmrx 1.02 answers ZCRCW with ZRPOS (see above).
+  lines.
 
 * compile tested on Debian GNU/Linux, Alpine Linux and OpenBSD.
 * compile tested with gcc and clang.
