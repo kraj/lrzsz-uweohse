@@ -73,7 +73,7 @@ static int wcsend (int argc, char *argp[]);
 static int wcputsec (char *buf, int sectnum, size_t cseclen);
 
 /* DO_SYSLOG is replaced by the shared variadic macro (zglobal.h) plus
- * lrzsz_basename() (util.c) — same logged values, no `zi` coupling. */
+ * lrzsz_basename() (util.c) - same logged values, no `zi` coupling. */
 
 #define ZSDATA(x,y,z) \
 	do { if (Crc32t) {zsda32(x,y,z); } else {zsdata(x,y,z);}} while(0)
@@ -1413,7 +1413,7 @@ getzrxinit(void)
 		case ZFERR:
 			/* the receiver aborted during the handshake; ZFERR is
 			 * spec'd as equivalent to ZABORT (§4). NAKing an
-			 * aborting receiver would loop forever here — reply
+			 * aborting receiver would loop forever here - reply
 			 * with the ZFIN sequence the spec requires (§4). */
 			if (gotblock == ZABORT)
 				stats_cancel();
@@ -1512,7 +1512,7 @@ again:
 			/* e.g. ZNAK from a receiver that cannot cope with the
 			 * ZFILE subpacket. Resending identically a few times is
 			 * fine, but don't loop forever (zmodem-current.txt §4:
-			 * the sender must be able to fall back — our subpacket
+			 * the sender must be able to fall back - our subpacket
 			 * never exceeds 1024 bytes, so a receiver that keeps
 			 * ZNAKing won't be satisfied by resending). */
 			if (++bad_acks > 3) {
@@ -1545,7 +1545,7 @@ again:
 			return ERROR;
 		case RCDO:
 			/* line dead (peer closed): retrying against it is
-			 * pointless — getinsync() treats RCDO like TIMEOUT,
+			 * pointless - getinsync() treats RCDO like TIMEOUT,
 			 * and so must this phase. */
 			DO_SYSLOG(LOG_INFO, "%s/%s: got RCDO",
 					   lrzsz_basename(zi->fname), protname());
@@ -1555,7 +1555,7 @@ again:
 			/* the receiver aborted during the file-header phase;
 			 * ZFERR is spec'd as equivalent to ZABORT
 			 * (zmodem-current.txt §4). Don't resend the ZFILE
-			 * against a receiver that just gave up — reply with
+			 * against a receiver that just gave up - reply with
 			 * the ZFIN sequence the spec requires (§4). */
 			if (gotblock == ZABORT)
 				stats_cancel();
@@ -1686,7 +1686,7 @@ ack_resync (struct zm_fileinfo *zi, int c, bool sync_first,
 		case ZRINIT:
 			/* the receiver finished the file and closed our input
 			 * (getinsync): the data phase must terminate, never
-			 * re-enter it — zfilbuf() would fread() from NULL.
+			 * re-enter it - zfilbuf() would fread() from NULL.
 			 * (OK would mean "resend ZDATA" to the callers.) */
 			return ZRINIT;
 		}
@@ -1778,7 +1778,7 @@ zsendfdata (struct zm_fileinfo *zi)
 
 	/* the ZRPOS restart re-enters here (the former somemore label): the
 	 * ZDATA header is sent again, per-file counters keep their values
-	 * (resume-in-place). No setjmp remains — the SIGINT checkpoint in
+	 * (resume-in-place). No setjmp remains - the SIGINT checkpoint in
 	 * the loop below handles the interrupt flag. */
 restart_data:
         newcnt = Rxbuflen;
@@ -2206,13 +2206,13 @@ getinsync(struct zm_fileinfo *zi, int flag)
 		case RCDO:
 			/* RCDO: the line is gone (peer closed, carrier lost).
 			 * Retrying (ZNAK etc.) is futile and unbounded against
-			 * a dead line — treat like TIMEOUT. */
+			 * a dead line - treat like TIMEOUT. */
 			return ERROR;
 		case ZABORT:
 		case ZFERR:
 			/* the receiver reported a fatal file error (ZFERR is
 			 * spec'd as equivalent to ZABORT, zmodem-current.txt
-			 * §4) and wants the transfer ended — reply with the
+			 * §4) and wants the transfer ended - reply with the
 			 * ZFIN sequence the spec requires (§4), not with
 			 * retries or a cancel sequence. ZABORT: user cancel;
 			 * ZFERR: receiver file error. */
@@ -2242,7 +2242,7 @@ getinsync(struct zm_fileinfo *zi, int flag)
 			/* zmrx 1.02 answers a ZCRCW with 1) a ZACK of the
 			 * wrong (pre-block) position, which is ignored below
 			 * because the position doesn't match, and 2) a ZRPOS
-			 * with the right position — which triggers the error
+			 * with the right position - which triggers the error
 			 * recovery machinery and thus another ZCRCW, i.e. a
 			 * slow loop even when the transfer succeeds. It kills
 			 * the benchmark. Partially the fault of the original
@@ -2252,12 +2252,12 @@ getinsync(struct zm_fileinfo *zi, int flag)
 			 * Workaround: translate a ZRPOS at the last sent
 			 * offset into a ZACK. That is safe: bytes_sent advances
 			 * when a subpacket is queued, while the receiver can
-			 * only ack what it received — so rxpos == bytes_sent
+			 * only ack what it received - so rxpos == bytes_sent
 			 * proves the receiver is missing nothing, and a real
 			 * error recovery ZRPOS (resend from here) always carries
 			 * rxpos < bytes_sent. A receiver using a same-position
 			 * ZRPOS to force a fresh ZCRCW sync point (the spec's
-			 * ZCRCW-after-ZRPOS rule) gets none — but there is
+			 * ZCRCW-after-ZRPOS rule) gets none - but there is
 			 * nothing to restart at that position, so no restart
 			 * is due. */
 			if (zi->bytes_sent == rxpos) {
@@ -2286,7 +2286,7 @@ getinsync(struct zm_fileinfo *zi, int flag)
                          * return ZRINIT, not ZSKIP, for correct accounting.
                          * It must be ZRINIT, not OK: ack_resync()'s verdict
                          * switches on this value, and OK would mean "resend
-                         * ZDATA" there — with input_f closed, zfilbuf()
+                         * ZDATA" there - with input_f closed, zfilbuf()
                          * would fread() from NULL.
                          * One day i'll possibly clean up the function exit 
                          * codes.
@@ -2315,7 +2315,7 @@ getinsync(struct zm_fileinfo *zi, int flag)
 
 /* Say "bibi" to the receiver, try to do it cleanly. Two roles: the normal
  * end-of-batch close (zmodem_requested path), and the reply to a receiver
- * that aborted with ZABORT/ZFERR — the spec requires the sender to respond
+ * that aborted with ZABORT/ZFERR - the spec requires the sender to respond
  * with a ZFIN sequence there (zmodem-current.txt §4, "The sender responds
  * with a ZFIN sequence"), the historical OMEN cancel reply deviated from
  * that. A receiver that has died answers with RCDO/nothing: bounded, so we

@@ -15,14 +15,14 @@
  * This is the CRC-16/CCITT (0x1021), also named 0x8810 after another
  * representation of the same polynomial.
  *
- * It is a suboptimal polynomial for its width — research by Koopman et al. 
+ * It is a suboptimal polynomial for its width - research by Koopman et al. 
  * has shown that better 16-bit polynomials exist with superior Hamming 
  * distance properties at common block sizes, meaning that the 0x1021 misses 
  * more multi-bit error patterns than necessary:
  * https://users.ece.cmu.edu/~koopman/roses/dsn04/koopman04_crc_poly_embedded.pdf
  *
  * Additionally, its 16-bit CRC width gives a (1/65536) per-block collision 
- * probability that becomes non-negligible over large transfers —
+ * probability that becomes non-negligible over large transfers -
  * 1000 blocks with random errors yields a ~1.5% chance of at least one 
  * undetected corruption.
  *

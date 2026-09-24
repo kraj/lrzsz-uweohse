@@ -317,7 +317,7 @@ chkinvok (const char *s, char dir)
 
 /* Parse the -s/--stop-at argument; see util.h. Both programs' copies were
  * identical except the +N upper bound (lrz capped at LONG_MAX, lsz was
- * unbounded); the cap wins — it protects the time_t cast below, and
+ * unbounded); the cap wins - it protects the time_t cast below, and
  * LONG_MAX seconds is beyond any practical stop time. */
 time_t
 lrzsz_parse_stop_time (const char *myarg, void (*die)(int, const char *))
@@ -416,7 +416,7 @@ lrzsz_basename (const char *path)
 }
 
 /* min_bps watchdog; see util.h. The lrz/lsz copies were identical except
- * the debug name and cosmetic format drift (%lu vs %ld) — both unified
+ * the debug name and cosmetic format drift (%lu vs %ld) - both unified
  * here: one display threshold (Verbose>=1), one type (long). */
 bool
 lrzsz_bps_watchdog (const char *dbgname, long last_bps, double d,

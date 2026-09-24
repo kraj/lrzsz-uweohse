@@ -469,7 +469,7 @@ static volatile sig_atomic_t alarm_fired;
  * must mmap ~16TB of virtual shadow memory at startup and dies with
  * "failed to allocate shadow memory (errno 12)" under any RLIMIT_AS.
  * The harness itself is msan-built when the tree is (--enable-msan),
- * so its targets are msan-built too — skip the limit there and rely
+ * so its targets are msan-built too - skip the limit there and rely
  * on the per-iteration -t deadline to bound runaway targets. */
 #if defined(__has_feature)
 #if __has_feature(memory_sanitizer)
@@ -499,7 +499,7 @@ run_cmd(const char *cmd)
 	if (pid < 0)
 		die("fork: %s", strerror(errno));
 	if (pid == 0) {
-		/* plumbing child: default dispositions, no alarm — the
+		/* plumbing child: default dispositions, no alarm - the
 		 * harness's wait_target() deadline must not be shortened
 		 * by an alarm armed in the forked shell */
 		signal(SIGALRM, SIG_DFL);
@@ -560,7 +560,7 @@ spawn_target(void)
 		 * canaries around it are meaningful).
 		 * send mode: the target only READS files (its file
 		 * arguments are relative to the caller's cwd) and writes
-		 * nothing to disk, so keep the caller's cwd — otherwise
+		 * nothing to disk, so keep the caller's cwd - otherwise
 		 * relative file arguments like ./test/4k.bin break. */
 		if (mode_receive && chdir(recvdir) != 0)
 			_exit(126);
@@ -1109,7 +1109,7 @@ rp_byte(struct rparser *p, unsigned char c, struct framebuf *fb)
 					/* ZSINIT carries the attention
 					 * string as a data subpacket,
 					 * but lsz sends it only after
-					 * ESCCTL/TESC8 negotiation — the
+					 * ESCCTL/TESC8 negotiation - the
 					 * header CRC comes first either
 					 * way */
 					p->in_data = 0;
@@ -1397,7 +1397,7 @@ build_zfile_data(unsigned char *dst, size_t dstcap, const char *name,
 		/* nl + NUL + ml + trailing NUL (+ terminator added by the
 		 * append layer) must fit; the trailing NUL is required by
 		 * receivers that validate the last block byte (zmrx-2.02
-		 * ZNAKs the ZFILE without it — the bug behind its
+		 * ZNAKs the ZFILE without it - the bug behind its
 		 * "odd exit code 4" run) */
 		if (nl + ml + 3 > dstcap)
 			return 0;
@@ -1671,7 +1671,7 @@ fuzz_receive_iter(int it, enum mclass mc, int *exitcode)
 			tr_mark("# no ZRINIT: aborting exchange");
 			/* counted as ok: a receiver may legitimately ignore
 			 * a mutated ZRQINIT. But if it printed anything it
-			 * is usually a misconfigured invocation — say so
+			 * is usually a misconfigured invocation - say so
 			 * loudly instead of looking like a healthy run. */
 			if (stderr_len)
 				fprintf(stderr,
@@ -1726,7 +1726,7 @@ fuzz_receive_iter(int it, enum mclass mc, int *exitcode)
 			{
 				/* junk frames (ZNAK etc.) tolerated up to 3
 				 * times per exchange: the counter MUST be
-				 * per-iteration — a function-static leaked
+				 * per-iteration - a function-static leaked
 				 * across iterations and permanently broke
 				 * the exchange wait after 3 junk frames
 				 * had accumulated in earlier iterations */
@@ -1765,7 +1765,7 @@ fuzz_receive_iter(int it, enum mclass mc, int *exitcode)
 				}
 			}
 			/* M_EOF: premature line drop right after the file
-			 * offer was acknowledged — the receiver sees the
+			 * offer was acknowledged - the receiver sees the
 			 * carrier go away mid-session */
 			if (mut.eof_after_zfile) {
 				tr_mark("# dropping the line (M_EOF)");
@@ -1775,7 +1775,7 @@ fuzz_receive_iter(int it, enum mclass mc, int *exitcode)
 			}
 		}
 
-		/* 4. ZDATA + subpackets: ONE ZDATA header per frame — after a
+		/* 4. ZDATA + subpackets: ONE ZDATA header per frame - after a
 		 * ZCRCG-terminated subpacket the receiver expects the next
 		 * subpacket to continue within the same frame (no new
 		 * header), so all chunks stream here under a single header
@@ -1787,7 +1787,7 @@ fuzz_receive_iter(int it, enum mclass mc, int *exitcode)
 		 * limit (e.g. crzsz: 1024) reject even "legal" chunks; the
 		 * post-stream drain below honors their (repeated) ZRPOS
 		 * requests and re-streams the remainder from the requested
-		 * offset, as many times as they ask — bounded. */
+		 * offset, as many times as they ask - bounded. */
 		{
 			size_t off = 0;
 			int done = 0;
@@ -1843,7 +1843,7 @@ fuzz_receive_iter(int it, enum mclass mc, int *exitcode)
 				 * subpacket larger than its buffer
 				 * ("Data subpacket too long") and drops
 				 * into its error-resync loop; it answers
-				 * with ZRPOS(pos) — wait for it and
+				 * with ZRPOS(pos) - wait for it and
 				 * resume from the acknowledged offset */
 				if (cap > SUBPKT_MAX) {
 					size_t resume_pos;
@@ -1899,7 +1899,7 @@ fuzz_receive_iter(int it, enum mclass mc, int *exitcode)
 						"continuing");
 				}
 				/* M_TRUNC: cut the stream after a bounded
-				 * number of subpackets — the receiver is
+				 * number of subpackets - the receiver is
 				 * left waiting for data that never comes */
 				if (mut.trunc_stop >= 0
 				    && (int)(off / 1024) >= mut.trunc_stop) {
@@ -1914,7 +1914,7 @@ fuzz_receive_iter(int it, enum mclass mc, int *exitcode)
 			 * (small subpacket limit) is error-retrying and has
 			 * sent ZRPOS requests while we were streaming. Honor
 			 * them now, newest wins, and re-stream the remainder
-			 * from the requested offset — a real sender does
+			 * from the requested offset - a real sender does
 			 * exactly this, as many times as it takes. Bounded:
 			 * a wedged receiver must not extend the iteration
 			 * forever. IMPORTANT: after a rejection the receiver
@@ -1925,7 +1925,7 @@ fuzz_receive_iter(int it, enum mclass mc, int *exitcode)
 			 * ZRPOS for a grace period), then stream once.
 			 * Gated on M_LONGPACKET only: for the other classes
 			 * a receiver stuck in an error loop over corrupted
-			 * data IS the mutation — answering its retries would
+			 * data IS the mutation - answering its retries would
 			 * turn every BYTEFLIP/FLAGS iteration into a
 			 * 14s resync marathon instead of a bounded abort. */
 			if (mc == M_LONGPACKET && mut.sub_chunk) {
@@ -2072,7 +2072,7 @@ fuzz_receive_iter(int it, enum mclass mc, int *exitcode)
 		}
 after_data:
 		/* 5. ZEOF (skipped after M_TRUNC: the receiver is left
-		 * hanging mid-stream — that is the mutation). The cut is
+		 * hanging mid-stream - that is the mutation). The cut is
 		 * followed by a CAN burst so the receiver cancels the
 		 * file promptly instead of waiting out its full 10s
 		 * Rxtimeout retries: the mid-stream interruption (and the
@@ -2116,7 +2116,7 @@ after_data:
 					/* resume request after an M_LONGPACKET
 					 * resync was already honored above;
 					 * here it means an error loop we do
-					 * not replay — just abort */
+					 * not replay - just abort */
 					final = 1;
 					break;
 				case ZFIN:
@@ -2140,7 +2140,7 @@ after_data:
 				tr_mark("> ZFIN (final)");
 				mut_send(mc, 0);
 				/* complete the close handshake: the receiver
-				 * answers ZFIN, then expects the "OO" —
+				 * answers ZFIN, then expects the "OO" -
 				 * without it it lingers in bounded retries */
 				rp_init(&rp2);
 				if (read_frame(&rp2, &fb, 1500) && fb.type == ZFIN) {
@@ -2154,7 +2154,7 @@ after_data:
 		}
 	}
 finish:
-	/* every early exit skips wait_target() — a pending alarm would
+	/* every early exit skips wait_target() - a pending alarm would
 	 * otherwise fire mid-later-iteration where nothing checks it
 	 * (observed: harness killed by its own SIGALRM against
 	 * zmtx-zmrx-1.02, which ignores reads) */
@@ -2166,7 +2166,7 @@ finish:
 
 /* main-loop hook: an M_LONGPACKET exchange that ran to completion sends
  * only clean frames after the oversized one, so the received file must
- * match byte for byte — the resync path is where resume-position bugs
+ * match byte for byte - the resync path is where resume-position bugs
  * would live. */
 static int
 longpkt_completed(void)
@@ -2187,7 +2187,7 @@ fuzz_send_iter(void)
 	 * mirror of receive mode. The choice below still decides the
 	 * session-level behavior; mc corrupts the answer frames. Every
 	 * 17th iteration is forced to M_NONE (like receive mode's clean
-	 * baseline) so the data-phase ACK loop can complete cleanly —
+	 * baseline) so the data-phase ACK loop can complete cleanly -
 	 * the mutation classes corrupt every ACK by design, which would
 	 * otherwise keep lsz in its bounded retry paths forever. The
 	 * override happens AFTER the draw: the PRNG stream is unaffected
@@ -2201,7 +2201,7 @@ fuzz_send_iter(void)
 	rp_init(&rp);
 	if (!read_frame(&rp, &fb, 5000)) {
 		/* the sender never even spoke. A sender that printed
-		 * to stderr is a misconfigured invocation — fail
+		 * to stderr is a misconfigured invocation - fail
 		 * loudly instead of masquerading as a healthy
 		 * "silence" iteration. */
 		if (stderr_len) {
@@ -2241,7 +2241,7 @@ fuzz_send_iter(void)
 			 * ever offering a file, and said why on stderr:
 			 * that is a misconfigured invocation (e.g. a
 			 * file argument that does not exist relative to
-			 * the harness's cwd) — the classic symptom is
+			 * the harness's cwd) - the classic symptom is
 			 * "cannot open <file>: No such file or
 			 * directory". This used to masquerade as a
 			 * healthy 0-failure run of "silence"
@@ -2385,14 +2385,14 @@ fuzz_send_iter(void)
 			break;
 		}
 		case 11: {
-			/* the data-phase ACK loop: act as a real receiver —
+			/* the data-phase ACK loop: act as a real receiver -
 			 * answer the ZFILE's ZCRCW with ZRPOS(0), then ack
 			 * every data subpacket: ZCRCQ → ZACK(pos), ZCRCW →
 			 * ZACK(pos), ZCRCE → ZACK(pos) + ZEOF handling and
 			 * the final ZRINIT (next-file) close. All answer
 			 * frames go through mut_send(mc, 1), so the 14
 			 * byte-mutation classes corrupt ACKs, positions and
-			 * CRCs mid-stream — this is the only send-mode
+			 * CRCs mid-stream - this is the only send-mode
 			 * choice that exercises the ACK path at all. */
 			unsigned char rh[4];
 			unsigned long ack_pos = 0;
@@ -2403,7 +2403,7 @@ fuzz_send_iter(void)
 			/* ZRINIT for the data phase: advertise CANFDX with
 			 * a 4096-byte buffer so lsz opens its streaming
 			 * window (Txwindow = (Rxbuflen/2/64)*64, lsz.c) and
-			 * pings ZCRCQ every Txwspac bytes — without a
+			 * pings ZCRCQ every Txwspac bytes - without a
 			 * buffer size it streams ZCRCG-only and the ACK
 			 * loop stays idle until ZCRCE. CANFC32 stays on:
 			 * when lsz negotiates CRC32 the data subpackets
@@ -2444,11 +2444,11 @@ fuzz_send_iter(void)
 				case ZFILE:
 				case ZSINIT:
 					/* re-offer / attention string:
-					 * answer ZRPOS(0) — the sender
+					 * answer ZRPOS(0) - the sender
 					 * (re)starts the data phase.
 					 * Handshake frame: pass through
 					 * UNMUTATED (like receive mode's
-					 * mut_send(mc, 0)) — a mutated
+					 * mut_send(mc, 0)) - a mutated
 					 * ZRPOS fails lsz's CRC check and
 					 * lsz resends the ZFILE forever
 					 * (bounded by its bad_acks>3), so
@@ -2722,7 +2722,7 @@ check_invariants(int exitcode, int hang)
 	 * correct, intended rejection, not a fuzzer finding.
 	 * 4 is zmtx-zmrx-2.02's EXIT_TRANSFER_FAILED: its designed
 	 * abort when a transfer cannot complete (the mutation classes
-	 * corrupt exchanges by design — a receiver giving up then is
+	 * corrupt exchanges by design - a receiver giving up then is
 	 * like lrz's exit 1). A clean iteration (it % 17 == 0) must
 	 * NEVER end in 4; that was the harness's missing trailing-NUL
 	 * bug in build_zfile_data, fixed.
@@ -2730,7 +2730,7 @@ check_invariants(int exitcode, int hang)
 	 * bytes as a receiver cancel and tears down (verified directly:
 	 * 5 raw CANs on stdin → exit 24, no message; the harness's
 	 * post-transfer 6-CAN close burst lands as a cancel even on a
-	 * clean exchange). Same class as 4 — designed cancel, not a bug. */
+	 * clean exchange). Same class as 4 - designed cancel, not a bug. */
 	if (exitcode != 0 && exitcode != 1 && exitcode != 4
 	    && exitcode != 24 && exitcode != 127 && exitcode < 0x80) {
 		switch (exitcode) {
@@ -2812,7 +2812,7 @@ usage(void)
 "  -S N        fast-forward to iteration N: replay the PRNG draws of\n"
 "              iterations 0..N-1 without running the target, then run\n"
 "              iterations N..N-1+(-n N). NOTE: the draw sequence is\n"
-"              only stable within one binary — changes to the mutation\n"
+"              only stable within one binary - changes to the mutation\n"
 "              code invalidate older seeds' offsets\n"
 "  -t SEC      per-iteration timeout in seconds (default 20). Keep this\n"
 "              at 8s or more for exploratory runs: the receiver has a\n"
@@ -2879,7 +2879,7 @@ main(int argc, char *argv[])
 	 * make every target argument that names an executable OR a
 	 * readable regular file a path relative to OUR cwd, so relative
 	 * invocations keep working (this covers nested execs like
-	 * zmodemsnif lrz and send-mode data files like test/4k.bin —
+	 * zmodemsnif lrz and send-mode data files like test/4k.bin -
 	 * in send mode the target's file arguments are relative to the
 	 * harness's cwd, not the fuzz working directory). Absolute paths
 	 * (leading '/') must NOT be touched: rewriting "/bin/true"
@@ -3026,7 +3026,7 @@ main(int argc, char *argv[])
 					/* hang: for mutation iterations an
 					 * exchange that deliberately breaks
 					 * mid-stream can leave the receiver
-					 * waiting for data that never comes —
+					 * waiting for data that never comes -
 					 * that is the mutation working, not a
 					 * target bug. Only signal deaths,
 					 * canary violations and clean-exchange
@@ -3052,7 +3052,7 @@ main(int argc, char *argv[])
 		 * every iteration is one)
 		 * broke the exchange mid-stream
 		 * by design and the target
-		 * waited — expected */
+		 * waited - expected */
 		bad = NULL;
 		/* still bookkeep the budget burn */
 		if (st)

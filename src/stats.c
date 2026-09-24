@@ -14,7 +14,7 @@ static FILE *journal_fp = NULL;
 #define OUT(X,Y)   do { if (st->X) fprintf(out, " %s=%lu",Y,(unsigned long) (st->X)); } while(0)
 #define OUTLL(X,Y) do { if (st->X) fprintf(out, " %s=%llu",Y,(unsigned long long) (st->X)); } while(0)
 
-/* Journal payload sanitizer: sanitize_bytes() with an unbounded source —
+/* Journal payload sanitizer: sanitize_bytes() with an unbounded source -
  * long names are processed in chunks so the journal keeps its no-cap
  * behavior. (The chunk size never splits an escape sequence: it can only
  * stop early mid-source, not mid-\xNN.) */

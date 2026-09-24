@@ -765,7 +765,7 @@ process_byte(struct parser *p, unsigned char c)
                 p->crc32 = (p->crc32 + c) & 0xff;
                 p->byte_idx++;
             } else {
-                /* Done with data — c is the first CRC/checksum byte */
+                /* Done with data - c is the first CRC/checksum byte */
                 emit_xmodem_block(p, p->x_block_num, p->x_block_size);
                 p->crc_recv[0] = c;
                 p->byte_idx = 1;
@@ -793,7 +793,7 @@ process_byte(struct parser *p, unsigned char c)
                 } else if (checksum_ok) {
                     print_ts(); print_dir(p->dir);
                     fprintf(stderr, "  (checksum ok)\n");
-                    /* byte 1 is the start of the next frame — process it now */
+                    /* byte 1 is the start of the next frame - process it now */
                     p->state = PS_IDLE;
                     process_byte(p, p->crc_recv[1]);
                 } else {

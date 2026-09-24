@@ -232,7 +232,7 @@ zdlread2(int c)
 		case (XOFF|0x80):
 			/* flow control: skipped. With ESC8/TESC8 negotiated the
 			 * high-bit forms (0x91/0x93) are the ZDLE-escaped data
-			 * bytes 0xd1/0xd3, not flow control — un-escape them
+			 * bytes 0xd1/0xd3, not flow control - un-escape them
 			 * instead. */
 			if (!(Esc8 && (c == (XON|0x80) || c == (XOFF|0x80))))
 				continue;
@@ -245,7 +245,7 @@ zdlread2(int c)
 			break;
 		}
 		/* ZDLE-escaped data: the classic rule accepts the escape
-		 * encoding of 0x40-0x5f/0xc0-0xdf ((c & 0x60) == 0x40) —
+		 * encoding of 0x40-0x5f/0xc0-0xdf ((c & 0x60) == 0x40) -
 		 * the escaped forms of the controls 0x00-0x1f/0x80-0x9f.
 		 * With ESC8/TESC8 negotiated, bytes >= 0x80 are escaped
 		 * too; their escape encodings are exactly the bytes whose
@@ -517,7 +517,7 @@ zsda32(const char *buf, size_t length, int frameend)
  * Receive array buf of max length with ending ZDLE sequence
  *  and CRC.  Returns the ending character or error code.
  *  NB: on the too-long error path (a data byte arriving when the buffer
- *  is already full) the offending byte is stored at buf[length] — buf
+ *  is already full) the offending byte is stored at buf[length] - buf
  *  must provide length+1 bytes. Callers allocate exactly that (secbuf:
  *  1+LRZSZ_MAX_SUBPACKET_LEN; Attn: ZATTNLEN+1).
  *
@@ -651,11 +651,11 @@ int
 zgethdr(unsigned char *hdr, int eflag, size_t *Rxpos)
 {
 	/* The byte-level resync parser is a state machine, was a goto hell:
-	 *   ST_GARBAGE  — read + classify a byte (former startover/again/agn2)
-	 *   ST_HUNT_CAN — CAN-hunt with eager 1-tenths-timeout reads (former gotcan)
-	 *   ST_ZPADS    — skip consecutive ZPADs via noxrd7() (former splat)
-	 *   ST_FRAME    — frame type read + ZBIN/ZBIN32/ZHEX dispatch
-	 *   ST_TAIL     — former fifi: common epilogue
+	 *   ST_GARBAGE  - read + classify a byte (former startover/again/agn2)
+	 *   ST_HUNT_CAN - CAN-hunt with eager 1-tenths-timeout reads (former gotcan)
+	 *   ST_ZPADS    - skip consecutive ZPADs via noxrd7() (former splat)
+	 *   ST_FRAME    - frame type read + ZBIN/ZBIN32/ZHEX dispatch
+	 *   ST_TAIL     - former fifi: common epilogue
 	 * reset_cancount: cancount resets only on the garbage-tail loop (the old
 	 *   goto startover), not when the CAN-hunt returns to the scan via TIMEOUT
 	 *   or more-CAN (the old goto again).

@@ -118,7 +118,7 @@ static time_t stop_time;
 int enable_syslog=true;
 
 /* DO_SYSLOG/DO_SYSLOG_FNAME are replaced by the shared variadic DO_SYSLOG
- * macro (zglobal.h) plus lrzsz_basename() (util.c) — same logged values,
+ * macro (zglobal.h) plus lrzsz_basename() (util.c) - same logged values,
  * no variable declarations or `zi` scope coupling inside a macro. */
 
 
@@ -1627,7 +1627,7 @@ again:
 			 * Retrying into the void would burn the whole
 			 * n-budget and then return 0, which sends the caller
 			 * down the YMODEM path against a dead line. Also:
-			 * re-handshaking after a reconnect would be wrong —
+			 * re-handshaking after a reconnect would be wrong -
 			 * the calling program (bbs, cu, ...) may have
 			 * authenticated the original peer, and whoever is on
 			 * the reconnected line may be someone different. */
@@ -1667,7 +1667,7 @@ again:
   			/* the sender asks for 8th-bit escaping (TESC8):
   			 * honor it unconditionally, like ESCCTL
   			 * (zmodem-current.txt §2.1). Rebuild the send
-  			 * table when the escape flags changed — lrz
+  			 * table when the escape flags changed - lrz
   			 * sends headers/ACKs through zsendline, and a
   			 * stale table would send the bytes wrong. This
   			 * also fixes the long-standing staleness for
@@ -1771,9 +1771,9 @@ rzfiles(struct zm_fileinfo *zi)
  * returns: ERROR ZSIKP ZEOF
  *
  * The control flow is an explicit three-state machine:
- *  ST_ZRPOS — send ZRPOS (on entry and after every retry)
- *  ST_HDR   — wait for a header (former nxthdr label)
- *  ST_DATA  — receive data subpackets (former moredata label)
+ *  ST_ZRPOS - send ZRPOS (on entry and after every retry)
+ *  ST_HDR   - wait for a header (former nxthdr label)
+ *  ST_DATA  - receive data subpackets (former moredata label)
  */
 enum rzfile_state { ST_ZRPOS, ST_HDR, ST_DATA };
 
@@ -2023,7 +2023,7 @@ rzfile(struct zm_fileinfo *zi)
 			default:
 				;   /* zrdata's remaining returns are handled
 				       above (GOT*, ERROR, TIMEOUT, RCDO,
-				       ZCAN) — anything else mirrors the
+				       ZCAN) - anything else mirrors the
 				       original's fall out of the loop body:
 				       re-send ZRPOS */
 				state = ST_ZRPOS;
