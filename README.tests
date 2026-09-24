@@ -41,9 +41,6 @@ If you want to do compatibility checks, note this:
     if test -x ~/bin/rzsz373/rz -a -x ~/bin/rzsz373/sz ; then
         available="$available rzsz373"
     fi
-    if test -x ~/bin/zmtx-zmrx-1.02/zmtx -a -x ~/bin/zmtx-zmrx-1.02/zmrx ; then
-        available="$available zmtxzmrx102"
-    fi
     if test -x ~/bin/zmtx-zmrx-2.02/zmtx -a -x ~/bin/zmtx-zmrx-2.02/zmrx ; then
         available="$available zmtxzmrx202"
     fi
@@ -65,6 +62,13 @@ oh, yes… "make vcheck-zbenchmark" runs a benchmark.
         time — never hang. -P drops exactly N bytes per event
         (overrides -x), so "silently dropping packets of some hundred
         bytes" is directly available.
+        The per-test timeout budget is raised to 100s (doit()'s default
+        is 35s): on a lossy line a resync storm — a duplicate ZRPOS
+        answered, the resulting stale ZDATA discarded, or a subpacket
+        terminator eaten by a drop — costs ~10s per event, because both
+        sides legitimately wait for each other until the receiver's
+        retry breaks the tie. Durations quantize to 10s steps; 0-3
+        storms per transfer are normal.
 
 "make vcheck-rcdo" (also part of the full vcheck/all run)
         RCDO regression tests on the receiver side: the sender is
