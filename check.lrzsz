@@ -222,7 +222,7 @@ doit() {
     fi
     if test -n "$KTRACE" ; then
         TRACE_SZ="ktrace -f $TRACEFILE_SZ"
-        TRACE_RZ="ktrace -f $TRACEFILE_RZ"
+        TRACE_RZ="ktrace -i -f $TRACEFILE_RZ"
     fi
 #rz="$rz -vvvv";
     echo "$doit_key - $title" >>$runlog
@@ -761,19 +761,6 @@ compat_traits() {
         BENCH_SZ_1k="$TEST_SZ"
         BENCH_RZ="$TEST_RZ"
         ;;
-    zmtxzmrx102)
-        TEST_SZ=~/bin/zmtx-zmrx-1.02/zmtx # no -q option
-        TEST_RZ=~/bin/zmtx-zmrx-1.02/zmrx" -q"
-        BENCH_SZ_1k="$TEST_SZ"
-        BENCH_RZ="$TEST_RZ"
-        otherrz="zmtxzmrx102"
-        othersz="zmtxzmrx102"
-        r_can_4k="yes"
-        r_can_8k="yes"
-        r_4k_opt="-q"
-        #s_can_resume=  : ZCRC is not implemented.
-        #can_escapectl= : ZESCCTL is not implemented
-        ;;
     zmtxzmrx202)
         TEST_SZ=~/bin/zmtx-zmrx-2.02/zmtx # no -q option
         TEST_RZ=~/bin/zmtx-zmrx-2.02/zmrx" -q"
@@ -800,9 +787,6 @@ available() {
     fi
     if test -x ~/bin/rzsz373/rz -a -x ~/bin/rzsz373/sz ; then
         available="$available rzsz373"
-    fi
-    if test -x ~/bin/zmtx-zmrx-1.02/zmtx -a -x ~/bin/zmtx-zmrx-1.02/zmrx ; then
-        available="$available zmtxzmrx102"
     fi
     if test -x ~/bin/zmtx-zmrx-2.02/zmtx -a -x ~/bin/zmtx-zmrx-2.02/zmrx ; then
         available="$available zmtxzmrx202"
@@ -1132,22 +1116,6 @@ config() {
         echo $_cmd $_opt
         return;
         ;;
-    zmtxzmrx102)
-        shift
-        _cmd=
-        for _i in $* ; do
-            case "$_i" in
-            r_can_2k) ;;
-            r_can_4k) ;;
-            r_can_8k) ;;
-            sz) _cmd=~/bin/zmtx-zmrx-1.02/zmtx ;;
-            rz) _cmd=~/bin/zmtx-zmrx-1.02/zmrx" -q" ;;
-            *) echo "" ; return ;;
-            esac
-        done
-        echo $_cmd
-        return;
-        ;;
     zmtxzmrx202)
         shift
         _cmd=
@@ -1313,9 +1281,8 @@ zbenchmark() {
     # The sniffer must stay out of benchmark runs: its per-frame stderr
     # logging both distorts the numbers being measured and perturbs the
     # byte-flow timing enough to trigger retransmit storms in fragile
-    # senders (zmtx 1.02 aborts the transfer after the second file).
-    # An ONLY= filtered benchmark would otherwise silently change what
-    # is being measured.
+    # senders. An ONLY= filtered benchmark would otherwise silently
+    # change what is being measured.
     NOSNIF=1
     export NOSNIF
     for profile in $profiles; do
@@ -1330,20 +1297,12 @@ zbenchmark() {
                 for receiver in $available ; do
                     # blacklist of known problem combos
                     case "$sender-$receiver" in
-                    zmtxzmrx102-crzsz|zmtxzmrx102-rzsz373)
-                        # crzsz for some reason falls back to XMODEM.
-                        continue;
-                        ;;
                     zmtxzmrx202-crzsz|zmtxzmrx202-rzsz373)
                         # CRC, ERROR, TIMEOUTs
                         continue;
                         ;;
-                    sexyz-zmtxzmrx102)
-                        # sexyz stumbles (a) over the ZACK zmrx sends for ZFILE, and (b) over the wrong ZACK position in other ZACKs.
-                        continue;
-                        ;;
                     esac
-            
+
                     TEST_S=$(config $sender sz $kparm)
                     if test -z "$TEST_S" ; then continue ; fi
                     t=""
@@ -1403,18 +1362,6 @@ zbenchmark2() {
         for kparm in "" 2k 4k 8k ; do
             for sender in $available ; do
                 for receiver in $available ; do
-                    # blacklist of known problem combos
-                    case "$sender-$receiver" in
-                    zmtxzmrx102-crzsz)
-                        # crzsz for some reason falls back to XMODEM.
-                        continue;
-                        ;;
-                    sexyz-zmtxzmrx102)
-                        # sexyz stumbles (a) over the ZACK zmrx sends for ZFILE, and (b) over the wrong ZACK position in other ZACKs.
-                        continue;
-                        ;;
-                    esac
-            
                     TEST_S=$(config $sender sz $kparm)
                     if test -z "$TEST_S" ; then continue ; fi
                     t=""
@@ -1959,6 +1906,16 @@ zpacketloss() {
     # suite's loss-per-file-size ratio and exercises the same machinery
     # within the budget. Heavier loss belongs in a manual benchmark run.
     #
+    # Budget: 100s, not the default 35s. On a lossy line a resync storm
+    # (duplicate ZRPOS answered, stale ZDATA discarded, a subpacket
+    # terminator eaten by a drop) costs ~10s per event — both sides
+    # legitimately wait for each other until the receiver's retry breaks
+    # the tie. Runs therefore quantize to 10s steps; 0-3 storms are
+    # normal (measured: max 45s pre-fix, max 31s after lrz learned to
+    # swallow stale ZDATA and re-request ZDATA quickly). 100s leaves
+    # generous headroom on slow machines while a hang (exit 124) stays
+    # a failure.
+    TIMEOUT_VALUE=100
 
     # packetized but errorfree line: pacing alone (X.75-style framing
     # flavor) must never stall the sender.
