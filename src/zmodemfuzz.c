@@ -1590,6 +1590,16 @@ fast_forward_rng(long it)
 
 	for (i = 0; i < it; i++) {
 		unsigned int mc;
+		if (it > 100000 && (i % 1000000) == 999999) {
+			/* no wall-clock dedup here: the loop can pass
+			 * several marks within one time() second, and a
+			 * silently suppressed report is exactly what we
+			 * are guarding against */
+			fprintf(stderr,
+				"zmodemfuzz: fast-forwarding rng: "
+				"%ld/%ld iterations done (%ld%%)\n",
+				i + 1, it, (int)((i + 1) * 100 / it));
+		}
 		build_payload(); /* main loop's per-iteration draw */
 		mc = rng_below(N_MCLASS - 1) + 1;
 		if (i % 17 == 0)
@@ -1673,7 +1683,7 @@ fuzz_receive_iter(int it, enum mclass mc, int *exitcode)
 			 * a mutated ZRQINIT. But if it printed anything it
 			 * is usually a misconfigured invocation - say so
 			 * loudly instead of looking like a healthy run. */
-			if (stderr_len)
+			if (stderr_len) {
 				fprintf(stderr,
 					"zmodemfuzz: iter %d: target sent no "
 					"ZRINIT and printed:\n  %.*s\n",
@@ -1681,6 +1691,18 @@ fuzz_receive_iter(int it, enum mclass mc, int *exitcode)
 					(int)(stderr_len < 400 ? stderr_len
 							       : 400),
 					stderr_capture);
+				*exitcode = -2;
+				return 1; /* counted as ok (target rejected us) */
+			}
+			/* total silence: on iteration 0 the target cannot
+			 * be "rejecting" anything - it never started
+			 * (exec failure in spawn_target, e.g. binary
+			 * missing). Anything else is a mutated ZRQINIT
+			 * the receiver legitimately ignored. */
+			if (it == 0) {
+				die("target never spoke (exec failure? "
+				    "target built?); fuzzing aborted");
+			}
 			*exitcode = -2;
 			return 1; /* counted as ok (target rejected us) */
 		}
@@ -1927,8 +1949,17 @@ fuzz_receive_iter(int it, enum mclass mc, int *exitcode)
 			 * a receiver stuck in an error loop over corrupted
 			 * data IS the mutation - answering its retries would
 			 * turn every BYTEFLIP/FLAGS iteration into a
-			 * 14s resync marathon instead of a bounded abort. */
-			if (mc == M_LONGPACKET && mut.sub_chunk) {
+			 * 14s resync marathon instead of a bounded abort.
+			 * SKIPPED when the stream ran to completion
+			 * (off >= payload_len): the ZEOF at after_data:
+			 * is due the instant the last subpacket is out.
+			 * Waiting here for the receiver's next ZRPOS lets
+			 * its error-retry budget expire on timeouts before
+			 * the ZEOF arrives, and lrz then unlinks the
+			 * COMPLETE file (observed: seed 453009526 it 535 -
+			 * 20 queued ZRPOS(73598) answered post-mortem). */
+			if (off < payload_len && mc == M_LONGPACKET
+			    && mut.sub_chunk) {
 				size_t last_pos = 0;
 				int same_pos = 0;
 				for (;;) {
@@ -1960,6 +1991,32 @@ fuzz_receive_iter(int it, enum mclass mc, int *exitcode)
 								newest =
 								payload_len;
 							got_any = 1;
+							if (newest >=
+							    payload_len) {
+								/* the receiver
+								 * has everything:
+								 * it wants the
+								 * ZEOF, not more
+								 * collecting. Break
+								 * out NOW - the
+								 * receiver is
+								 * burning its
+								 * error-retry
+								 * budget (one ZRPOS
+								 * per timeout
+								 * round, 20 rounds)
+								 * while we collect;
+								 * if the budget
+								 * expires before our
+								 * ZEOF lands it
+								 * unlinks the
+								 * COMPLETE file
+								 * (observed as the
+								 * two LONGPKT fails
+								 * of seed
+								 * 1812719613). */
+								break;
+							}
 						} else if (fb.type == ZSKIP
 							   || fb.type == ZCAN
 							   || fb.type ==
@@ -2064,8 +2121,20 @@ fuzz_receive_iter(int it, enum mclass mc, int *exitcode)
 						same_pos = 0;
 						last_pos = p2;
 					}
+					/* the receiver has everything: stop
+					 * resyncing entirely - the ZEOF is
+					 * sent at after_data:, reached the
+					 * moment this loop breaks. Waiting
+					 * here (or for another ZRPOS) while
+					 * the receiver sits in ST_HDR lets
+					 * its 20-round error budget expire
+					 * before the ZEOF lands, and it
+					 * unlinks the COMPLETE file. */
+					if (p2 >= payload_len)
+						goto zeof_now;
 				}
 			}
+zeof_now:
 			sent_pos = payload_len;
 			if (mc == M_LONGPACKET && mut.sub_chunk)
 				longpkt_done = 1;
@@ -2213,7 +2282,15 @@ fuzz_send_iter(void)
 			die("target never spoke (bad file argument?); "
 			    "fuzzing aborted");
 		}
-		return; /* silent death (e.g. exec failure): nothing to fuzz */
+		/* total silence means the target never started: the
+		 * classic case is an exec failure (_exit(127) in
+		 * spawn_target, e.g. binary missing or not built).
+		 * This used to return and the main loop still booked
+		 * the iteration into tx_stats[0] ("silence") - a run
+		 * against a nonexistent target then looked perfectly
+		 * green. Die loudly instead. */
+		die("target never spoke and said nothing "
+		    "(exec failure? target built?); fuzzing aborted");
 	}
 
 	{
@@ -2254,8 +2331,14 @@ fuzz_send_iter(void)
 			die("target never offered a file (bad file "
 			    "argument?); fuzzing aborted");
 		}
-		if (!got_file)
-			return; /* silent death: nothing to fuzz */
+		if (!got_file) {
+			/* same as above: a live lsz always offers a file
+			 * or says something on stderr; total silence is
+			 * an exec/startup failure and must not book a
+			 * healthy "silence" iteration */
+			die("target never offered a file and said nothing "
+			    "(exec failure? target built?); fuzzing aborted");
+		}
 	}
 	/* now ZFILE arrived: decide hostile answer */
 	{
@@ -2851,6 +2934,16 @@ main(int argc, char *argv[])
 			iterations = strtol(argv[++i], NULL, 0);
 		} else if (!strcmp(argv[i], "-S") && i + 1 < argc) {
 			start_iteration = strtol(argv[++i], NULL, 0);
+			/* replays are for debugging a run of tens to
+			 * thousands of iterations. Each fast-forwarded
+			 * iteration costs ~200 PRNG draws, so a large
+			 * -S spins for hours at 100% CPU with no alarm
+			 * protection (observed with a seed-sized value).
+			 * Die before the freeze instead. */
+			if (start_iteration < 0 || start_iteration > 10000000)
+				die("unreasonable -S start_iteration %ld "
+				    "(replay range is small; did you mean "
+				    "-s for the seed?)", start_iteration);
 		} else if (!strcmp(argv[i], "-t") && i + 1 < argc) {
 			alarm_seconds = atoi(argv[++i]);
 		} else if (!strcmp(argv[i], "--selftest")) {
@@ -3133,7 +3226,8 @@ main(int argc, char *argv[])
 				alarm_seconds, target_argv[0]);
 			fprintf(stderr, "zmodemfuzz: "
 				"(count, avg ms, max ms, hangs, timeouts"
-				", fails, crc32)\n");
+				", fails%s)\n",
+				mode_receive ? ", crc32" : "");
 			if (mode_receive) {
 				for (ci = 0; ci < N_MCLASS; ci++) {
 					if (!rx_stats[ci].count)
