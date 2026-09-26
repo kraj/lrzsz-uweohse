@@ -76,12 +76,6 @@
   its frame log remains trustworthy up to the first desync.
   [i needed an AI to find that. i myself totally overlooked that angle]
 
-- A17 (from audit.md): inconsistent i18n in zperr.c. "Retry %d: "
-  (zperr.c:36) is the only message marked with _(); zpfatal(),
-  vstringf() and the rest of zperr are unmarked. Either mark
-  everything user-visible in zperr.c or drop the one _() - do not
-  stay inconsistent. (xgettext picks up the marked one alone.)
-
 - B38 (from audit.md, reduced scope): remaining unbounded protocol
   loops. Most loops gained escape hatches since the audit (rzfile's
   n=20 budget, wcgetsec RETRYMAX, getnak tries==3, wcputsec/EOT
