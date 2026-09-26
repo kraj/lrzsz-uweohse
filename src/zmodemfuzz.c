@@ -1597,7 +1597,7 @@ fast_forward_rng(long it)
 			 * are guarding against */
 			fprintf(stderr,
 				"zmodemfuzz: fast-forwarding rng: "
-				"%ld/%ld iterations done (%ld%%)\n",
+				"%ld/%ld iterations done (%d%%)\n",
 				i + 1, it, (int)((i + 1) * 100 / it));
 		}
 		build_payload(); /* main loop's per-iteration draw */
