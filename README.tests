@@ -106,3 +106,15 @@ oh, yes… "make vcheck-zbenchmark" runs a benchmark.
         leaves /tmp/zmodemfuzz-fail-seedNNN-itNNN.log with the complete
         byte transcript; reproduce any run exactly with the printed seed:
              src/zmodemfuzz -s SEED -m receive -- ./src/lrz -q -Z
+        The end-of-run class summary columns are
+             count, avg ms, max ms, hangs, timeouts, fails [, crc32]
+        where "timeouts" counts iterations that burned the harness
+        alarm budget (hang, or the target was still stuck in a bounded
+        retry loop when the alarm fired) - expected after mid-stream
+        mutations and the hostile ACK-loop choice, NOT a target bug;
+        and "fails" counts real invariant violations (crash, signal
+        death, canary escape, content mismatch). A run is healthy when
+        the trailing "done, N iterations, F failures" line reports
+        F=0. The per-row "fails" is redundant with F: fail() prints a
+        FAIL line for every counted failure, so a row with fails>0
+        without FAIL lines cannot happen.
