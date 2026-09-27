@@ -2293,8 +2293,20 @@ getinsync(struct zm_fileinfo *zi, int flag)
 
 			/* the input_f check is for the static analyzer clang-tidy,
 			 * which doesn't catch the logic around input_f. */
-			if (input_f && fseeko(input_f, (off_t) rxpos, 0))
-				return ERROR;
+			if (input_f) {
+				/* §5: a ZRPOS with rxpos > 0 into a non-seekable input
+				 * (pipe, socket, char device) must not abort the
+				 * transfer; the spec lets the sender ignore it (or
+				 * restart - which on such input can only ever mean
+				 * restarting from 0, since that is the only position a
+				 * stream can still deliver). Ignore. */
+				struct stat fst;
+				if (fstat(fileno(input_f), &fst) == 0
+				    && !S_ISREG(fst.st_mode) && rxpos > 0)
+					continue;
+				if (fseeko(input_f, (off_t) rxpos, 0))
+					return ERROR;
+			}
 			zi->eof_seen = 0;
 			bytcnt = Lrxpos = zi->bytes_sent = rxpos;
 			if (Lastsync == rxpos) {
