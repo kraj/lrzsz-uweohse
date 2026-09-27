@@ -144,6 +144,12 @@ static int error_count;
 #define OVERHEAD 18
 #define OVER_ERR 20
 
+/* garbage tolerance for input that never becomes a recognizable prompt or
+ * header. getnak() has no protocol-state retry budget of its own (only
+ * TIMEOUT is bounded), so a line feeding continuous junk must give up
+ * instead of waiting forever. */
+#define MAX_GARBAGE 100
+
 int enable_syslog=true;
 
 /* set by the SIGINT handler; zsendfdata() checks it at its loop
@@ -927,6 +933,7 @@ getnak(void)
 {
 	int firstch;
 	int tries=0;
+	int garbage=0;
 
 	Lastrx = 0;
 	for (;;) {
@@ -976,7 +983,18 @@ getnak(void)
 		case CAN:
 			if ((firstch = READLINE_PF(20)) == CAN && Lastrx == CAN)
 				return ERROR;
+			if (++garbage > MAX_GARBAGE) {
+				zperr(_("Too much garbage on line"));
+				return ERROR;
+			}
+			break;
 		default:
+			/* unbounded if garbage never stops arriving: the TIMEOUT
+			 * budget above only runs while the line is quiet. */
+			if (++garbage > MAX_GARBAGE) {
+				zperr(_("Too much garbage on line"));
+				return ERROR;
+			}
 			break;
 		}
 		Lastrx = firstch;
