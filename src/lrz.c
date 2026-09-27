@@ -650,8 +650,15 @@ fubar:
             vstringf(_("\r\n%s: %s kept (incomplete).\r\n"),
                 lrzsz_progname, Pathname);
         } else if (Pathname) {
-            unlink(Pathname);
-            vstringf(_("\r\n%s: %s removed.\r\n"), lrzsz_progname, Pathname);
+            struct stat st;
+            /* Never unlink anything but a regular file: -D sets the
+             * pathname to /dev/null, and any similar special case added
+             * later must not turn a failed transfer into the deletion of
+             * a device, socket, or symlink. */
+            if (lstat(Pathname, &st) == 0 && S_ISREG(st.st_mode)) {
+                unlink(Pathname);
+                vstringf(_("\r\n%s: %s removed.\r\n"), lrzsz_progname, Pathname);
+            }
         }
         stats_file_error();
         stats_account_one();
