@@ -2269,31 +2269,16 @@ getinsync(struct zm_fileinfo *zi, int flag)
 			if (input_f)
 				clearerr(input_f);	/* In case file EOF seen */
 
-			/* zmrx 1.02 answers a ZCRCW with 1) a ZACK of the
-			 * wrong (pre-block) position, which is ignored below
-			 * because the position doesn't match, and 2) a ZRPOS
-			 * with the right position - which triggers the error
-			 * recovery machinery and thus another ZCRCW, i.e. a
-			 * slow loop even when the transfer succeeds. It kills
-			 * the benchmark. Partially the fault of the original
-			 * ZMODEM specification, which never concretely
-			 * specified WHICH response a receiver must send when
-			 * answering a ZCRCW.
-			 * Workaround: translate a ZRPOS at the last sent
-			 * offset into a ZACK. That is safe: bytes_sent advances
-			 * when a subpacket is queued, while the receiver can
-			 * only ack what it received - so rxpos == bytes_sent
-			 * proves the receiver is missing nothing, and a real
-			 * error recovery ZRPOS (resend from here) always carries
-			 * rxpos < bytes_sent. A receiver using a same-position
-			 * ZRPOS to force a fresh ZCRCW sync point (the spec's
-			 * ZCRCW-after-ZRPOS rule) gets none - but there is
-			 * nothing to restart at that position, so no restart
-			 * is due. */
-			if (zi->bytes_sent == rxpos) {
-				Lrxpos = rxpos;
-				return ZACK;
-			}
+			/* A ZRPOS is always honored as "resume at this offset",
+			 * including a same-position one (rxpos == bytes_sent): §5
+			 * grants the receiver the right to force a fresh sync
+			 * point that way, and requires the first data subpacket
+			 * after a ZRPOS to be ZCRCW (ack_resync() re-arms
+			 * need_wait on this path). An earlier version used to
+			 * translate a same-position ZRPOS into a ZACK here - a
+			 * speed workaround for zmrx 1.02, which answers every
+			 * ZCRCW with exactly such a ZRPOS - deviating from §5 by
+			 * silently reinterpreting the frame type; removed. */
 
 			/* the input_f check is for the static analyzer clang-tidy,
 			 * which doesn't catch the logic around input_f. */
