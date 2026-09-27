@@ -254,8 +254,6 @@ Other changes:
 * syslog support is now always compiled in. Earlier releases had
   configure options to deselect it.
 
-* Performance on bad lines is quite a bit better now.
-
 * support for many old systems has been removed. The new support policy is
   this:
   - I aim for POSIX standards of the last 20 years.
@@ -321,6 +319,18 @@ Other changes:
 * compile tested with gcc and clang.
 
 * included: ZMODEM specification / documentations. See doc/README
+
+* performance improvements and regressions:
+  Generally performance on bad lines has improved, and transfers
+  with lrzsz will succeed on faulty lines where other implementations
+  give up.
+  Performance on errorfree lines conditions may be worse than before,
+  depending on the network buffering and delay. On a line with a high
+  delay (ping time) the precautions against high packet loss rates result
+  in a loss of performance.
+  Fun fact: the same implementations leading the performance score on
+  a 115200 bps line with a 20ms delay are the ones losing on the
+  1mbit line with 250ms delay line.
 
 * a personal note: I had abandoned the project for about 27 years, from
   1999-08-22 to 2026-08-10, because the existing package was good enough
