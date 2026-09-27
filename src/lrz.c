@@ -532,6 +532,10 @@ wcreceive(int argc, char **argp)
 	const char *shortname=NULL;
 	zi_init(&zi);
 
+	/* forward decl: fubar is reached before Pathname's declaration line
+	 * is ever executed (e.g. when the very first tryz() fails). */
+	Pathname=NULL;
+
 	if (protocol!=ZM_XMODEM || argc==0) {
 		Crcflg=1;
 		if ( !Quiet)
@@ -572,6 +576,9 @@ wcreceive(int argc, char **argp)
 					(long) zi.bytes_skipped);
 				stats_file_ok();
                                 stats_account_one();
+				/* the file is complete; a later fubar must not delete it */
+				free(Pathname);
+				Pathname=NULL;
 			}
 		}
 	} else {
@@ -619,6 +626,9 @@ wcreceive(int argc, char **argp)
                 report_transfer_result(0, shortname, zi.fname,
                     (long) zi.bytes_received, (long) zi.bytes_total,
                     (long) zi.bytes_skipped);
+		/* the file is complete */
+		free(Pathname);
+		Pathname=NULL;
         }
         return OK;
 fubar:
@@ -1334,12 +1344,16 @@ procheader(char *name, struct zm_fileinfo *zi)
         uncaps(name_static);
     }
 
+    /* the received name is about to be replaced (or discarded for the
+     * XMODEM dummy case); Pathname must not point at the previous file
+     * from here on - a fubar between here and the new assignment below
+     * would otherwise act on that older file's path. */
+    free(Pathname);
+    Pathname=NULL;
+
     if (protocol==ZM_XMODEM)
         /* we don't have the filename yet */
         return OK; /* dummy */
-    if (Pathname)
-        free(Pathname);
-
     Pathname=xstrdup(name_static);
     if (Verbose) {
         /* overwrite the "waiting to receive" line */
@@ -1748,6 +1762,9 @@ rzfiles(struct zm_fileinfo *zi)
 				(long) zi->bytes_skipped);
                         stats_file_ok();
                         stats_account_one();
+			/* the file is complete; a later fubar must not delete it */
+			free(Pathname);
+			Pathname=NULL;
 			break;
 		case ZSKIP:
                         stats_file_skipped();
@@ -1755,6 +1772,10 @@ rzfiles(struct zm_fileinfo *zi)
                         if (Verbose) 
                                 vstringf(_("Skipped"));
                         DO_SYSLOG(LOG_INFO, "%s/%s: skipped",lrzsz_basename(zi->fname),protname());
+			/* the file was skipped, not written; a later fubar must
+			 * not delete a pre-existing file */
+			free(Pathname);
+			Pathname=NULL;
 			break;
 		default:
 		case ERROR:
