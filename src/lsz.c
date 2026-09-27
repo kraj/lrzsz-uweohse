@@ -1498,7 +1498,6 @@ zsendfile(struct zm_fileinfo *zi, const char *buf, size_t blen)
 {
 	unsigned long crc;
 	size_t rxpos;
-        int zack_count=0;
 	int bad_acks = 0;
 
 	/* we are going to send a ZFILE. There cannot be much useful
@@ -1539,12 +1538,16 @@ again:
 			}
 			continue;
 		case ZACK:
-                        /* zmrx does this. it answers the ZCRCW for the ZFILE (filename etc). But this was never done by omen, which used the ZRPOS as ACK. */
-                        zack_count++;
-                        if (zack_count <=3) {
-                            goto again;
+                        /* zmrx answers the ZCRCW for the ZFILE (filename etc)
+                         * with a ZACK; omen never did - it used the ZRPOS as
+                         * the ACK. A receiver that keeps ACKing must not make
+                         * us resend the ZFILE forever, so ZACK shares the
+                         * default branch's retry budget. */
+                        if (++bad_acks > 3) {
+                            zperr(_("receiver keeps rejecting the file header"));
+                            return ERROR;
                         }
-                        continue;
+                        goto again;
 		case ZRQINIT:  /* remote site is sender! */
 			if (Verbose)
 				vstringf(_("got ZRQINIT"));
