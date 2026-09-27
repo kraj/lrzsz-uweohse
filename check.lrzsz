@@ -1718,17 +1718,27 @@ SEOF
     #
     # -D / --null in XMODEM mode: the received data goes to /dev/null,
     # no file with the given pathname may be created.
-    # Pre-existing quirk, not checked before the exit-status rule: both
-    # sides end via their cancel path (lsz "Line dropped" once the
-    # receiver's /dev/null receiver has nothing left to say, lrz gives up
-    # on its sector-header retries) — the verdict is the missing file.
-    # Both sides give up via their own retry counters, so which one quits
-    # first is a race; if the receiver closes while the sender is in its
-    # brief retransmit-write instant, lsz gets SIGPIPE=141 (theoretical,
-    # never observed). The sender opt-out covers both variants.
+    # Since -D actually opens /dev/null again (formerly rejected by
+    # safe_open_fd's blanket absolute-path ban), the receiver accepts the
+    # whole transfer, answers the EOT, and both sides exit 0. The verdict
+    # is the missing file.
+    #
+    # -c on the receiver only: plain lsz -X always sends CRC-format
+    # sectors (lsz has no XMODEM checksum flag; -c is the removed
+    # ZCOMMAND mode there), so lrz must ask for CRC via -c (Crcflg).
+    # Without it lrz would send NAK requesting checksum mode, get CRC
+    # blocks, fail them, and cancel the first sector.
+    #
+    # The receiver gets a (never-created) filename argument: XMODEM has
+    # no filename on the wire, and lrz's XMODEM branch uses one from the
+    # command line. Without any, `argc==0` makes wcreceive run the
+    # ZMODEM tryz handshake and then the YMODEM pathname loop - which
+    # consumes the first data sector as "pathname" and cancels the
+    # transfer. -D still discards the data to /dev/null regardless.
     key="xmodem-lrz-null"
+    mkdir "$testdir/$key"
     doit "$key" "xmodem lrz -D does not create the file" \
-        "$SZ -q -X" "$RZ -q -b -X -D" "missing" $all_256_file 128,141 128
+        "$SZ -q -X" "$RZ -q -b -X -c -D payload.bin" "missing" $all_256_file
 
     #
     # long ZFILE subpacket (V10): a filename near the 960-byte name limit
