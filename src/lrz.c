@@ -592,7 +592,11 @@ wcreceive(int argc, char **argp)
 		if (Pathname)
 			free(Pathname);
 		errno=0;
-		Pathname=xstrdup(*argp);
+		/* argc may be 0 here (XMODEM with a bare -D; no filename on
+		 * the command line). *argp would be NULL - the transfer target
+		 * name is a mere placeholder in that case, and -D replaces it
+		 * with /dev/null right below anyway. */
+		Pathname=xstrdup(argc ? *argp : "stdin");
 
                 checkpath(Pathname);
                 if (Nflag) {
@@ -602,11 +606,11 @@ wcreceive(int argc, char **argp)
                         Pathname=xstrdup("/dev/null");
                 }
                 stats_set_filename(Pathname);
-                shortname=strrchr(*argp,'/');
+                shortname=strrchr(Pathname,'/');
                 if (shortname)
                     shortname++;
                 else
-                    shortname=*argp;
+                    shortname=Pathname;
                 if (Verbose>1) {
                     vchar('\n');
                     vstringf(_("%s: ready to receive %s"), lrzsz_progname, Pathname);
