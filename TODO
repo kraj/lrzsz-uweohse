@@ -1,6 +1,8 @@
 - make argv[0]-recognition of X/YModem work with program_name_transform.
   (or not? does anyone use that feature?)
 
+- add a stronger turbo escaping, only escaping ZDLE.
+
 - look into VMIN code: how to determine if it's usable (it isn't unter
   FreeBSD and NetBSD (might have changed) and possibly many other 
   systems), and what is the max value?
