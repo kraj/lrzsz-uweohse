@@ -1702,7 +1702,15 @@ ack_resync (struct zm_fileinfo *zi, int c, bool sync_first,
 					   lrzsz_basename(zi->fname), protname());
 			return ZSKIP;
 		case ZACK:
+			break;
 		case ZRPOS:
+			/* a ZRPOS restart must resume with the first data
+			 * subpacket being ZCRCW (zmodem-current.txt section 5).
+			 * need_wait was previously armed only on the CAN/ZPAD
+			 * drain path below; a verdict-here ZRPOS (the normal
+			 * error-recovery path) would otherwise resume with
+			 * ZCRCG. */
+			*need_waitp = 1;
 			break;
 		case ZRINIT:
 			/* the receiver finished the file and closed our input
