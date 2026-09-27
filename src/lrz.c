@@ -574,7 +574,7 @@ wcreceive(int argc, char **argp)
 				report_transfer_result(0, shortname, zi.fname,
 					(long) zi.bytes_received, (long) zi.bytes_total,
 					(long) zi.bytes_skipped);
-				stats_file_ok();
+				/* stats_file_ok() already ran in wcrx(); don't count twice */
                                 stats_account_one();
 				/* the file is complete; a later fubar must not delete it */
 				free(Pathname);
