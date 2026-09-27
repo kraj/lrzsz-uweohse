@@ -98,8 +98,8 @@ Security related changes:
   implementations (OMEN zmodem and older lrz) that still execute received
   commands. New setups should not use these options.
 
-* lsz no longer sends the "rz\r" auto-download trigger. Modern practice 
-  is to watch the data stream for a ZRQINIT frame instead. This also 
+* lsz no longer sends the "rz\r" auto-download trigger. Modern practice
+  is to watch the data stream for a ZRQINIT frame instead. This also
   stops lsz from writing protocol-unrelated bytes to the transfer line.
 
 * the PUBDIR feature was removed from lsz and lrz.
@@ -179,9 +179,9 @@ Other changes:
   and derivatives) allowed both, so lsz still keeps it for compatibility.
   A future release will keep allowing relative paths but will reject
   absolute paths and ".." components with a fatal error.
-   On the receiving side lrz confines received filenames to the receiving
-   directory regardless of what the sender transmits.
-   New setups should use plain relative filenames.
+  On the receiving side lrz confines received filenames to the receiving
+  directory regardless of what the sender transmits.
+  New setups should use plain relative filenames.
 
 * the ZMODEM 8th-bit escaping capability (ESC8/TESC8) is now implemented:
   the new option -7 / --escape-8bit makes lsz escape every byte >= 0x80
@@ -302,21 +302,121 @@ Other changes:
   never specified which answer a ZCRCW subpacket gets. zmrx 1.02 answers
   with a ZRPOS, which forced lsz into a slow recovery loop).
 
-* compatibility tests were done against Synchronet sexyz v3.5,
+* full compatibility tests were done against Synchronet sexyz v3.5,
   lrzsz-0.12.21rc, crzsz-1.13, rzsz-3.73 and zmtx-zmrx-2.02.
   Known third-party problems found by these tests, none of them lrzsz
-  bugs: zmtx 1.02 retransmits frames without pacing while its input
-  buffer holds queued frames and loses transfers on high-latency lines,
-  it sent stale data causing bad CRCs, and answered ZCRCW with ZRPOS
-  (see above).
+  bugs: zmtx 1.02 (later removed from the compatibility test runs)
+  retransmits frames without pacing while its input buffer holds queued
+  frames and loses transfers on high-latency lines, it sent stale data
+  causing bad CRCs, and answered ZCRCW with ZRPOS (see above).
   crzsz and rzsz-3.73 flush their input queue on error recovery,
   discarding the receiver's answers, which slows their give-up on faulty
   lines.
+
+* manual compatibility tests were done against DSZ in a dosbox. What was
+  tested worked correctly. It is possible, though not likely, that a
+  future release will expand upon that.
 
 * compile tested on Debian GNU/Linux, Alpine Linux and OpenBSD.
 * compile tested with gcc and clang.
 
 * included: ZMODEM specification / documentations. See doc/README
+
+* a personal note: I had abandoned the project for about 27 years, from
+  1999-08-22 to 2026-08-10, because the existing package was good enough
+  and i had no use for lrzsz anymore after 2002 or so. Later I didn't
+  even have a serial port to test on, i didn't even once use C after
+  2005, and additionally i'm not dealing with UNIX incompatibility
+  issues anymore. I don't miss all that. Today i deal with PHP, HTML,
+  CSS, Javascript, SQL, and go.
+
+  The package refused to die. CVS-2018-10195 came, and i wondered for a
+  while why nothing worse had been detected. But then i decided that
+  lrzsz is not my problem anymore. It had to be the problem of someone
+  else.
+
+  Then Tristan contacted me on 2026-07-27, which was 8 days after i
+  did a major screwup at https://naturfotografen-forum.de by updating
+  the production system to a software version which should been tested
+  and debugged for at least 2 or 3 additional weeks, and which contained
+  one feature which made a rollback infeasible. I saw his mail, and
+  thought 'Uh, uh… this is not a minor thing'.
+  But i had no time, because the forum is more important to me.
+
+  14 days later i found the time, and the real fun started. I needed
+  far less time to fix the three vulnerabilities Tristan reported than
+  i needed to fix the autoconf stuff so i could compile the package.
+  Updating the gettext stuff also took hours, and i wasted half an
+  evening trying to update the dejagnu test suite (which i failed at).
+
+  Then i sat back, looked at the code, decided what compatibility hacks
+  to throw out, and started to clean up the mess.
+
+  Then i asked qwen (coder next) to block my graphics card for a few days,
+  i mean, i asked the LLM to review the code (the prompt was somewhat
+  longer than that), which on my 4 GB graphics card took a long time.
+  In the meantime i found the old recordxyz tool (a protocol tracer),
+  and even the version 2 of it (a total rewrite which was much worse than
+  the original, which wasn't very good to begin with), took some parts
+  from them, and created zmodemsnif.
+
+  When that was about ready, i gave up on the local qwen. It had produced
+  some interesting findings, but my machine is too slow for that. I used
+  a cloud kimi-k2.6 to do a review, and later used glm-5.2, kimi-k3,
+  some qwen and glm-5.3-flash for the same.
+
+  For all you LLM haters or sceptics: i get it. I hate these LLM companies
+  with a passion. These people steal in the internet (and from my own
+  server, too), and give nothing back, beyond nebulous claims and lies
+  and server overloads. They spend billions to improve LLMs, which should
+  be spend to improve people and society. The list of reasonable
+  complaints is long. I get all that.
+
+  But i've run out of people i can work with. The only programmer whom
+  i could have relied on reviewing my code, and any changes, in time has
+  died a few years ago (and i would have had to pay for by reviewing his
+  code, which is something i tried to avoid, because his stuff was really
+  complicated - lrzsz is quite simple compared to that).
+  And i absolutely _needed_ some kind of review. I was out of practise
+  with C and the toolchain, and given the sorry state of the C language
+  (why, oh why, isn't '-Wturn-on-all -Werror' the default?) it would have
+  been irresponsible to not use an LLM for that.
+  This kind of review is something LLMs are good at, and they found more
+  than a few security issues in the code (i also found some, but not that
+  many), and quite a few bugs.
+
+  The core code, any code in the installed programs, is 100% human written
+  (i'm lazy and hate commenting, and copied some LLM generated comments,
+  but no code).
+
+  The code of the programs not installed by default (which are not very
+  useful for anyone but the maintainer) is partially or mostly human
+  written:
+  - zmodemsniff.c is about 75% human written (maybe more, i don't care).
+  - linesimulator.c is about 50% human written.
+    [this tool is for the test suite, and simulates different line types
+    with different error modes]
+  - zmodemfuzz.c is about 15% human written, maybe a bit less.
+  The reason the later has been written mostly by the LLMs is that i'm
+  not feeling able to think as attacker and defender at the same time.
+  Maybe i could - but i would never bet on it.
+  I also would never bet on the fuzzer being able to detect all possible
+  holes, but it did help me to fix many border cases.
+
+  If you don't want to use lrzsz because of the LLM usage, you don't
+  have to. I understand that. Maybe you can backport the security fixes
+  to lrzsz-0.12.21rc - but i will not do that.
+
+  This release did cost about 6 weeks of my spare time, including some
+  extra time during my vacation. In addition i spent a few days rewriting
+  the ZMODEM specification.
+  If you feel that i should not have spent that much time on this old
+  package: you are not alone.
+
+  If you feel you should pay something for this: please consider donating
+  to some international help organization, for example Amnesty
+  International, International Red Cross and Red Crescent Movement,
+  Médecins Sans Frontières (Doctors Without Borders) or UNICEF.
 
 Version 0.12.21rc - August 1999, Uwe Ohse
 

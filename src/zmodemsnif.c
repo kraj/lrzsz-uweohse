@@ -9,10 +9,9 @@
  * Build: cc -o zmodemsnif zmodemsnif.c
  *
  * deliberately totally independent of the lrzsz code.
- * can be compiled with: cc -o zmodemsnif zmodemsnif.c
  *
- * in memoriam of a similar thing i wrote in the early 200x years, which got
- * lost somehow.
+ * in memoriam of recordxyz, a similar thing i wrote in the late 1990s
+ * and rewrote in the early 200x years.
  */
 
 /* #define _POSIX_C_SOURCE 200809L */
