@@ -1222,8 +1222,17 @@ procheader(char *name, struct zm_fileinfo *zi)
         }
     }
 
-    /* Check for existing file */
-    if (zconv != ZCRESUM && !Rxclob && (zmanag&ZF1_ZMMASK) != ZF1_ZMCLOB
+	/* Security: validate the sender-chosen name BEFORE any open of it.
+	 * safe_open_fd() deliberately allows interior ".." components, so a
+	 * pre-check open or the -H CRC probe below would otherwise probe and
+	 * read files outside the receive directory, leaking existence and
+	 * (via do_crc_check) content fingerprints to the peer. checkpath()
+	 * must run first. No-op for the empty XMODEM placeholder name. */
+	if (*name_static)
+		checkpath(name_static);
+
+	/* Check for existing file */
+	if (zconv != ZCRESUM && !Rxclob && (zmanag&ZF1_ZMMASK) != ZF1_ZMCLOB
             && (zmanag&ZF1_ZMMASK) != ZF1_ZMAPND
             && (fout=safe_open(name, "r", MKDIR_NO))) {
         struct stat sta;
@@ -1338,7 +1347,7 @@ procheader(char *name, struct zm_fileinfo *zi)
         vstringf(_("Receiving: %s\n"), name_static);
     }
 
-    checkpath(name_static);
+	/* checkpath() already ran before any open (see above). */
         if (Nflag)
         {
                 /* write to /dev/null instead; if a rename target was claimed
