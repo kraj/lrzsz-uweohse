@@ -1029,8 +1029,15 @@ safe_open_fd(const char *path, int open_flags, enum safe_mkdir mkdir_ok)
 
     open_flags |= O_NOFOLLOW;
 
-    if (path[0] == '/')
-        return -1; /* absolute paths are rejected by checkpath() */
+    if (path[0] == '/') {
+        /* -D: /dev/null is the one absolute path we deliberately open
+         * (a device node; open_flags already carry O_NOFOLLOW). Anything
+         * else absolute is rejected by checkpath(). */
+        if (0 == strcmp(path, "/dev/null"))
+            return open(path, open_flags, 0666);
+        errno = EACCES;
+        return -1;
+    }
 
     dirfd = open(".", O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
     if (dirfd < 0)
@@ -1372,6 +1379,7 @@ procheader(char *name, struct zm_fileinfo *zi)
                 }
                 free(name_static);
                 name_static=xstrdup("/dev/null");
+                zi->fname=name_static; /* was left dangling at the freed name */
         }
 
         if (!fout && Thisbinary && zconv==ZCRESUM) {
