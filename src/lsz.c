@@ -762,8 +762,19 @@ wcs(const char *oname, const char *remotename)
 		}
 	}
 	vpos = 0;
+	/* fstat must succeed: its fields are transmitted below as the file's
+	 * metadata (mode/mtime/size). A failure used to send uninitialized
+	 * memory - a garbage size in particular can make the receiver
+	 * truncate the incoming stream to R_BYTESLEFT. Skip the file. */
+	if (fstat(fileno(input_f), &f) == -1) {
+		int e = errno;
+		lrzsz_warning(e, _("cannot stat %s"), name);
+		fclose(input_f);
+		++errcnt;
+                stats_file_local_error();
+		return OK;
+	}
 	/* Check for directory or block special files */
-	fstat(fileno(input_f), &f);
 	if (S_ISDIR(f.st_mode) || S_ISBLK(f.st_mode)) {
 		lrzsz_warning(0, _("is not a file: %s"),name);
 		fclose(input_f);
