@@ -2301,9 +2301,31 @@ getinsync(struct zm_fileinfo *zi, int flag)
 				 * restarting from 0, since that is the only position a
 				 * stream can still deliver). Ignore. */
 				struct stat fst;
-				if (fstat(fileno(input_f), &fst) == 0
-				    && !S_ISREG(fst.st_mode) && rxpos > 0)
-					continue;
+				if (fstat(fileno(input_f), &fst) == 0) {
+					if (!S_ISREG(fst.st_mode)) {
+						if (rxpos > 0)
+							continue;
+					} else if ((unsigned long long)rxpos > (unsigned long long)fst.st_size) {
+						/* resume beyond our EOF: attack,
+						 * receiver bug, or our file was
+						 * shortened since the receiver's
+						 * partial was made. No wire answer
+						 * serves the receiver (clamp ->
+						 * ZRPOS/ZEOF loop; ignore -> offset
+						 * desync loop; ZSKIP is sender-side
+						 * forbidden). Reject the frame (§5
+						 * "implementation-defined") and end
+						 * the file locally, like fseeko
+						 * failure. Receiver keeps partial. */
+						DO_SYSLOG(LOG_INFO,
+							"%s/%s: resume beyond EOF (%llu > %llu)",
+							lrzsz_basename(zi->fname),
+							protname(),
+							(unsigned long long)rxpos,
+							(unsigned long long)fst.st_size);
+						return ERROR;
+					}
+				}
 				if (fseeko(input_f, (off_t) rxpos, 0))
 					return ERROR;
 			}
