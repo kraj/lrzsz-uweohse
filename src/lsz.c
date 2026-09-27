@@ -2214,6 +2214,7 @@ getinsync(struct zm_fileinfo *zi, int flag)
 {
 	size_t rxpos;
 	int gotblock;
+	int garbage=0; /* consecutive garbled headers; bounds the ZNAK retry */
 
 	for (;;) {
 		gotblock = zgethdr(Rxhdr, 0, &rxpos);
@@ -2298,6 +2299,7 @@ getinsync(struct zm_fileinfo *zi, int flag)
 			Lrxpos = rxpos;
 			if (flag || zi->bytes_sent == rxpos)
 				return ZACK;
+			garbage = 0; /* a parsed frame: not the loop we're bounding */
 			continue;
 		case ZRINIT:
 			/* The receiver got the file and is ready for the next.
@@ -2323,6 +2325,12 @@ getinsync(struct zm_fileinfo *zi, int flag)
 		case ERROR:
 		default:
 			error_count++;
+			/* was unbounded: a peer (or a noisy line) that keeps
+			 * delivering garbled headers got a ZNAK for each, forever.
+			 * error_count only feeds the adaptive blocksize; nothing
+			 * ever stopped retrying. Give up after a bounded run. */
+			if (++garbage > 10)
+				return ERROR;
                         stohdr(0);
 			zsbhdr(ZNAK, Txhdr);
 			continue;
