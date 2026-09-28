@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: lrzsz 0.13.0-beta3\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-26 09:44+0200\n"
+"POT-Creation-Date: 2026-09-28 11:45+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -22,210 +22,219 @@ msgstr ""
 msgid "tcsetattr failed: %s"
 msgstr ""
 
-#: src/lsz.c:187 src/lrz.c:164
+#: src/lsz.c:193 src/lrz.c:164
 #, c-format
 msgid "caught signal %d; exiting"
 msgstr ""
 
-#: src/lsz.c:384
+#: src/lsz.c:390
 msgid "this option has been removed; see the manual"
 msgstr ""
 
-#: src/lsz.c:426 src/lsz.c:435 src/lrz.c:333
+#: src/lsz.c:432 src/lsz.c:441 src/lrz.c:333
 #, c-format
 msgid ""
 "this option has been removed. See the manual page for more information.\n"
 msgstr ""
 
-#: src/lsz.c:460 src/lrz.c:355
+#: src/lsz.c:466 src/lrz.c:355
 msgid "cannot turnoff syslog"
 msgstr ""
 
-#: src/lsz.c:473 src/lrz.c:377
+#: src/lsz.c:479 src/lrz.c:377
 msgid "bad --debug argument"
 msgstr ""
 
-#: src/lsz.c:483 src/lrz.c:387
+#: src/lsz.c:489 src/lrz.c:387
 msgid "this program was never intended to be used setuid\n"
 msgstr ""
 
-#: src/lsz.c:503 src/lsz.c:514
+#: src/lsz.c:509 src/lsz.c:520
 msgid "need at least one file to send"
 msgstr ""
 
-#: src/lsz.c:517
+#: src/lsz.c:523
 msgid "can't send command in restricted mode"
 msgstr ""
 
-#: src/lsz.c:549 src/zreadline.c:128
+#: src/lsz.c:555 src/zreadline.c:128
 msgid "out of memory"
 msgstr ""
 
-#: src/lsz.c:562
+#: src/lsz.c:568
 msgid "can read only one file from stdin"
 msgstr ""
 
-#: src/lsz.c:567 src/lrz.c:425
+#: src/lsz.c:573 src/lrz.c:425
 msgid "cannot set transfer line mode; continuing"
 msgstr ""
 
-#: src/lsz.c:641 src/lrz.c:441
+#: src/lsz.c:647 src/lrz.c:441
 msgid "Transfer incomplete\n"
 msgstr ""
 
-#: src/lsz.c:643 src/lrz.c:443
+#: src/lsz.c:649 src/lrz.c:443
 msgid "Transfer complete\n"
 msgstr ""
 
-#: src/lsz.c:672
+#: src/lsz.c:678
 msgid "Can't open any requested files."
 msgstr ""
 
-#: src/lsz.c:723 src/lrz.c:1417
+#: src/lsz.c:729 src/lrz.c:1459
 #, c-format
 msgid "cannot open %s"
 msgstr ""
 
-#: src/lsz.c:762
+#: src/lsz.c:771
+#, c-format
+msgid "cannot stat %s"
+msgstr ""
+
+#: src/lsz.c:779
 #, c-format
 msgid "is not a file: %s"
 msgstr ""
 
-#: src/lsz.c:786
+#: src/lsz.c:803
 #, c-format
 msgid ""
 "file %s is larger than 2 GiB; transfers may fail with older ZMODEM "
 "implementations"
 msgstr ""
 
-#: src/lsz.c:794 src/lsz.c:809
+#: src/lsz.c:811 src/lsz.c:826
 #, c-format
 msgid "%s/%s: error occured"
 msgstr ""
 
-#: src/lsz.c:798
+#: src/lsz.c:815
 #, c-format
 msgid "skipped: %s"
 msgstr ""
 
-#: src/lsz.c:801
+#: src/lsz.c:818
 #, c-format
 msgid "%s/%s: skipped"
 msgstr ""
 
-#: src/lsz.c:828
+#: src/lsz.c:845
 #, c-format
 msgid "security violation: not allowed to upload from %s"
 msgstr ""
 
-#: src/lsz.c:846
+#: src/lsz.c:863
 #, c-format
 msgid "Sending %s, %ld blocks: "
 msgstr ""
 
-#: src/lsz.c:850
+#: src/lsz.c:867
 msgid "Give your local XMODEM receive command now."
 msgstr ""
 
-#: src/lsz.c:875
+#: src/lsz.c:892
 #, c-format
 msgid "filename too long for %s subpacket: %s"
 msgstr ""
 
-#: src/lsz.c:907
+#: src/lsz.c:924
 #, c-format
 msgid "Sending: %s\n"
 msgstr ""
 
-#: src/lsz.c:944
+#: src/lsz.c:962
 msgid "Timeout on pathname"
 msgstr ""
 
-#: src/lsz.c:974 src/lsz.c:1005 src/lsz.c:1033 src/lsz.c:1122 src/zm.c:613
-#: src/lrz.c:848
+#: src/lsz.c:992 src/lsz.c:1034 src/lsz.c:1062 src/lsz.c:1151 src/zm.c:613
+#: src/lrz.c:869
 msgid "Line dropped"
 msgstr ""
 
-#: src/lsz.c:1001
+#: src/lsz.c:998 src/lsz.c:1006
+msgid "Too much garbage on line"
+msgstr ""
+
+#: src/lsz.c:1030
 msgid "Receiver Cancelled"
 msgstr ""
 
-#: src/lsz.c:1039
+#: src/lsz.c:1068
 msgid "No ACK on EOT"
 msgstr ""
 
-#: src/lsz.c:1058
+#: src/lsz.c:1087
 #, c-format
 msgid "Xmodem sectors/kbytes sent: %3d/%2dk"
 msgstr ""
 
-#: src/lsz.c:1060
+#: src/lsz.c:1089
 #, c-format
 msgid "Ymodem sectors/kbytes sent: %3d/%2dk"
 msgstr ""
 
-#: src/lsz.c:1094
+#: src/lsz.c:1123
 msgid "Cancelled"
 msgstr ""
 
-#: src/lsz.c:1099
+#: src/lsz.c:1128
 msgid "Timeout on sector ACK"
 msgstr ""
 
-#: src/lsz.c:1106
+#: src/lsz.c:1135
 msgid "NAK on sector"
 msgstr ""
 
-#: src/lsz.c:1113
+#: src/lsz.c:1142
 msgid "Got burst for sector ACK"
 msgstr ""
 
-#: src/lsz.c:1115
+#: src/lsz.c:1144
 #, c-format
 msgid "Got %02x for sector ACK"
 msgstr ""
 
-#: src/lsz.c:1132
+#: src/lsz.c:1161
 msgid "Retry Count Exceeded"
 msgstr ""
 
-#: src/lsz.c:1148 src/lsz.c:1175 src/lsz.c:1197
+#: src/lsz.c:1177 src/lsz.c:1204 src/lsz.c:1226
 #, c-format
 msgid "read error: %s"
 msgstr ""
 
-#: src/lsz.c:1222 src/lrz.c:460
+#: src/lsz.c:1251 src/lrz.c:460
 #, c-format
 msgid "Try `%s -h' for more information.\n"
 msgstr ""
 
-#: src/lsz.c:1227 src/lrz.c:465
+#: src/lsz.c:1256 src/lrz.c:465
 #, c-format
 msgid "%s version %s\n"
 msgstr ""
 
-#: src/lsz.c:1230
+#: src/lsz.c:1259
 #, c-format
 msgid "Usage: %s [options] file ...\n"
 msgstr ""
 
-#: src/lsz.c:1232
+#: src/lsz.c:1261
 #, c-format
 msgid "   or: %s [options] -{c|i} COMMAND\n"
 msgstr ""
 
-#: src/lsz.c:1233
+#: src/lsz.c:1262
 msgid "Send file(s) with ZMODEM/YMODEM/XMODEM protocol\n"
 msgstr ""
 
-#: src/lsz.c:1235 src/lrz.c:471
+#: src/lsz.c:1264 src/lrz.c:471
 msgid ""
 "    (X) = option applies to XMODEM only\n"
 "    (Y) = option applies to YMODEM only\n"
 "    (Z) = option applies to ZMODEM only\n"
 msgstr ""
 
-#: src/lsz.c:1241
+#: src/lsz.c:1270
 msgid ""
 "  -+, --append                append to existing destination file (Z)\n"
 "  -2, --twostop               use 2 stop bits\n"
@@ -257,7 +266,7 @@ msgid ""
 "  -M, --min-bps-time N          for at least N seconds (default: 120)\n"
 msgstr ""
 
-#: src/lsz.c:1270
+#: src/lsz.c:1299
 msgid ""
 "  -n, --newer                 send file if source newer (Z)\n"
 "  -N, --newer-or-longer       send file if source newer or longer (Z)\n"
@@ -282,40 +291,40 @@ msgid ""
 "short options use the same arguments as the long ones\n"
 msgstr ""
 
-#: src/lsz.c:1294 src/lrz.c:518
+#: src/lsz.c:1323 src/lrz.c:518
 msgid ""
 "The long options (--...) are not available on your system (getopt_long is "
 "not available)\n"
 msgstr ""
 
-#: src/lsz.c:1519
+#: src/lsz.c:1547 src/lsz.c:1558
 msgid "receiver keeps rejecting the file header"
 msgstr ""
 
-#: src/lsz.c:1532
+#: src/lsz.c:1564
 msgid "got ZRQINIT"
 msgstr ""
 
-#: src/lsz.c:1538 src/lrz.c:940 src/lrz.c:1716
+#: src/lsz.c:1570 src/lrz.c:961 src/lrz.c:1758
 msgid "got ZCAN"
 msgstr ""
 
-#: src/lsz.c:1590
+#: src/lsz.c:1622
 #, c-format
 msgid "fstat failed: %s"
 msgstr ""
 
-#: src/lsz.c:1865
+#: src/lsz.c:1905
 #, c-format
 msgid "Bytes Sent:%7ld/%7ld   BPS:%-8ld ETA %02d:%02d  "
 msgstr ""
 
-#: src/lsz.c:1953
+#: src/lsz.c:1988
 #, c-format
 msgid "receiver not advancing after %d ACKs"
 msgstr ""
 
-#: src/lsz.c:2397
+#: src/lsz.c:2455
 msgid "got a ZRQINIT packet: the other side is trying to send, too\n"
 msgstr ""
 
@@ -332,7 +341,7 @@ msgstr ""
 msgid "Sender Canceled"
 msgstr ""
 
-#: src/zm.c:607 src/lrz.c:856
+#: src/zm.c:607 src/lrz.c:877
 msgid "TIMEOUT"
 msgstr ""
 
@@ -430,115 +439,115 @@ msgid ""
 "short options use the same arguments as the long ones\n"
 msgstr ""
 
-#: src/lrz.c:538
+#: src/lrz.c:542
 #, c-format
 msgid "%s waiting to receive."
 msgstr ""
 
-#: src/lrz.c:605
+#: src/lrz.c:616
 #, c-format
 msgid "%s: ready to receive %s"
 msgstr ""
 
-#: src/lrz.c:636
+#: src/lrz.c:650
 #, c-format
 msgid ""
 "\r\n"
 "%s: %s kept (incomplete).\r\n"
 msgstr ""
 
-#: src/lrz.c:640
+#: src/lrz.c:660
 #, c-format
 msgid ""
 "\r\n"
 "%s: %s removed.\r\n"
 msgstr ""
 
-#: src/lrz.c:674
+#: src/lrz.c:695
 msgid "Pathname fetch returned EOT"
 msgstr ""
 
-#: src/lrz.c:732
+#: src/lrz.c:753
 msgid "Received dup Sector"
 msgstr ""
 
-#: src/lrz.c:750
+#: src/lrz.c:771
 msgid "Sync Error"
 msgstr ""
 
-#: src/lrz.c:802
+#: src/lrz.c:823
 msgid "CRC"
 msgstr ""
 
-#: src/lrz.c:818
+#: src/lrz.c:839
 msgid "Checksum"
 msgstr ""
 
-#: src/lrz.c:825
+#: src/lrz.c:846
 msgid "Sector number garbled"
 msgstr ""
 
-#: src/lrz.c:834
+#: src/lrz.c:855
 msgid "Sender Cancelled"
 msgstr ""
 
-#: src/lrz.c:851
+#: src/lrz.c:872
 #, c-format
 msgid "Got 0x%x sector header"
 msgstr ""
 
-#: src/lrz.c:1164
+#: src/lrz.c:1192
 #, c-format
 msgid "file name ends with a /, skipped: %s\n"
 msgstr ""
 
-#: src/lrz.c:1235 src/lrz.c:1285
+#: src/lrz.c:1272 src/lrz.c:1322
 #, c-format
 msgid "file exists, skipped: %s\n"
 msgstr ""
 
-#: src/lrz.c:1298
+#: src/lrz.c:1335
 #, c-format
 msgid "cannot claim %s.N: %s\n"
 msgstr ""
 
-#: src/lrz.c:1338
+#: src/lrz.c:1379
 #, c-format
 msgid "Receiving: %s\n"
 msgstr ""
 
-#: src/lrz.c:1518
+#: src/lrz.c:1560
 #, c-format
 msgid "Blocks received: %d"
 msgstr ""
 
-#: src/lrz.c:1542
+#: src/lrz.c:1584
 #, c-format
 msgid "%s: %s exists\n"
 msgstr ""
 
-#: src/lrz.c:1556
+#: src/lrz.c:1598
 #, c-format
 msgid "%s:\tSecurity Violation"
 msgstr ""
 
-#: src/lrz.c:1693
+#: src/lrz.c:1735
 msgid "remote command execution denied"
 msgstr ""
 
-#: src/lrz.c:1712
+#: src/lrz.c:1754
 msgid "got ZRINIT"
 msgstr ""
 
-#: src/lrz.c:1747
+#: src/lrz.c:1792
 msgid "Skipped"
 msgstr ""
 
-#: src/lrz.c:1948
+#: src/lrz.c:1996
 #, c-format
 msgid "\rBytes received: %7ld/%7ld   BPS:%-6lu ETA %02d:%02d  "
 msgstr ""
 
-#: src/lrz.c:2102
+#: src/lrz.c:2150
 msgid "file close error"
 msgstr ""

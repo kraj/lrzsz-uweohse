@@ -30,7 +30,7 @@ lrzsz_parse_debug (const char *spec)
 		{ "protocol",       DEBUG_PROTOCOL },
 		{ "readline",       DEBUG_READLINE },
 		{ "transfer",       DEBUG_TRANSFER },
-		{ "windowhandling", DEBUG_WINDOWHANDLING },
+		{ "window",         DEBUG_WINDOWHANDLING },
 		{ "tty",            DEBUG_TTY },
 		{ "all",            DEBUG_ALL },
 	};
