@@ -60,7 +60,8 @@ AC_ARG_ENABLE([coverage],
 
 dnl Checks for programs.
 AC_PROG_CC
-AX_COMPILER_FLAGS_CFLAGS()
+dnl AX_COMPILER_FLAGS_CFLAGS() is called below, together with the manual
+dnl WARN_CFLAGS list, inside the gcc-family gate.
 
 dnl explicit std: must be on the list AND probe clean; anything else is a
 dnl user error (the compiler may accept flags like -std=c89 for code that
@@ -90,22 +91,41 @@ dnl The msan block below appends -U_FORTIFY_SOURCE after this, so the
 dnl ordering matters; keep the two in this order or MSan breaks.
 AX_APPEND_COMPILE_FLAGS([ -D_FORTIFY_SOURCE=2], [LRZSZ_CFLAGS])
 
-AX_APPEND_COMPILE_FLAGS([ -Wunused-result -Wpedantic -Wcast-qual -Wmissing-braces -Wcomments -Wformat], [WARN_CFLAGS])
-
-dnl that one does not take #ifdefs into account. clang-only warning family.
-dnl probe the positive form: gcc errors on unknown positive -W flags immediately,
-dnl but silently accepts unknown -Wno-* forms and then prints a per-file
-dnl "unrecognized command-line option" note on every file / translation unit
-dnl that has any diagnostic.
-AX_CHECK_COMPILE_FLAG([-Wpre-c23-compat],
-	[AX_APPEND_COMPILE_FLAGS([ -Wno-pre-c23-compat], [WARN_CFLAGS])])
-
 dnl -Werror is a development default; release builds may pass --disable-Werror.
+dnl The option is registered unconditionally; the flag is appended inside
+dnl the gcc-family gate below (so --disable-Werror keeps working everywhere
+dnl and non-gcc builds never see -Werror at all).
 AC_ARG_ENABLE([Werror],
 	AS_HELP_STRING([--disable-Werror], [do not turn compiler warnings into errors]),
 	[], [enable_Werror=yes])
-AS_IF([test "x$enable_Werror" = xyes],
-	[AX_APPEND_COMPILE_FLAGS([ -Werror ], [WARN_CFLAGS])])
+
+dnl The warning machinery (AX_COMPILER_FLAGS_CFLAGS plus the manual
+dnl WARN_CFLAGS list) is tuned for gcc and clang; autoconf reports every
+dnl compiler defining __GNUC__ as $GCC (gcc, clang, icc, ...). Compilers
+dnl outside that family either reject the probed -W flags one by one
+dnl (noisy but harmless) or - worse - accept unknown -W options silently
+dnl and would then fail the -Werror default on warnings never vetted for
+dnl them. Give them a quiet build without -W flags instead. The
+dnl functional probes (-std, -g3, -D_FORTIFY_SOURCE, sanitizers) stay
+dnl outside the gate: they are probed individually and must apply to
+dnl every compiler.
+WARN_CFLAGS=""
+AS_IF([test "x$GCC" = "xyes"], [
+	AX_COMPILER_FLAGS_CFLAGS()
+
+	AX_APPEND_COMPILE_FLAGS([ -Wunused-result -Wpedantic -Wcast-qual -Wmissing-braces -Wcomments -Wformat], [WARN_CFLAGS])
+
+	dnl that one does not take #ifdefs into account. clang-only warning family.
+	dnl probe the positive form: gcc errors on unknown positive -W flags immediately,
+	dnl but silently accepts unknown -Wno-* forms and then prints a per-file
+	dnl "unrecognized command-line option" note on every file / translation unit
+	dnl that has any diagnostic.
+	AX_CHECK_COMPILE_FLAG([-Wpre-c23-compat],
+		[AX_APPEND_COMPILE_FLAGS([ -Wno-pre-c23-compat], [WARN_CFLAGS])])
+
+	AS_IF([test "x$enable_Werror" = xyes],
+		[AX_APPEND_COMPILE_FLAGS([ -Werror ], [WARN_CFLAGS])])
+])
 
 if test "$want_coverage" != "no" ; then
     AX_APPEND_COMPILE_FLAGS([ --coverage ], [LRZSZ_CFLAGS])
@@ -173,6 +193,7 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
 
 AC_SUBST(LRZSZ_CFLAGS)
 AC_SUBST(LRZSZ_LDFLAGS)
+AC_SUBST([WARN_CFLAGS])
 
 dnl gettext infrastructure is vendored (m4/, po/, config.rpath); do not add
 dnl AM_GNU_GETTEXT_VERSION / AM_GNU_GETTEXT_REQUIRE_VERSION here — autoreconf -fi

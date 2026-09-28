@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: lrzsz 0.13.0-beta3\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-28 11:45+0200\n"
+"POT-Creation-Date: 2026-09-28 16:13+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -324,7 +324,7 @@ msgstr ""
 msgid "receiver not advancing after %d ACKs"
 msgstr ""
 
-#: src/lsz.c:2455
+#: src/lsz.c:2468
 msgid "got a ZRQINIT packet: the other side is trying to send, too\n"
 msgstr ""
 
