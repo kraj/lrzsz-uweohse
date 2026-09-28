@@ -1963,9 +1963,8 @@ restart_data:
 		if (Txwindow && e != ZCRCE && e != ZCRCG) {
 			size_t tcount = 0;
 			int stuck_acks = 0;
-			int abandoned = 0;
 			size_t prev_lrxpos = Lrxpos;
-			while (!abandoned && zi->bytes_sent >= Lrxpos &&
+			while (zi->bytes_sent >= Lrxpos &&
 			       (tcount = zi->bytes_sent - Lrxpos) >= Txwindow) {
 				DPRINTF(DEBUG_WINDOWHANDLING,
 					"%zu (%ld,%ld) window >= %u\n", tcount,
@@ -1977,10 +1976,6 @@ restart_data:
 				c = getinsync (zi, 1);
 				if (c != ZACK) {
 					ZSDATA (txbuf, 0, ZCRCE);
-					/* escalate to the verdict switch; the
-					 * window loop is abandoned, as the
-					 * old goto gotack did */
-					abandoned = 1;
 					rc = ack_resync (zi, c, false,
 							 &junkcount,
 							 &need_wait);
@@ -1993,10 +1988,6 @@ restart_data:
 						lrzsz_warning(0, _("receiver not advancing after %d ACKs"), stuck_acks);
 						ZSDATA (txbuf, 0, ZCRCE);
 						c = ERROR;
-						/* escalate; the window loop is
-						 * abandoned (the old goto
-						 * gotack) */
-						abandoned = 1;
 						rc = ack_resync (zi, c, false,
 								 &junkcount,
 								 &need_wait);
