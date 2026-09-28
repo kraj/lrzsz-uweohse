@@ -585,6 +585,9 @@ spawn_target(void)
 		for (i = 0; i < target_argc && i < 66; i++)
 			argv[i] = target_argv[i];
 		argv[i] = NULL;
+                if (!argv[0]) {
+		    _exit(127); /* ECANTHAPPEN */
+                }
 		execvp(argv[0], argv);
 		_exit(127);
 	}
@@ -1545,7 +1548,7 @@ mut_send(enum mclass mc, int data_frame)
 		size_t off = (size_t)mut.frame_off % (outpos ? outpos : 1);
 		outbuf[off] ^= (unsigned char)(mut.frame_type & 0x1f);
 	} else if (mc == M_ZDLE_ILL) {
-		unsigned char ill[4];
+		unsigned char ill[4]={0,0,0,0};
 		for (i = 0; i < mut.ill_n && i < 4; i++)
 			ill[i] = ZDLE;
 		inject_bytes((size_t)mut.ill_off, ill, (size_t)(i ? i : 1));
@@ -1962,10 +1965,10 @@ fuzz_receive_iter(int it, enum mclass mc, int *exitcode)
 			    && mut.sub_chunk) {
 				size_t last_pos = 0;
 				int same_pos = 0;
+                                size_t wait_ms = 200;
 				for (;;) {
 					size_t p2;
 					struct rparser rp4;
-					size_t wait_ms = 200;
 					size_t newest;
 					int got_any;
 					/* quiesce: collect ZRPOS until the
@@ -2120,6 +2123,7 @@ fuzz_receive_iter(int it, enum mclass mc, int *exitcode)
 					} else {
 						same_pos = 0;
 						last_pos = p2;
+                                                wait_ms = 200;
 					}
 					/* the receiver has everything: stop
 					 * resyncing entirely - the ZEOF is
@@ -2547,7 +2551,6 @@ fuzz_send_iter(void)
 					build_hexhdr(ZRPOS, rh);
 					tr_mark("< ZRPOS pos=0");
 					mut_send(mc, 0);
-					ack_pos = 0;
 					break;
 				case ZDATA:
 					/* the parser emits the ZDATA
