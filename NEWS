@@ -74,12 +74,18 @@ Security fixes:
 * the lrz file CRC check could have run into an endless loop.
   This was a possible remotely triggered denial of service attack.
 
+* some denial of service possibilities were fixed:
+  - a misbehaving receiver could cause an endless loop
+    when the sender used a transmit window (80s).
+  - a misbehaving receiver could cause an endless loop
+    after causing a resynchronization (80s).
+  - a misbehaving receiver could cause an endless loop
+    during the YMODEM filename exchange (80s).
+
 * a number of possible security problems have been fixed:
   - double fclose in lrz.
   - a write before a buffer in lrz (80s).
   - a use of uninitialized memory in lsz (80s).
-  - a misbehaving receiver could cause an endless loop
-    when the sender used a transmit window (80s).
 
 
 Security related changes:
