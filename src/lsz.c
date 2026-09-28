@@ -2327,9 +2327,17 @@ getinsync(struct zm_fileinfo *zi, int flag)
 			}
 			zi->eof_seen = 0;
 			bytcnt = Lrxpos = zi->bytes_sent = rxpos;
-			if (Lastsync == rxpos) {
-				error_count++;
-			}
+			/* every ZRPOS here is an error event: the receiver only
+			 * re-requests a position after a subpacket failed CRC or
+			 * was lost on the line (the initial ZRPOS after ZFILE is
+			 * handled in zsendfile(), not here). The old same-position
+			 * test undercounted on lines where every resync succeeded
+			 * first-try: error_count stayed 0, the adaptive blklen and
+			 * the Rxbuflen safety ladder never engaged, and the sender
+			 * kept 8k subpackets whose terminators sat behind holes -
+			 * each terminator-eating drop then cost a full 10s
+			 * Rxtimeout instead of a fast CRC verdict. */
+			error_count++;
 			Lastsync = rxpos;
 			return ZRPOS;
 		case ZACK:
