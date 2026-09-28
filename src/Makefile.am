@@ -36,8 +36,7 @@ uninstall-local:
 	rm -f $(DESTDIR)/$(bindir)/`echo lrb |sed -e '$(transform)'`
 	rm -f $(DESTDIR)/$(bindir)/`echo lrx |sed -e '$(transform)'`
 
-TIDY_FILES = $(lrz_SOURCES) $(lsz_SOURCES) \
-	$(zmodemsnif_SOURCES) $(linesimulator_SOURCES) $(timestamp_SOURCES) \
-	$(zmodemfuzz_SOURCES)
+TIDY_FILES = $(COMMON_SOURCES) lrz.c lsz.c \
+	zmodemsnif.c linesimulator.c timestamp.c zmodemfuzz.c
 tidy: $(TIDY_FILES) $(noinst_HEADERS)
 	clang-tidy --checks='-clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling' $(TIDY_FILES) -- $(AM_CPPFLAGS) $(AM_CFLAGS)
