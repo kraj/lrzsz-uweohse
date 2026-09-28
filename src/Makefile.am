@@ -6,7 +6,7 @@ noinst_HEADERS = timing.h zglobal.h zmodem.h stats.h util.h crctab.h
 noinst_PROGRAMS = zmodemsnif linesimulator timestamp zmodemfuzz
 
 LDADD = @LIBINTL@
-AM_CPPFLAGS = -I.. -I$(srcdir) -I$(top_srcdir)/src -DLOCALEDIR=\"$(localedir)\" -D_FORTIFY_SOURCE=2 -D_POSIX_C_SOURCE=@MIN_POSIX_C_STD@
+AM_CPPFLAGS = -I.. -I$(srcdir) -I$(top_srcdir)/src -DLOCALEDIR=\"$(localedir)\" -D_POSIX_C_SOURCE=@MIN_POSIX_C_STD@
 AM_CFLAGS = @WARN_CFLAGS@ @LRZSZ_CFLAGS@
 # clang development aid: to enable nearly every clang warning, move the
 # following line into AM_CFLAGS above (removing the leading '#'); the

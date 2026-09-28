@@ -81,6 +81,15 @@ if test "$have_std" != "no" ; then
 fi
 
 AX_APPEND_COMPILE_FLAGS([ -g3], [LRZSZ_CFLAGS])
+
+dnl Default to glibc buffer-overflow checks (autoconf turns on -O2, so the
+dnl build satisfies the optimization requirement of FORTIFY_SOURCE). 
+dnl This probe allows to default to an environments -D_FORTIFY_SOURCE, and
+dnl avoids a glibc redefinition error.
+dnl The msan block below appends -U_FORTIFY_SOURCE after this, so the
+dnl ordering matters; keep the two in this order or MSan breaks.
+AX_APPEND_COMPILE_FLAGS([ -D_FORTIFY_SOURCE=2], [LRZSZ_CFLAGS])
+
 AX_APPEND_COMPILE_FLAGS([ -Wunused-result -Wpedantic -Wcast-qual -Wmissing-braces -Wcomments -Wformat], [WARN_CFLAGS])
 
 dnl that one does not take #ifdefs into account. clang-only warning family.
