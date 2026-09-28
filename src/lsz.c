@@ -2083,6 +2083,7 @@ calc_blklen_worker(long total_sent)
          * Fun fact: this brute force solution is good for the performance.
          */
         if (error_count) {
+            unsigned int last_rxbuflen=Rxbuflen;
             if (!Rxbuflen) {
                 Rxbuflen=SAFETY_RXBUFLEN;
             }
@@ -2098,7 +2099,11 @@ calc_blklen_worker(long total_sent)
             Txwindow=(Rxbuflen)/2;
             Txwindow = (Rxbuflen/2/64) * 64;
             Txwspac = Txwindow/4;
-// fprintf(stderr,"LBPE %lu => RXB %lu Txwindow %lu\n",last_bytes_per_error, Rxbuflen, Txwindow);
+            if (Rxbuflen != last_rxbuflen) {
+                DPRINTF(DEBUG_WINDOWHANDLING,
+                    "calc_blklen: LPBE %lu => RXB %lu Txwindow %lu\n", 
+                last_bytes_per_error, (unsigned long) Rxbuflen, (unsigned long) Txwindow);
+            }
         }
 
 	/* it's not good to calc blklen too early */
