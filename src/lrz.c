@@ -788,7 +788,6 @@ static int
 wcgetsec(size_t *Blklen, char *rxbuf, unsigned int maxtime)
 {
     int checksum, wcj, firstch, c;
-    unsigned short oldcrc;
     char *p;
     int sectcurr;
 
@@ -798,7 +797,8 @@ wcgetsec(size_t *Blklen, char *rxbuf, unsigned int maxtime)
         if ((firstch=READLINE_PF(maxtime))==STX || firstch==SOH) {
             *Blklen = (firstch==STX) ? 1024 : 128;
             sectcurr=READLINE_PF(1);
-            if ((sectcurr+(oldcrc=READLINE_PF(1)))==0xff) {
+            if ((sectcurr+READLINE_PF(1))==0xff) {
+                unsigned short oldcrc;
                 oldcrc=checksum=0;
                 for (p=rxbuf,wcj=*Blklen; --wcj>=0; ) {
                     if ((firstch=READLINE_PF(1)) < 0) {
@@ -1865,7 +1865,6 @@ rzfile(struct zm_fileinfo *zi)
 			 * consecutive short waits. */
 			pos_waits = 0;
 			Rxtimeout = 10;
-			state = ST_HDR;
 			/* fall through */
 		case ST_HDR:
 			c = zgethdr(Rxhdr, 0, NULL);
