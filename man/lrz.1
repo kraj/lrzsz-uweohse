@@ -327,6 +327,15 @@ instead of
 .B HH:MM,
 stops transmission in
 .B N
+seconds. The deadline is tracked with a one-second granularity because
+of the way the check is implemented (the
+.B N
+argument is parsed before any data flows and compared against integer
+seconds afterwards); the transfer stops during the second after the
+deadline is reached, so a transfer stops within about
+.B N+1
+to
+.B N+2
 seconds.
 .TP
 .B "--syslog[=off]"
