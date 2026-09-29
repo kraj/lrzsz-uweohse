@@ -1934,18 +1934,29 @@ zpacketloss() {
     doit "$key" "lsz sending to lrz, packetized line (1024 byte blocks, 5ms)" \
         "$SZ -q -Z" "$RZ -q -Z" cmp $binary_256k
 
-    # ~6% silent packet loss, default subpacket size: completion or
-    # bounded abort, data intact on completion.
+    # ~6% silent packet loss, sender in integrity mode (--sync-transfer): a
+    # dropped subframe is retransmitted by resync instead of silently shifting
+    # the receiver. Plain streaming CANNOT detect the loss of a whole
+    # subpacket (data + ZCRCx escape + CRC: no checksum breaks and the ZDATA
+    # position is frame-anchored only), which corrupted completed files with
+    # exit 0 here before.
+    # The payload is 64k: with -F 16384 the loss frequency scales with the
+    # wire length (~4 events instead of 16), so the test stays a quick
+    # ~10s resync-proof instead of a 160s slog. lrz runs with -t 10 (its
+    # minimum, 1s): in sync mode the sender waits anyway, the shortened
+    # receiver wait only accelerates the resync turnaround; jitter-triggered
+    # spurious ZRPOSes are self-healing (the ZDATA at the same position is
+    # accepted). Real-world sync transfers keep the 10s default.
     key="zmodem-lsz-lrz-packetdrop"
     FAULT="$SIMU -s 1 -r 8m -P 1024 -F 16384"
-    doit "$key" "lsz sending to lrz, ~6% silent packet drops (1k packets)" \
-        "$SZ -q -Z" "$RZ -q -Z" cmp $binary_256k
+    doit "$key" "lsz sending to lrz, ~4 silent packet drops (1k packets)" \
+        "$SZ -q -Z --sync-transfer" "$RZ -q -Z -t 10" cmp $binary_64k
 
     # the 1998 scenario shape: the sender insists on oversized (8k)
     # subpackets while packets keep dropping silently.
     key="zmodem-lsz-lrz-packetdrop-8k"
-    doit "$key" "lsz -8 sending to lrz, ~6% silent packet drops (1k packets)" \
-        "$SZ -q -8 -Z" "$RZ -q -Z" cmp $binary_256k
+    doit "$key" "lsz -8 sending to lrz, ~4 silent packet drops (1k packets)" \
+        "$SZ -q -8 -Z --sync-transfer" "$RZ -q -Z -t 10" cmp $binary_64k
 
     # loss only in the ack direction: the sender's resync path must stay
     # bounded while its data gets through untouched.

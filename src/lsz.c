@@ -116,6 +116,7 @@ static int Lfseen=0;
 static unsigned int Rxbuflen = DEFAULT_RXBUFLEN;	/* Receiver's max buffer length */
 static unsigned int Tframlen = 0;	/* Override for tx frame length */
 static unsigned int blkopt=0;		/* Override value for zmodem blklen */
+static int sync_transfer;		/* ZCRCW after every data subpacket */
 static int Rxflags = 0;
 static size_t bytcnt;
 static int Wantfcs32 = true;	/* want to send 32 bit FCS */
@@ -272,6 +273,7 @@ static struct option const long_options[] =
   {"delay-startup", required_argument, NULL, 4},
   {"no-unixmode", no_argument, NULL, 8},
   {"debug", required_argument, NULL, 9},
+  {"sync-transfer", no_argument, NULL, 10},
   {NULL, 0, NULL, 0}
 };
 #endif
@@ -478,6 +480,7 @@ main(int argc, char **argv)
 			if (!lrzsz_parse_debug(optarg))
 				usage(2, _("bad --debug argument"));
 			break;
+		case 10: sync_transfer = 1; break;
 		default:
 			usage (2,NULL);
 			break;
@@ -1310,6 +1313,9 @@ usage(int exitcode, const char *what)
 "  -v, --verbose               be verbose (twice: also show progress)\n"
 "  --debug=MODULES             comma separated list: protocol, readline,\n"
 "                              transfer, windowhandling, tty, all\n"
+"  --sync-transfer             force a ZCRCW after every data subpacket\n"
+"                              (integrity mode: slower and immune to loss of\n"
+"                              whole subframes)\n"
 "  -V, --version               show version information\n"
 "  -w, --windowsize N          Window is N bytes (Z)\n"
 "  -X, --xmodem                use XMODEM protocol\n"
@@ -1852,6 +1858,14 @@ restart_data:
 		if (zi->eof_seen) {
 			e = ZCRCE;
 			DPRINTF(DEBUG_WINDOWHANDLING, "e=ZCRCE/eof seen\n");
+		} else if (sync_transfer) {
+			/* integrity mode: wait for an ACK after every subpacket.
+			 * This detects the loss of complete subframes on unreliable 
+			 * transport layers, which would be undetectable in the
+			 * streaming mode.
+			 */
+			e = ZCRCW;
+			DPRINTF(DEBUG_WINDOWHANDLING, "e=ZCRCW/sync-transfer\n");
 		} else if (junkcount > 3) {
 			e = ZCRCW;
 			DPRINTF(DEBUG_WINDOWHANDLING, "e=ZCRCW/junkcount > 3\n");
@@ -2130,8 +2144,6 @@ calc_blklen_worker(long total_sent)
 			last_blklen/=2;
 			if (last_blklen < 32)
 				last_blklen = 32;
-			else if (last_blklen > 512)
-				last_blklen=512;
 			DPRINTF(DEBUG_WINDOWHANDLING,
 				"calc_blklen: reduced to %d due to error\n",
 				last_blklen);

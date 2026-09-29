@@ -360,6 +360,25 @@ Wait for the receiver to acknowledge correct data every
 characters.
 This may be used to avoid network overrun when XOFF flow control is lacking.
 .TP
+.B "--sync-transfer"
+(ZMODEM) Integrity mode: wait for the receiver's acknowledgement after
+every data sub-packet (a ZCRCW round trip), instead of streaming.
+On a packetized transport an entire sub-packet together with its
+terminator and CRC can be silently swallowed, which plain streaming
+cannot detect (the CRC is position independent and the frame
+position is only checked at the start of a ZDATA frame).
+The cost is one round trip per sub-packet, causing a substantial
+throughput loss on slow or high-latency lines.
+This option is only needed on transports that can silently drop a
+contiguous chunk of the byte stream, for example a packet radio or
+other datagram link that loses packets without retransmitting them,
+or a line that overruns its buffer when flow control fails. It is pointless on
+transports that hide packet loss by retransmitting internally, so that
+no loss reaches the byte stream (TCP, ISDN, X.25), and wasteful on
+transports that only corrupt individual characters (noisy modem or
+serial lines): there the CRC catches the damage and the normal resync
+heals it, streaming is safe and faster.
+.TP
 .B "-n, --newer"
 (ZMODEM) Send each file if
 destination file does not exist.

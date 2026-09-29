@@ -142,6 +142,20 @@ Other changes:
 * the `-d / --dot-to-slash` option (DOS 8.3 filename transformation)
   was removed (it collided with the now extended pathname checking).
 
+* the new option `--sync-transfer` forces a ZCRCW for every transmitted
+  subpacket (cost: one round trip each for each subpacket). It allows to
+  detect and recover if the transport layer silenty drops a packet,
+  which is undetectable in the (default) streaming mode.
+  This works around a protocol limitation (neither does a subpacket
+  have a position information nor is the position included in the CRC,
+  so a silenty loss is possible.
+  This option is only needed on transports that can silently drop a
+  packet, for example a packet radio or other datagram link that loses
+  packets without retransmitting them, or a line that overruns its buffer
+  when flow control fails. It is unnecessary on transports that retransmit
+  internally, and on transports that only corrupt individual characters
+  (noisy modem or serial lines).
+
 * on 32bit systems the programs are now able to transfer files with sizes
   in the range 2GB to just under 4GB (64bit systems did not have that
   limit).
