@@ -68,8 +68,22 @@ vcheck-y:
 vcheck-z:
 	$(srcdir)/check.lrzsz $(srcdir) `pwd` z
 
+# need clang compiler options for clang-tidy.
+clangconfigure:
+	CC=clang ./configure -q
 tidy:
 	@$(MAKE) -C src tidy
+.PHONY: tiny
+
+# releasecheck runs about 2h.
+releasecheck: distclean clangconfigure all tidy maintainertools dist distcheck vcheck qa buildcheck+ buildcheck-remote fuzz1000
+
+# need clang compiler options for clang-tidy.
+releasecheck1: distclean
+	CC=clang ./configure -q
+	@$(MAKE) 
+maintainertools: 
+	@$(MAKE) -C src zmodemfuzz zmodemsnif timestamp linesimulator
 
 # zmodem protocol fuzzing: 25 iterations per mode (FUZZITER overrides), each
 # iteration is alarm limited (-t 20).
@@ -81,7 +95,12 @@ fuzz:
 	$(srcdir)/src/zmodemfuzz -P -m receive -n $${FUZZITER:-25} -t 20 -- ./src/lrz -q -Z; \
 	$(srcdir)/src/zmodemfuzz -P -m send -n $${FUZZITER:-25} -t 20 -- ./src/lsz -q -Z ./test/4k.bin
 
-.PHONY: fuzz
+fuzz1000:
+	@$(MAKE) -C src zmodemfuzz lrz lsz; \
+	$(srcdir)/src/zmodemfuzz -P -m receive -n 1000 -t 20 -- ./src/lrz -q -Z; \
+	$(srcdir)/src/zmodemfuzz -P -m send -n 1000 -t 20 -- ./src/lsz -q -Z ./test/4k.bin
+
+.PHONY: fuzz fuzz1000
 
 qa: asan msan ubsan coverage
 
@@ -110,3 +129,4 @@ coverage/coverage.html: $(wildcard src/*.c src/*.h)
 	./configure -q
 	make -s V=0 clean
 	make -s V=0 -j 4
+

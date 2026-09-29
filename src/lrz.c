@@ -1838,6 +1838,7 @@ rzfile(struct zm_fileinfo *zi)
 	int state = ST_ZRPOS;
 	unsigned int saved_rxtimeout = Rxtimeout;
 	int pos_waits = 0;
+        time_t now;
 
 	zi->eof_seen=false;
 
@@ -1971,36 +1972,41 @@ rzfile(struct zm_fileinfo *zi)
 			}
 			continue;
 		case ST_DATA:
-			if ((Verbose>1 || min_bps || stop_time)
-				&& (not_printed > (min_bps ? 3 : 7)
-					|| zi->bytes_received > last_bps / 2 + last_rxbytes)) {
+                        now=time(NULL); /* wall clock: -s stop deadline */
+                        if (stop_time) {
+				if (lrzsz_stop_time_reached("rzfile", now,
+							    stop_time, zi->fname))
+					return ERROR;
+                        }
+			if (Verbose>1 || min_bps) {
 				int minleft =  0;
 				int secleft =  0;
-				time_t now;
 				double d;
-				now=time(NULL); /* wall clock: -s stop deadline */
 				d=timing_elapsed();
 				if (d==0)
 					d=0.5; /* first call: zero elapsed */
 				last_bps=(unsigned long) (zi->bytes_received/d);
-				lrzsz_eta(last_bps, (size_t) R_BYTESLEFT(zi), &minleft, &secleft);
-				if (lrzsz_bps_watchdog("rzfile", (long) last_bps, d,
-						       min_bps, min_bps_time,
-						       &low_bps, zi->fname))
-					return ERROR;
-				if (lrzsz_stop_time_reached("rzfile", now,
-							    stop_time, zi->fname))
-					return ERROR;
+                                if (min_bps) {
+                                        if (lrzsz_bps_watchdog("rzfile", (long) last_bps, d,
+                                                               min_bps, min_bps_time,
+                                                               &low_bps, zi->fname))
+                                                return ERROR;
+                                }
 
 				if (Verbose > 1) {
-					vstringf(_("\rBytes received: %7ld/%7ld   BPS:%-6lu ETA %02d:%02d  "),
-						(long) zi->bytes_received, (long) zi->bytes_total,
-						last_bps, minleft, secleft);
-					last_rxbytes=zi->bytes_received;
-					not_printed=0;
+				        if (not_printed > (min_bps ? 3 : 7)
+                                            || zi->bytes_received > last_bps / 2 + last_rxbytes) {
+				            lrzsz_eta(last_bps, (size_t) R_BYTESLEFT(zi), &minleft, &secleft);
+                                            vstringf(_("\rBytes received: %7ld/%7ld   BPS:%-6lu ETA %02d:%02d  "),
+                                                    (long) zi->bytes_received, (long) zi->bytes_total,
+                                                    last_bps, minleft, secleft);
+                                            last_rxbytes=zi->bytes_received;
+                                            not_printed=0;
+                                        } else {
+				            not_printed++;
+                                        }
 				}
-			} else if (Verbose)
-				not_printed++;
+                        }
 			switch (c = zrdata(secbuf, LRZSZ_MAX_SUBPACKET_LEN, &bytes_in_block))
 			{
 			case ZCAN:
