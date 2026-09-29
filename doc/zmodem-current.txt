@@ -321,7 +321,11 @@ A larger subpacket size reduces per-subpacket overhead (CRC, frameend,
 ZDLE escaping) but increases the amount of data that must be
 retransmitted on error. On error-free connections, larger subpackets
 improve throughput; on noisy connections, smaller subpackets reduce
-retransmission cost.
+retransmission cost. Note the flip side (see section 3, "Subpacket
+loss undetectability"): the smaller the subpacket, the likelier that a
+silently dropped contiguous run of bytes covers a whole subpacket
+including frameend and CRC, which is a damage no checksum can detect
+and that only non-streaming mode fully protects against.
 
 ### Frameend
 
@@ -437,6 +441,43 @@ fixed-window protocols.
 In this mode the sender waits (ZCRCW) for a response after every
 subpacket. This can be slow, especially over high-latency connections,
 but it is the safest approach when the connection is really bad.
+
+## Subpacket loss undetectability (why non-streaming exists)
+
+In both streaming modes (segmented streaming and window streaming, at
+any segment length or window size) and in plain streaming without
+sync points at all, the loss of an entire subpacket together with its
+frameend and CRC is undetectable:
+- every surviving subpacket still carries a valid CRC (the CRC is
+  position independent),
+- the position is only anchored at the ZDATA header,
+- and the receiver writes the following subpackets at its current
+  file offset.
+The transferred file is then silently corrupted.
+
+This is a protocol-inherent blind spot, not an implementation bug.
+Senders can manage it in one of two ways:
+
+- Size the subpackets so that the transport's plausible loss window (the
+  longest continuous span it can silently remove) is smaller than a
+  subpacket: every loss then damages at least one CRC and is detected
+  and healed as usual.
+  Note:
+  - on transports that always retransmit lost packets on layers below the
+    byte stream (TCP, ISDN, X.25), no loss window exists and any subpacket
+    size is safe.
+  - on transports that only corrupt individual bytes (noise on modem or
+    serial lines), the loss window is zero.
+  - resync points already built into the modes mentioned above (a ZCRCW at
+    the end of a segment, a ZACK inside a window) shrink but do not close
+    this window: a loss between two sync points still swallows a whole
+    subpacket.
+- If the loss window cannot be bounded with any confidence, use
+  non-streaming mode (ZCRCW after every data subpacket). In this mode
+  only one subpacket is in flight, a loss will be detected, and the
+  protocol resync retransmits exactly the lost subpacket. This recovery
+  (see section 5) is immune to losses of any size, at the cost of one
+  round trip per subpacket.
 
 ## Mixed modes
 
@@ -1417,6 +1458,11 @@ may be in flight, and the old taxonomy no longer matches practice:
   links may correct errors, but packet loss happens.
 Normative today: the three modes of section 3, combinable, with recovery
 per section 5.
+Documented the subpacket-loss undetectability that all streaming modes
+share (section 3) when using transports able to lose continuous byte
+streams or packets: a loss window covering a whole subpacket including
+frameend and CRC breaks no checksum, and only non-streaming mode (ZCRCW
+per subpacket) protects against losses of arbitrary size.
 
 ## 11.21 ZRPXWN/ZRRQWN/ZRWOVR
 - deprecated ZRPXWN
