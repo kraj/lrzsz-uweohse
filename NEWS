@@ -313,6 +313,10 @@ Other changes:
   that aborted would previously have been sent the command up to 20
   times). ZABORT is counted as a user cancel, ZFERR as a file error.
 
+* the --stop-at option only worked if verbose mode was active.
+  The '-s +N' case did stop after less between N-1 and N seconds (due 
+  to integer calculation), it now stops between N and N+1.
+
 * interoperability with senders that do not pace their retransmissions
   (zmtx 1.02 and friends): lrz now answers a duplicate ZEOF between
   files with ZRINIT immediately, and lsz answers a receiver's ZRPOS for
@@ -322,14 +326,6 @@ Other changes:
 
 * full compatibility tests were done against Synchronet sexyz v3.5,
   lrzsz-0.12.21rc, crzsz-1.13, rzsz-3.73 and zmtx-zmrx-2.02.
-  Known third-party problems found by these tests, none of them lrzsz
-  bugs: zmtx 1.02 (later removed from the compatibility test runs)
-  retransmits frames without pacing while its input buffer holds queued
-  frames and loses transfers on high-latency lines, it sent stale data
-  causing bad CRCs, and answered ZCRCW with ZRPOS (see above).
-  crzsz and rzsz-3.73 flush their input queue on error recovery,
-  discarding the receiver's answers, which slows their give-up on faulty
-  lines.
 
 * manual compatibility tests were done against DSZ in a dosbox. What was
   tested worked correctly. It is possible, though not likely, that a
@@ -345,9 +341,10 @@ Other changes:
   with lrzsz will succeed on faulty lines where other implementations
   give up.
   Performance on errorfree lines conditions may be worse than before,
-  depending on the network buffering and delay. On a line with a high
-  delay (ping time) the precautions against high packet loss rates result
-  in a loss of performance.
+  depending on the network buffering and delay, though the impact is
+  limited. On a line with a high delay (ping time) the precautions 
+  against high packet loss rates result in a loss of performance.
+
   Fun fact: the same implementations leading the performance score on
   a 115200 bps line with a 20ms delay are the ones losing on the
   1mbit line with 250ms delay line.
