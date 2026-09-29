@@ -447,7 +447,8 @@ bool
 lrzsz_stop_time_reached (const char *dbgname, time_t now, time_t stop_time,
                          const char *fname)
 {
-	if (!stop_time || now < stop_time)
+        /* stop_time+1 because that might be based on a measurement at 0.99s */
+	if (!stop_time || now < stop_time+1)
 		return false;
 	if (Verbose)
 		vstringf(_("%s: reached stop time\n"), dbgname);
