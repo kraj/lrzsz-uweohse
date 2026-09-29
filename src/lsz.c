@@ -1800,6 +1800,7 @@ zsendfdata (struct zm_fileinfo *zi)
 	double low_bps = 0;
         int newcnt;
 	int rc;
+	time_t now = 0;		/* wall clock: -s stop deadline */
 	/* the first data subpacket after a ZRPOS must be ZCRCW
 	 * (zmodem-current.txt §5, sender-side error recovery). Without this
 	 * reset only the FIRST file of a batch started with ZCRCW (need_wait
@@ -1892,37 +1893,48 @@ restart_data:
 			e = ZCRCG;
 			DPRINTF(DEBUG_WINDOWHANDLING, "e=ZCRCG\n");
 		}
-		if ((Verbose > 1 || min_bps || stop_time)
-			&& (not_printed > (min_bps ? 3 : 7)
-				|| zi->bytes_sent > last_bps / 2 + last_txpos)) {
+		now = time (NULL);	/* wall clock: -s stop deadline */
+		if (stop_time
+			&& lrzsz_stop_time_reached ("zsendfdata", now,
+						    stop_time, zi->fname))
+			return ERROR;
+		if (Verbose > 1 || min_bps) {
 			int minleft = 0;
 			int secleft = 0;
-			time_t now;
 			double d;
-			now=time(NULL); /* wall clock: -s stop deadline */
 			d=timing_elapsed();
 			if (d == 0)
 				d = 0.5; /* first call: zero elapsed */
 			last_bps = (long) ((zi->bytes_sent / d));
-			lrzsz_eta(last_bps, zi->bytes_total - zi->bytes_sent,
-				&minleft, &secleft);
-			if (lrzsz_bps_watchdog("zsendfdata", last_bps, d,
-					       min_bps, min_bps_time, &low_bps,
-					       zi->fname))
-				return ERROR;
-			if (lrzsz_stop_time_reached("zsendfdata", now,
-						    stop_time, zi->fname))
+			/* the bps watchdog needs regular sampling: it arms at
+			 * the first violation and fires after min_bps_time of
+			 * cumulative elapsed time below the limit. */
+			if (min_bps
+				&& lrzsz_bps_watchdog ("zsendfdata", last_bps, d,
+						       min_bps, min_bps_time,
+						       &low_bps, zi->fname))
 				return ERROR;
 
 			if (Verbose > 1) {
-				vchar ('\r');
-				vstringf (_("Bytes Sent:%7ld/%7ld   BPS:%-8ld ETA %02d:%02d  "),
-					 (long) zi->bytes_sent, (long) zi->bytes_total,
-					last_bps, minleft, secleft);
+				/* print throttling: only refresh the line at
+				 * most every (min_bps ? 3 : 7) unprinted
+				 * subpackets, or after half a cumulative-bps
+				 * worth of data */
+				if (not_printed > (min_bps ? 3 : 7)
+					|| zi->bytes_sent > last_bps / 2 + last_txpos) {
+					lrzsz_eta (last_bps,
+						   zi->bytes_total - zi->bytes_sent,
+						   &minleft, &secleft);
+					vchar ('\r');
+					vstringf (_("Bytes Sent:%7ld/%7ld   BPS:%-8ld ETA %02d:%02d  "),
+						 (long) zi->bytes_sent, (long) zi->bytes_total,
+						last_bps, minleft, secleft);
+					last_txpos = zi->bytes_sent;
+					not_printed = 0;
+				} else
+					not_printed++;
 			}
-			last_txpos = zi->bytes_sent;
-		} else if (Verbose)
-			not_printed++;
+		}
 		ZSDATA (txbuf, n, e);
 		bytcnt = zi->bytes_sent += n;
 		if (e == ZCRCW) {
@@ -2247,6 +2259,14 @@ getinsync(struct zm_fileinfo *zi, int flag)
 	int garbage=0; /* consecutive garbled headers; bounds the ZNAK retry */
 
 	for (;;) {
+		/* another stop_time checkpoint: a ZCRCW ack wait
+		 * blocks here up to the receiver's activity level, and the
+		 * per-subpacket check in zsendfdata does not run while we
+		 * are waiting here. So check. */
+		if (stop_time
+			&& lrzsz_stop_time_reached ("getinsync", time (NULL),
+						    stop_time, zi->fname))
+			return ERROR;
 		gotblock = zgethdr(Rxhdr, 0, &rxpos);
 		switch (gotblock) {
 		case ZCAN:
