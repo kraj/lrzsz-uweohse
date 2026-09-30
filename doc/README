@@ -10,7 +10,7 @@ Included in this directory are:
   Written by Jacques Mattheij, the author of the zmtx-zmrx suite.
   It was written in 1994, and is also out of date.
 
-- my own ZMODEM documentation: zmodem-current.txt
+- my own ZMODEM work-in-progress documentation: zmodem-wip.txt
   It was written in 2026.
   I marked many features as deprecated, because they are either
   obsolete or should not be used in todays environment. I also 
