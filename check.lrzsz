@@ -581,7 +581,7 @@ compat_traits() {
     s_framelen_opt=""
     s_4k_opt=""
     s_8k_opt=""
-    s_turno_opt=""
+    s_turbo_opt=""
     r_error_opt=""
     r_ymodem_opt=""
     s_ymodem_opt=""
@@ -676,7 +676,7 @@ compat_traits() {
         s_framelen_opt=-l
         s_4k_opt="-4"
         s_8k_opt="-8"
-        s_turno_opt="-T"
+        s_turbo_opt="-T"
         r_error_opt="--errors" #lrzsz lrz option to create errors
         r_ymodem_opt="--ymodem"
         s_ymodem_opt="--ymodem"
@@ -699,19 +699,19 @@ compat_traits() {
         r_can_4k="yes"
         r_can_8k="yes"
         can_escctl="yes"
-        otherrz="lrz(0.12.21rc)"
-        othersz="lsz(0.12.21rc)"
+        otherrz="lrz01221rc"
+        othersz="lsz01221rc"
         s_16bit_crc_opt="-o"
         r_can_16bit_crc="yes"
         ;;
 
     sexyz)
-        TEST_SZ=~/bin/sexyz" -s sz"
-        TEST_RZ=~/bin/sexyz" -s rz"
-        TEST_SX=~/bin/sexyz" sx"
-        TEST_RX=~/bin/sexyz" rx"
-        TEST_SB=~/bin/sexyz" sy"
-        TEST_RB=~/bin/sexyz" ry"
+        TEST_SZ=~/bin/sexyz-3.6" -s sz"
+        TEST_RZ=~/bin/sexyz-3.6" -s rz"
+        TEST_SX=~/bin/sexyz-3.6" sx"
+        TEST_RX=~/bin/sexyz-3.6" rx"
+        TEST_SB=~/bin/sexyz-3.6" sy"
+        TEST_RB=~/bin/sexyz-3.6" ry"
         otherrz="sexyz"
         othersz="sexyz"
         s_1k_opt="-k"
@@ -761,16 +761,19 @@ compat_traits() {
         BENCH_SZ_1k="$TEST_SZ"
         BENCH_RZ="$TEST_RZ"
         ;;
-    zmtxzmrx202)
-        TEST_SZ=~/bin/zmtx-zmrx-2.02/zmtx # no -q option
-        TEST_RZ=~/bin/zmtx-zmrx-2.02/zmrx" -q"
+    zmtxzmrx2)
+        TEST_SZ=~/bin/zmtx-zmrx-2.06/zmtx # no -q option
+        TEST_RZ=~/bin/zmtx-zmrx-2.06/zmrx" -q"
         BENCH_SZ_1k="$TEST_SZ"
         BENCH_RZ="$TEST_RZ"
-        otherrz="zmtxzmrx202"
-        othersz="zmtxzmrx202"
+        otherrz="zmtxzmrx2"
+        othersz="zmtxzmrx2"
         r_can_4k="yes"
         r_can_8k="yes"
         r_4k_opt="-q"
+        s_4k_opt="-4"
+        s_8k_opt="-8"
+        s_turbo_opt=""
         #s_can_resume=  : ZCRC is not implemented.
         #can_escapectl= : ZESCCTL is not implemented
         ;;
@@ -788,10 +791,10 @@ available() {
     if test -x ~/bin/rzsz373/rz -a -x ~/bin/rzsz373/sz ; then
         available="$available rzsz373"
     fi
-    if test -x ~/bin/zmtx-zmrx-2.02/zmtx -a -x ~/bin/zmtx-zmrx-2.02/zmrx ; then
-        available="$available zmtxzmrx202"
+    if test -x ~/bin/zmtx-zmrx-2.06/zmtx -a -x ~/bin/zmtx-zmrx-2.06/zmrx ; then
+        available="$available zmtxzmrx2"
     fi
-    if test -x ~/bin/sexyz ; then
+    if test -x ~/bin/sexyz-3.6 ; then
         available="$available sexyz"
     fi
     echo "$available"
@@ -1116,7 +1119,7 @@ config() {
         echo $_cmd $_opt
         return;
         ;;
-    zmtxzmrx202)
+    zmtxzmrx2)
         shift
         _cmd=
         for _i in $* ; do
@@ -1124,8 +1127,8 @@ config() {
             r_can_2k) ;;
             r_can_4k) ;;
             r_can_8k) ;;
-            sz) _cmd=~/bin/zmtx-zmrx-2.02/zmtx ;;
-            rz) _cmd=~/bin/zmtx-zmrx-2.02/zmrx" -q" ;;
+            sz) _cmd=~/bin/zmtx-zmrx-2.06/zmtx ;;
+            rz) _cmd=~/bin/zmtx-zmrx-2.06/zmrx" -q" ;;
             *) echo "" ; return ;;
             esac
         done
@@ -1134,8 +1137,8 @@ config() {
         ;;
     sexyz)
         shift
-        _cmd=~/bin/sexyz
-        _post=~/bin/sexyz
+        _cmd=~/bin/sexyz-3.6
+        _post=~/bin/sexyz-3.6
         for _i in $* ; do
             case "$_i" in
             r_can_2k) ;;
@@ -1297,7 +1300,7 @@ zbenchmark() {
                 for receiver in $available ; do
                     # blacklist of known problem combos
                     case "$sender-$receiver" in
-                    zmtxzmrx202-crzsz|zmtxzmrx202-rzsz373)
+                    zmtxzmrx2-crzsz|zmtxzmrx2-rzsz373)
                         # CRC, ERROR, TIMEOUTs
                         continue;
                         ;;
@@ -1816,22 +1819,12 @@ SEOF
         any_failure="$any_failure $key"
     fi
 
-    #
     # --keep-incomplete: an aborted transfer must DELETE the partial file by
-    # default and KEEP it with --keep-incomplete. The abort is deterministic:
-    # the receiver hits its -s +1 stop deadline while the linesimulator's
-    # 1m-baud limit keeps the ~1MiB transfer busy for ~8s, so lrz aborts
-    # mid-file (rzfile: reached stop time -> ERROR -> session fubar).
-    # Which side tears the session down first is a race. On Linux the
-    # receiver always hits its deadline first (receiver 128, sender then dies
-    # of SIGPIPE=141 on the closed pipe). On OpenBSD in rare cases the sender
-    # won the race, and the receiver's final write hit the closed pipe first
-    # first (receiver SIGPIPE=141 via its bibi handler, sender 141). On Alpine
-    # (musl, gcc/c17) the sender once lost the session through its READ path
-    # instead: draining the receiver's cancel sequence / dead line gives
-    # "Receiver Cancelled" or "Line dropped" -> wcsend() == ERROR ->
-    # END_WITH_CANCEL -> clean exit 0x80=128. Both orders are by-design
-    # outcomes of the deliberate abort, and not failures.
+    # default and KEEP it with --keep-incomplete. The '-s +1' aborts after 
+    # 1-2 seconds, and since the file is large and the (simulated) line is 
+    # slow, the transfer is incomplete.
+    # We ignore exit 128 (deadline reached) and 141 (sigpipe), because the
+    # test is racy.
     # The real verdicts are the cmp functions (delete vs keep).
     key="zmodem-lsz-lrz-MGMT-keep-incomplete"
     mkdir "$testdir/$key"
@@ -1842,7 +1835,6 @@ SEOF
         "$SZ -q -Z" "$RZ -q -Z --keep-incomplete -s +1" incomplete_keep_cmp $binary_1m 128,141 128,141
     FAULT=
 
-    #
     # SIGINT during a ZMODEM send: the sender gets ^C mid-stream (a
     # backgrounded waiter signals it as soon as the data phase is truly
     # underway) while a throttled line keeps the transfer busy. lsz must
@@ -1851,18 +1843,21 @@ SEOF
     # nondeterministic, so this key must not be part of any
     # journal-counter baseline.
     #
+    # Careful when changing: This is a jungle of incompatibilities.
+    #
     # The waiter signals the sender via a pid file, not $PPID: shells do
     # not re-evaluate $PPID inside a subshell (dash on Linux, OpenBSD ksh,
     # bash), so there it still holds the *script's* parent — here the
-    # timeout(1) wrapper. Signaling that wrapper had wildly different
-    # results: GNU timeout happens to forward a caught SIGINT to the child
-    # (which made Linux pass by accident), while OpenBSD's timeout does
-    # setpgid(0,0) + killpg with SIGTERM, killing the transfer via the
-    # bibi handler. The sender runs under "timeout --foreground" so a
-    # stray signal is forwarded to the child instead of a process group
-    # kill; the long option is spelled out because GNU coreutils uses -f
-    # for --kill-after.
-    #
+    # timeout(1) wrapper.
+    # Signaling that wrapper had inconsistent results:
+    # - GNU timeout happens to forward a caught SIGINT to the child
+    #   (which made Linux pass by accident),
+    # - OpenBSD's timeout does setpgid(0,0) + killpg with SIGTERM, 
+    #   killing the transfer via the bibi handler.
+    # The sender runs under "timeout --foreground" so a stray signal is 
+    # forwarded to the child instead of a process group kill. The long 
+    # option is used because GNU coreutils uses -f for --kill-after.
+    # yes, OpenBSD implements the long option.
     key="zmodem-lsz-lrz-sigint"
     mkdir "$testdir/$key"
     cat > $testdir/run-sigint-sender.sh <<SEOF
