@@ -41,42 +41,18 @@ If you want to do compatibility checks, note this:
     if test -x ~/bin/rzsz373/rz -a -x ~/bin/rzsz373/sz ; then
         available="$available rzsz373"
     fi
-    if test -x ~/bin/zmtx-zmrx-2.02/zmtx -a -x ~/bin/zmtx-zmrx-2.02/zmrx ; then
-        available="$available zmtxzmrx202"
+    if test -x ~/bin/zmtx-zmrx-2.06/zmtx -a -x ~/bin/zmtx-zmrx-2.06/zmrx ; then
+        available="$available zmtxzmrx2"
     fi
-    if test -x ~/bin/sexyz ; then
+    if test -x ~/bin/sexyz-3.6 ; then
         available="$available sexyz"
     fi
 
-zmtx-zmrx-2.02 is easy to compile.
+zmtx-zmrx-2.06 is easy to compile.
 sexyz is easy to compile.
 The other are mostly historic, anyway.
 
 oh, yes… "make vcheck-zbenchmark" runs a benchmark.
-
-"make vcheck-packetloss" (also part of the full vcheck/all run)
-        checks the packetized-line failure class behind the historical
-        README.isdn4linux: linesimulator packetizes (-b 1024) and
-        silently drops whole packets (-P 1024), in the data and/or ack
-        direction. The transfers must complete or abort in bounded
-        time — never hang. -P drops exactly N bytes per event
-        (overrides -x), so "silently dropping packets of some hundred
-        bytes" is directly available.
-        The per-test timeout budget is raised to 100s (doit()'s default
-        is 35s): on a lossy line a resync storm — a duplicate ZRPOS
-        answered, the resulting stale ZDATA discarded, or a subpacket
-        terminator eaten by a drop — costs ~10s per event, because both
-        sides legitimately wait for each other until the receiver's
-        retry breaks the tie. Durations quantize to 10s steps; 0-3
-        storms per transfer are normal.
-
-"make vcheck-rcdo" (also part of the full vcheck/all run)
-        RCDO regression tests on the receiver side: the sender is
-        SIGKILLed right at startup (ZMODEM and YMODEM) and mid-transfer.
-        lrz must abort in bounded time — never burn its retry budgets
-        against a dead line, and never fall back to another protocol or
-        re-handshake (a reconnected line may carry an unauthenticated
-        peer).
 
 "make buildcheck-remote"
         unpacks the distribution tarball on one or more remote machines
@@ -89,32 +65,30 @@ oh, yes… "make vcheck-zbenchmark" runs a benchmark.
              make buildcheck-remote REMOTE_HOSTS=uwe@openbsd
 
 "make fuzz"
-        runs the ZMODEM protocol fuzzing (src/zmodemfuzz.c).
-        default: 25 iterations per mode (override with FUZZITER=NNN, 
-           for example FUZZITER=200 make fuzz):
-        - "-m receive": a faked sender talks to ./src/lrz with mutated
-          byte streams (CRC corruption, illegal ZDLE escapes, frame type
-          roulette, garbage floods, CAN bursts, truncated streams,
-          hostile file names).
-        - "-m send": a faked receiver answers ./src/lsz with hostile
-          frame sequences (silence, ZNAK loops, ZSKIP, ZABORT, ZFERR,
-          ZCHALLENGE, absurd ZRPOS positions, cancel bursts).
-        The fuzzer checks that the target terminates in a bounded time,
-        dies by no signal, writes nothing outside the receiving
-        directory, and (clean baseline exchanges, every 17th iteration)
-        that the received content matches what was sent. Every failure
-        leaves /tmp/zmodemfuzz-fail-seedNNN-itNNN.log with the complete
-        byte transcript; reproduce any run exactly with the printed seed:
-             src/zmodemfuzz -s SEED -m receive -- ./src/lrz -q -Z
-        The end-of-run class summary columns are
-             count, avg ms, max ms, hangs, timeouts, fails [, crc32]
-        where "timeouts" counts iterations that burned the harness
-        alarm budget (hang, or the target was still stuck in a bounded
-        retry loop when the alarm fired) - expected after mid-stream
-        mutations and the hostile ACK-loop choice, NOT a target bug;
-        and "fails" counts real invariant violations (crash, signal
-        death, canary escape, content mismatch). A run is healthy when
-        the trailing "done, N iterations, F failures" line reports
-        F=0. The per-row "fails" is redundant with F: fail() prints a
-        FAIL line for every counted failure, so a row with fails>0
-        without FAIL lines cannot happen.
+    runs the ZMODEM protocol fuzzing (src/zmodemfuzz.c).
+    default: 25 iterations per mode (override with FUZZITER=NNN, for
+    example: FUZZITER=200 make fuzz):
+    - "-m receive": a faked sender talks to ./src/lrz with mutated byte
+      streams (CRC corruption, illegal ZDLE escapes, frame type roulette,
+      garbage floods, CAN bursts, truncated streams, hostile file names).
+    - "-m send": a faked receiver answers ./src/lsz with hostile frame 
+      sequences (silence, ZNAK loops, ZSKIP, ZABORT, ZFERR, ZCHALLENGE,
+      absurd ZRPOS positions, cancel bursts).
+    The fuzzer checks that the target terminates in a bounded time,
+    dies by no signal, writes nothing outside the receiving directory,
+    and (clean baseline exchanges, every 17th iteration) that the
+    received content matches what was sent. Every failure leaves
+    /tmp/zmodemfuzz-fail-seedNNN-itNNN.log with the complete byte
+    transcript; reproduce any run exactly with the printed seed:
+         src/zmodemfuzz -s SEED -m receive -- ./src/lrz -q -Z
+    The end-of-run class summary columns are
+         count, avg ms, max ms, hangs, timeouts, fails [, crc32]
+    where "timeouts" counts iterations that burned the harness alarm
+    budget (hang, or the target was still stuck in a bounded retry loop
+    when the alarm fired) - expected after mid-stream mutations and the
+    hostile ACK-loop choice, NOT a target bug; and "fails" counts real
+    invariant violations (crash, signal death, canary escape, content
+    mismatch). A run is healthy when the trailing "done, N iterations, F
+    failures" line reports F=0. The per-row "fails" is redundant with F:
+    fail() prints a FAIL line for every counted failure, so a row with
+    fails>0 without FAIL lines cannot happen.

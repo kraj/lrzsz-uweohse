@@ -143,12 +143,12 @@ Other changes:
   was removed (it collided with the now extended pathname checking).
 
 * the new option `--sync-transfer` forces a ZCRCW for every transmitted
-  subpacket (cost: one round trip each for each subpacket). It allows to
-  detect and recover if the transport layer silenty drops a packet,
-  which is undetectable in the (default) streaming mode.
+  subpacket (cost: one round trip for each subpacket). It makes it
+  possible to detect and recover if the transport layer silently drops
+  a packet, which is undetectable in the (default) streaming mode.
   This works around a protocol limitation (neither does a subpacket
   have a position information nor is the position included in the CRC,
-  so a silenty loss is possible.
+  so a silent loss is possible).
   This option is only needed on transports that can silently drop a
   packet, for example a packet radio or other datagram link that loses
   packets without retransmitting them, or a line that overruns its buffer
@@ -315,7 +315,9 @@ Other changes:
 
 * the --stop-at option only worked if verbose mode was active.
   The '-s +N' case did stop after less between N-1 and N seconds (due 
-  to integer calculation), it now stops between N and N+1.
+  to integer calculation). It now stops between N+1 and N+2 seconds
+  (the check compares integer seconds, so the deadline can fire slightly
+  late rather than early).
 
 * interoperability with senders that do not pace their retransmissions
   (zmtx 1.02 and friends): lrz now answers a duplicate ZEOF between
@@ -324,8 +326,8 @@ Other changes:
   never specified which answer a ZCRCW subpacket gets. zmrx 1.02 answers
   with a ZRPOS, which forced lsz into a slow recovery loop).
 
-* full compatibility tests were done against Synchronet sexyz v3.5,
-  lrzsz-0.12.21rc, crzsz-1.13, rzsz-3.73 and zmtx-zmrx-2.02.
+* full compatibility tests were done against Synchronet sexyz v3.6,
+  lrzsz-0.12.21rc, crzsz-1.13, rzsz-3.73 and zmtx-zmrx-2.06.
 
 * manual compatibility tests were done against DSZ in a dosbox. What was
   tested worked correctly. It is possible, though not likely, that a
