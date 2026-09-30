@@ -6,9 +6,9 @@
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: lrzsz 0.13.0-beta4\n"
+"Project-Id-Version: lrzsz 0.13.0-beta5\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-29 13:21+0200\n"
+"POT-Creation-Date: 2026-09-29 22:49+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -317,17 +317,17 @@ msgstr ""
 msgid "fstat failed: %s"
 msgstr ""
 
-#: src/lsz.c:1919
+#: src/lsz.c:1929
 #, c-format
 msgid "Bytes Sent:%7ld/%7ld   BPS:%-8ld ETA %02d:%02d  "
 msgstr ""
 
-#: src/lsz.c:2002
+#: src/lsz.c:2014
 #, c-format
 msgid "receiver not advancing after %d ACKs"
 msgstr ""
 
-#: src/lsz.c:2480
+#: src/lsz.c:2500
 msgid "got a ZRQINIT packet: the other side is trying to send, too\n"
 msgstr ""
 
@@ -546,11 +546,11 @@ msgstr ""
 msgid "Skipped"
 msgstr ""
 
-#: src/lrz.c:1996
+#: src/lrz.c:2000
 #, c-format
 msgid "\rBytes received: %7ld/%7ld   BPS:%-6lu ETA %02d:%02d  "
 msgstr ""
 
-#: src/lrz.c:2150
+#: src/lrz.c:2156
 msgid "file close error"
 msgstr ""
