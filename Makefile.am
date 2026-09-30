@@ -1,7 +1,7 @@
 SUBDIRS = src po man
 EXTRA_DIST = m4/ChangeLog check.lrzsz COMPATABILITY README.cvs README.isdn4linux \
 	README.tests remote-build-check.sh \
-	doc/README doc/zmodem-forsberg.txt doc/zmodem-zmtx-zmrx.txt doc/zmodem-current.txt doc/zmodemsnif.txt
+	doc/README doc/zmodem-forsberg.txt doc/zmodem-zmtx-zmrx.txt doc/zmodem-wip.txt doc/zmodemsnif.txt
 
 PR=@DIST_TARBALL@
 DISTCLEANFILES=fastcheck.done
