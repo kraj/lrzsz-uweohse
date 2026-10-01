@@ -1795,7 +1795,6 @@ zsendfdata (struct zm_fileinfo *zi)
 	int c;
 	int junkcount;				/* Counts garbage chars received by TX */
 	size_t last_txpos = 0;
-	long last_bps = 0;
 	long not_printed = 0;
 	double low_bps = 0;
         int newcnt;
@@ -1810,7 +1809,6 @@ zsendfdata (struct zm_fileinfo *zi)
 	Lrxpos = 0;
 	junkcount = 0;
 	Beenhereb4 = 0;
-	last_bps = 0;
 	last_txpos = 0;
 	low_bps = 0;
 	not_printed = 0;
@@ -1899,6 +1897,7 @@ restart_data:
 						    stop_time, zi->fname))
 			return ERROR;
 		if (Verbose > 1 || min_bps) {
+	                long last_bps = 0;
 			int minleft = 0;
 			int secleft = 0;
 			double d;
