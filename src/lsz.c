@@ -131,7 +131,7 @@ static int Exitcode;
 static size_t Lastsync;		/* Last offset to which we got a ZRPOS */
 static int Beenhereb4;		/* How many times we've been ZRPOS'd same place */
 /* set when an abort arm has answered a receiver's ZABORT/ZFERR with the
- * spec-required ZFIN sequence (zmodem-current.txt §4): the session is then
+ * spec-required ZFIN sequence (zmodem-wip.txt §4): the session is then
  * already ended cleanly, and main() must not append a cancel sequence */
 static bool replied_abort=false;
 
@@ -911,7 +911,7 @@ wctxpn(struct zm_fileinfo *zi)
 	 * int. But i believe sending %lo instead of %o _could_ break compatability
 	 */
 	if (!Ascii && (input_f!=stdin) && *zi->fname && fstat(fileno(input_f), &f)!= -1) {
-		/* cap the ZFILE data subpacket at 1024 bytes (zmodem-current.txt
+		/* cap the ZFILE data subpacket at 1024 bytes (zmodem-wip.txt
 		 * §4). snprintf truncates cleanly; a truncated metadata suffix
 		 * only loses trailing batch-estimate fields. */
 		size_t metasize = (size_t)(txbuf + 1024 - 1 - p);
@@ -1480,7 +1480,7 @@ sendzsinit(void)
 		/* send ZSINIT as a BINARY header, because it carries a data subpacket
 		 * (the attention string), and data subpackets after a hex header would 
                  * use a 16-bit CRC, which the current ZMODEM * documentation forbids 
-                 * (zmodem-current.txt §2.2). zsbhdr sets Crc32t per negotiation, so 
+                 * (zmodem-wip.txt §2.2). zsbhdr sets Crc32t per negotiation, so 
                  * the subpacket goes out with the negotiated CRC (normally CRC-32).
 		 */
  		if (Zctlesc)
@@ -1537,7 +1537,7 @@ again:
 		default:
 			/* e.g. ZNAK from a receiver that cannot cope with the
 			 * ZFILE subpacket. Resending identically a few times is
-			 * fine, but don't loop forever (zmodem-current.txt §4:
+			 * fine, but don't loop forever (zmodem-wip.txt §4:
 			 * the sender must be able to fall back - our subpacket
 			 * never exceeds 1024 bytes, so a receiver that keeps
 			 * ZNAKing won't be satisfied by resending). */
@@ -1584,7 +1584,7 @@ again:
 		case ZFERR:
 			/* the receiver aborted during the file-header phase;
 			 * ZFERR is spec'd as equivalent to ZABORT
-			 * (zmodem-current.txt §4). Don't resend the ZFILE
+			 * (zmodem-wip.txt §4). Don't resend the ZFILE
 			 * against a receiver that just gave up - reply with
 			 * the ZFIN sequence the spec requires (§4). */
 			if (gotblock == ZABORT)
@@ -1714,7 +1714,7 @@ ack_resync (struct zm_fileinfo *zi, int c, bool sync_first,
 			break;
 		case ZRPOS:
 			/* a ZRPOS restart must resume with the first data
-			 * subpacket being ZCRCW (zmodem-current.txt section 5).
+			 * subpacket being ZCRCW (zmodem-wip.txt section 5).
 			 * need_wait was previously armed only on the CAN/ZPAD
 			 * drain path below; a verdict-here ZRPOS (the normal
 			 * error-recovery path) would otherwise resume with
@@ -1793,7 +1793,7 @@ zsendfdata (struct zm_fileinfo *zi)
 	int rc;
 	time_t now = 0;		/* wall clock: -s stop deadline */
 	/* the first data subpacket after a ZRPOS must be ZCRCW
-	 * (zmodem-current.txt §5, sender-side error recovery). Without this
+	 * (zmodem-wip.txt §5, sender-side error recovery). Without this
 	 * reset only the FIRST file of a batch started with ZCRCW (need_wait
 	 * was static and consumed by file 1); later files started with ZCRCG. */
         int need_wait = 1;
@@ -2271,7 +2271,7 @@ getinsync(struct zm_fileinfo *zi, int flag)
 		case ZABORT:
 		case ZFERR:
 			/* the receiver reported a fatal file error (ZFERR is
-			 * spec'd as equivalent to ZABORT, zmodem-current.txt
+			 * spec'd as equivalent to ZABORT, zmodem-wip.txt
 			 * §4) and wants the transfer ended - reply with the
 			 * ZFIN sequence the spec requires (§4), not with
 			 * retries or a cancel sequence. ZABORT: user cancel;
@@ -2293,7 +2293,7 @@ getinsync(struct zm_fileinfo *zi, int flag)
 			 *   dump the modem's buffer.		 */
 			/* purge pending output: bytes already written but not
 			 * yet transmitted would only be stale data the receiver
-			 * must discard (zmodem-current.txt §5, sender-side
+			 * must discard (zmodem-wip.txt §5, sender-side
 			 * error recovery). No-op on pipes/ptys. */
 			tcflush(io_mode_fd, TCOFLUSH);
 			if (input_f)
@@ -2410,7 +2410,7 @@ getinsync(struct zm_fileinfo *zi, int flag)
 /* Say "bibi" to the receiver, try to do it cleanly. Two roles: the normal
  * end-of-batch close (zmodem_requested path), and the reply to a receiver
  * that aborted with ZABORT/ZFERR - the spec requires the sender to respond
- * with a ZFIN sequence there (zmodem-current.txt §4, "The sender responds
+ * with a ZFIN sequence there (zmodem-wip.txt §4, "The sender responds
  * with a ZFIN sequence"), the historical OMEN cancel reply deviated from
  * that. A receiver that has died answers with RCDO/nothing: bounded, so we
  * don't loop forever on a dead line. */
@@ -2467,7 +2467,7 @@ listen:
 		case ZABORT:
 		case ZFERR:
 			/* ZFERR is specified as equivalent to ZABORT
-			 * (zmodem-current.txt §4): the receiver reported a
+			 * (zmodem-wip.txt §4): the receiver reported a
 			 * fatal file error. Do not retry the command against
 			 * a dead filesystem. Reply with the ZFIN sequence the
 			 * spec requires for ZABORT (§4). */

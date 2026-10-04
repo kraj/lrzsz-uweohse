@@ -32,7 +32,7 @@ static double
 timing_now(void)
 {
   /* CLOCK_MONOTONIC: durations (bps, ETA, min_bps watchdog) must not be
-   * affected by NTP steps or date changes (zmodem-current.txt uses wall
+   * affected by NTP steps or date changes (zmodem-wip.txt uses wall
    * time only for the user-specified -s stop deadline, which timing.c
    * callers obtain via time(2) separately). */
   struct timespec ts;

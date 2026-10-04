@@ -1240,7 +1240,7 @@ procheader(char *name, struct zm_fileinfo *zi)
             zi->bytes_total = (size_t) bytes_total;
             zi->mode = (mode_t) mode;
             /* NOTE: acting on the historical full-st_mode marker below is
-             * a SHOULD NOT per doc/zmodem-current.txt §4 ("file access
+             * a SHOULD NOT per doc/zmodem-wip.txt §4 ("file access
              * rights"), kept for compatibility with old peers. See also
              * the mode checks in closeit()/S1. */
             if (zi->mode & S_IFMT)
@@ -1354,7 +1354,7 @@ procheader(char *name, struct zm_fileinfo *zi)
 
     /* NOTE: the S_IFMT check is the same legacy marker as above (V4):
      * a full st_mode from an old sender means "Unix peer, keep case".
-     * Deprecated per doc/zmodem-current.txt §4, kept for old peers. */
+     * Deprecated per doc/zmodem-wip.txt §4, kept for old peers. */
     if (!zmodem_requested && MakeLCPathname && !IsAnyLower(name_static)
             && !(zi->mode&S_IFMT))
         uncaps(name_static);
@@ -1625,7 +1625,7 @@ tryz(void)
                 }
 		/* advertise CANBRK only if the transfer line is a terminal:
 		 * a break is a termios concept, unavailable on pipes/sockets
-		 * (doc/zmodem-current.txt §10.6: "if you have tcsendbreak and
+		 * (doc/zmodem-wip.txt §10.6: "if you have tcsendbreak and
 		 * send via a terminal, set this") */
 		if (isatty(0))
 			Txhdr[ZF0] = CANFC32|CANFDX|CANOVIO|CANBRK;
@@ -1710,7 +1710,7 @@ again:
  			 * initialized once at startup). */
  			zsendline_init();
   			if (zrdata(Attn, ZATTNLEN,&bytes_in_block) == GOTCRCW) {
- 				stohdr(0L); /* ZACK to a ZSINIT must carry 0 (see zmodem-current.txt §4) */
+ 				stohdr(0L); /* ZACK to a ZSINIT must carry 0 (see zmodem-wip.txt §4) */
  				zshhdr(ZACK, Txhdr);
  				goto again;
  			}
