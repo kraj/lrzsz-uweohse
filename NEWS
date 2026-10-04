@@ -1,3 +1,17 @@
+Version 0.13.1 - October 2026, Uwe Ohse
+
+This release only removes the ZMODEM 8th-bit escaping capability,
+which was recently implemented, and not part of any announced release,
+after Stephen Hurd alerted me to the fact that the implementation was
+incompatible with the (proprietary and undocumented) Omen implementation.
+The incompatibility would have made the session mutually undecodable in
+both directions. The option's practical benefit (escaping bytes >= 0x80,
+which keeps bit 7 set and thus cannot cross 7-bit links) is negligible:
+the historically problematic bytes (XON/XOFF lookalikes) are escaped
+by default, and transports that act on the remaining high bytes are
+practically extinct.
+Thank you, Stephen.
+
 Version 0.13.0 - September 2026, Uwe Ohse
 
 This release fixes a large number of security issues. Two of the changes
@@ -9,8 +23,7 @@ Security fixes:
 * if PUBDIR support was NOT compiled in, the restricted mode path check of
   lrz did allow uploads to any directory the user has write access to.
 
-  This was a security bug found by TristanInSec with an email domain gmail
-  under the com tld.
+  This was a security bug found by Tristan Madani (Talence Security).
 
   Likewise lsz did not correctly check paths in the restricted mode if
   PUBDIR support was not compiled in.
@@ -18,8 +31,7 @@ Security fixes:
 * a buffer overflow was fixed in lrz, in which the attacker could quite
   easily cause an overflow in a malloc()ed buffer.
 
-  This was a security bug found by TristanInSec with an email domain
-  gmail under the com tld.
+  This was a security bug found by Tristan Madani (Talence Security).
 
   Note: this stems from the original public domain rzsz suite (80s).
 
@@ -30,8 +42,7 @@ Security fixes:
   This feature/insecurity was only accessible if the installer appended
   some string to the lrz (or rz) commands name.
 
-  This was a security bug found by TristanInSec with an email
-  domain gmail under the com tld.
+  This was a security bug found by Tristan Madani (Talence Security).
 
   Note: this stems from the original public domain rzsz suite (80s).
 
