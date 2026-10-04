@@ -208,25 +208,6 @@ seconds before doing anything.
 Force sender to escape all control characters;
 normally XON, XOFF, DLE, CR-@-CR, and Ctrl-X are escaped.
 .TP
-.B "-7, --escape-8bit"
-(ZMODEM) Force sender to escape all bytes with the 8th bit set
-(>= 0x80) as well, by advertising the ESC8 capability in the ZRINIT
-frame. Escaped high bytes arrive as
-.B DLE
-plus the byte XORed with 0x40; incoming streams using this
-convention are decoded regardless of this option.
-Note that the escaped form still has the 8th bit set: this makes
-corruption of the 8th bit fail fast (mangled escaped bytes are
-rejected by the decoder) instead of silently corrupting data, but
-does not make 8-bit data survive a line that strips or rewrites
-the 8th bit.
-This implements the classic interpretation of ESC8; the
-undocumented Omen Technology variable-header format (0x31 frames,
-salted with a copyright notice inside the checksum) is not
-implemented, by decision — the extension was never documented by
-its author, and the salted checksum reads as a request not to
-copy it.
-.TP
 .B "-E, --rename"
 Rename incoming file if target filename already exists. The new file
 name will have a dot and a number (0..999) appended.

@@ -124,7 +124,6 @@ extern int Verbose;
 extern int errors;
 extern bool no_timeout;
  extern bool Zctlesc;    /* Encode control characters */
- extern bool Esc8;      /* Encode 8th bit (bytes >= 0x80) */
  extern bool under_rsh;
 extern bool turbo_escape;
 extern bool zmodem_requested;

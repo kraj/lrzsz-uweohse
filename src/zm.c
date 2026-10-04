@@ -40,7 +40,6 @@ char Attn[ZATTNLEN+1];	/* Attention string rx sends to tx on err */
 
 static char lastsent;	/* Last char we sent */
 bool turbo_escape;
-bool Esc8;		/* Escape all bytes >= 0x80 (ESC8/TESC8) */
 
 static const char *frametypes[] = {
 	"Carrier Lost",		/* -3 */
@@ -230,31 +229,22 @@ zdlread2(int c)
 		case (XON|0x80):
 		case XOFF:
 		case (XOFF|0x80):
-			/* flow control: skipped. With ESC8/TESC8 negotiated the
-			 * high-bit forms (0x91/0x93) are the ZDLE-escaped data
-			 * bytes 0xd1/0xd3, not flow control - un-escape them
-			 * instead. */
-			if (!(Esc8 && (c == (XON|0x80) || c == (XOFF|0x80))))
-				continue;
-			/* fall through to the unescape rule */
-			;
-			/* FALLTHRU */
+			/* flow control: skipped, also in the escaped
+			 * context - the classic rule (see below) can
+			 * only be reached for encodings of controls. */
+			continue;
 		default:
 			if (Zctlesc && !(c & 0x60))
 				continue;	/* skip and stay escaped */
 			break;
 		}
 		/* ZDLE-escaped data: the classic rule accepts the escape
-		 * encoding of 0x40-0x5f/0xc0-0xdf ((c & 0x60) == 0x40) -
-		 * the escaped forms of the controls 0x00-0x1f/0x80-0x9f.
-		 * With ESC8/TESC8 negotiated, bytes >= 0x80 are escaped
-		 * too; their escape encodings are exactly the bytes whose
-		 * un-escape (c ^ 0x40) has the high bit set ((c^0x40)&0x80,
-		 * i.e. c in 0x80-0x9f/0xa0-0xbf/0xc0-0xdf/0xe0-0xff). In a
-		 * stream without ESC8 a ZDLE followed by such a byte cannot
-		 * occur legitimately, so accepting it here is harmless for
-		 * non-Esc8 peers. */
-		if ((c & 0x60) == 0x40 || ((c ^ 0x40) & 0x80))
+		 * encodings of 0x40-0x5f/0xc0-0xdf ((c & 0x60) == 0x40) -
+		 * the escapes of the always-escaped controls 0x00-0x1f
+		 * and 0x80-0x9f. Any other byte after ZDLE is a format
+		 * error (the ESC8 dialect, whose escape encodings
+		 * include 0xa0-0xbf/0xe0-0xff, is deprecated). */
+		if ((c & 0x60) == 0x40)
 			return (c ^ 0x40);
 		zperr(_("Bad escape sequence 0x%x"), (unsigned int) c);
 		return ERROR;
@@ -453,9 +443,9 @@ frameend_to_string(unsigned int type)
         case ZCRCQ: return "ZCRCQ";
         case ZCRCW: return "ZCRCW";
         default: return "unknown";
-        }
+	}
 }
-void 
+void
 zsdata(const char *buf, size_t length, int frameend)
 {
 	unsigned short crc;
@@ -1044,7 +1034,7 @@ zsendline_init(void)
 				else 
 					zsendline_tab[i]=0;
 				break;
- 			default:
+			default:
  				if (Zctlesc)
  					zsendline_tab[i]=1;
  				else
@@ -1052,12 +1042,6 @@ zsendline_init(void)
  			}
  		}
  	}
-	/* ESC8/TESC8: escape all bytes >= 0x80 (zmodem-current.txt §2.1).
-	 * Overrides everything else. */
-	if (Esc8) {
-		for (i=0x80; i<256; i++)
-			zsendline_tab[i]=1;
-	}
 }
 
 

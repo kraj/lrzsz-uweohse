@@ -934,7 +934,6 @@ zcompat() {
         doit "zmodem-lsz-$otherrz-turbo" "lsz sending with turbo escaping to $otherrz" "$SZ -qT" "$TEST_RZ" cmp "$all_binaries" 
         test -n "$r_can_8k" && doit "zmodem-lsz-$otherrz-8k-turbo" "lsz tries to send 4k block with turbo escaping to $otherrz" "$SZ -qT -8" "$TEST_RZ" cmp "$all_binaries" 
         test -n "$can_escctl" && doit "zmodem-lsz-$otherrz-escapectl-s" "lsz sending with escaped control chars to $otherrz (sender initiated)" "$SZ -q -e" "$TEST_RZ" cmp "$all_binaries" 
-        test -n "$can_esc8" && doit "zmodem-lsz-$otherrz-escape8-s" "lsz sending with escaped eigth bit to $otherrz (sender initiated)" "$SZ -q -7" "$TEST_RZ" cmp "$all_binaries" 
         test -n "$r_can_16bit_crc" && doit "zmodem-lsz-$otherrz-crc16" "lsz sending with CRC16 to $otherrz" "$SZ -q -o" "$TEST_RZ" cmp "$all_binaries" 
         if test -n "$s_resume_opt" ; then
             key="zmodem-lsz-$otherrz-RESUME-s"

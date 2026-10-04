@@ -234,7 +234,6 @@ static struct option const long_options[] =
   {"dot-to-slash", no_argument, NULL, 'd'},
   {"full-path", no_argument, NULL, 'f'},
   {"escape", no_argument, NULL, 'e'},
-  {"escape-8bit", no_argument, NULL, '7'},
   {"rename", no_argument, NULL, 'E'},
   {"help", no_argument, NULL, 'h'},
   {"crc-check", no_argument, NULL, 'H'},
@@ -393,7 +392,6 @@ main(int argc, char **argv)
 			break;
 		case 'f': Fullname=true; break;
  		case 'e': Zctlesc = 1; break;
- 		case '7': Esc8 = 1; break;
  		case 'E': Lzmanag = ZF1_ZMCHNG; break;
 		case 'h': usage(0,NULL); break;
 		case 'H': Lzmanag = ZF1_ZMCRC; break;
@@ -1377,12 +1375,8 @@ getzrxinit(void)
  			{
  				int old=Zctlesc;
  				Zctlesc |= Rxflags & TESCCTL;
- 				/* the peer asks for 8th-bit escaping (TESC8):
- 				 * honor it unconditionally, like ESCCTL
- 				 * (zmodem-current.txt §2.1) */
- 				Esc8 |= Rxflags & TESC8;
  				/* update table - was initialised to not escape */
- 				if ((Zctlesc && !old) || (Rxflags & TESC8))
+ 				if (Zctlesc && !old)
  					zsendline_init();
  			}
 			Rxbuflen = (0xff & Rxhdr[ZP0])+((0xff & Rxhdr[ZP1])<<8);
@@ -1478,7 +1472,7 @@ sendzsinit(void)
 {
 	int c;
 
-	if (Myattn[0] == '\0' && (!Zctlesc || (Rxflags & TESCCTL)) && !Esc8)
+	if (Myattn[0] == '\0' && (!Zctlesc || (Rxflags & TESCCTL)))
 		return OK;
 	errors = 0;
 	for (;;) {
@@ -1491,8 +1485,6 @@ sendzsinit(void)
 		 */
  		if (Zctlesc)
  			Txhdr[ZF0] |= TESCCTL;
- 		if (Esc8)
- 			Txhdr[ZF0] |= TESC8;
  		zsbhdr(ZSINIT, Txhdr);
 		ZSDATA(Myattn, 1+strlen(Myattn), ZCRCW);
 		c = zgethdr(Rxhdr, 1,NULL);

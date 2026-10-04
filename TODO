@@ -114,7 +114,7 @@
   (~50 sites, mechanical thanks to A10's helper barrier; A2's inline
   send primitives need a zi parameter + fresh gcc -S hot-path
   proof), (3) zm.c engine state (Rxhdr/Txhdr/Txfcs32/Crc32t/Znulls/
-  Attn/Rxtimeout/Zrwindow/protocol/errors/Zctlesc/Esc8) into zi
+  Attn/Rxtimeout/Zrwindow/protocol/errors/Zctlesc) into zi
   (~18 signature changes, ~250-350 sites, re-touches the I4/I5
   machines - highest regression risk). Scope (4) (full context
   struct incl. Verbose/Baudrate) was explicitly recommended against.

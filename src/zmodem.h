@@ -87,7 +87,7 @@
 #define CANLZW	0x10	/* Receiver can uncompress */
 #define CANFC32	0x20	/* Receiver can use 32 bit Frame Check */
 #define ESCCTL  0x40	/* Receiver expects ctl chars to be escaped */
-#define ESC8    0x80	/* Receiver expects 8th bit to be escaped */
+#define ESC8    0x80	/* Receiver expects 8th bit to be escaped [DEPRECATED] */
 /* Bit Masks for ZRINIT flags byze ZF1 */
 #define ZF1_CANVHDR  0x01  /* Variable headers OK, unused in lrzsz */
 
@@ -95,7 +95,7 @@
 #define ZATTNLEN 32	/* Max length of attention string */
 /* Bit Masks for ZSINIT flags byte ZF0 */
 #define TESCCTL 0x40	/* Transmitter expects ctl chars to be escaped */
-#define TESC8   0x80	/* Transmitter expects 8th bit to be escaped */
+#define TESC8   0x80	/* Transmitter expects 8th bit to be escaped [DEPRECATED] */
 
 /* Parameters for ZFILE frame */
 /* Conversion options one of these in ZF0 */

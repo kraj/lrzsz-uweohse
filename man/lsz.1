@@ -266,26 +266,6 @@ to leave permission selection entirely to the receiver's defaults
 Escape all control characters;
 normally XON, XOFF, DLE, CR-@-CR, and Ctrl-X are escaped.
 .TP
-.B "-7, --escape-8bit"
-(ZMODEM) Escape all bytes with the 8th bit set
-(>= 0x80) in addition to the control characters, and advertise
-the ESC8 capability to the receiver. Use this with peers that
-request it via TESC8/ESC8 (a peer's request is automatically
-honored without this option; the option only forces it), or when
-you want corruption of the 8th bit to fail fast (the decoder
-rejects mangled escaped bytes immediately) instead of silently
-corrupting the transferred data. Byte values >= 0x80 are then sent as
-.B DLE
-plus the byte XORed with 0x40; note that the escaped form still
-has the 8th bit set, so this does not make 8-bit data survive a
-line that strips or rewrites the 8th bit.
-This implements the classic interpretation of ESC8; the
-undocumented Omen Technology variable-header format (0x31 frames,
-salted with a copyright notice inside the checksum) is not
-implemented, by decision — the extension was never documented by
-its author, and the salted checksum reads as a request not to
-copy it.
-.TP
 .B "-E, --rename"
 Force the sender to rename the new file if a file with the same
 name already exists.
